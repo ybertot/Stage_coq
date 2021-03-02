@@ -20,11 +20,13 @@ Definition pt_eqb (a b : pt) : bool :=
 
 Lemma pt_eqP : Equality.axiom pt_eqb.
 Proof.
+rewrite /Equality.axiom.
 move=> [a_x a_y] [b_x b_y] /=.
-have [/eqP <- | /eqP anb] := boolP(a_x == b_x).
+have [/eqP <-|/eqP anb] := boolP(a_x == b_x).
+
   have [/eqP <- | /eqP anb] := boolP(a_y == b_y).
     by apply: ReflectT.
-  by apply: ReflectF=> [][].
+  by apply : ReflectF => [][].
 by apply: ReflectF=> [][].
 Qed.
 
@@ -46,7 +48,7 @@ Proof.
 move=> [a1 b1 p1] [a2 b2 p2] /=.
 have [/eqP a1a2 | /eqP a1na2] := boolP(a1 == a2).
   have [/eqP b1b2 | /eqP b1nb2] := boolP(b1 == b2).
-     move: p1 p2; rewrite -a1a2 -b1b2=> p1 p2.
+     move: p1 p2. rewrite -a1a2 -b1b2 => p1 p2.
      rewrite (eqtype.bool_irrelevance p1 p2).
      by apply: ReflectT.
    by apply: ReflectF=> [][].
@@ -57,16 +59,20 @@ Canonical edge_eqType := EqType edge (EqMixin edge_eqP).
 
 Record cell := Bcell  {pts : list pt; edges : list edge}.
 
-Definition cell_eqb (c1 c2 : cell) : bool :=
-  let: Bcell pts1 edges1 := c1 in
-  let: Bcell pts2 edges2 := c2 in
-  (pts1 == pts2) && (edges1 == edges2).
+Definition cell_eqb (ca cb : cell) : bool :=
+  let: Bcell ptsa edgesa := ca in
+  let: Bcell ptsb edgesb := cb in
+  (ptsa == ptsb) && (edgesa == edgesb).
 
 
-
-
-
-
-
-
+Lemma cell_eqP : Equality.axiom cell_eqb.
+Proof.
+rewrite /Equality.axiom.
+move => [ptsa edgesa] [ptsb edgesb] /=.
+have [/eqP <-|/eqP anb] := boolP(ptsa == ptsb).
+  have [/eqP <-|/eqP anb] := boolP(edgesa == edgesb).
+    by apply:ReflectT.
+  by apply : ReflectF => [][].
+by apply: ReflectF=> [][].
+Qed.
 
