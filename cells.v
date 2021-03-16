@@ -3,15 +3,15 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Section with_rcf.
-
-Variable R : rcfType.
+(*Section with_rcf.
+Print archiType.
+Variable R : archiType.*)
 
 Import GRing.Theory Num.Theory Num.ExtraDef.
 
 Open Scope ring_scope.
 
-Record pt := Bpt {p_x : R; p_y : R}.
+Record pt := Bpt {p_x : archiType; p_y : archiType}.
 
 Definition pt_eqb (a b : pt) : bool :=
   let: Bpt a_x a_y := a in
@@ -33,14 +33,14 @@ Qed.
 Canonical pt_eqType := EqType pt (EqMixin pt_eqP).
 
 Record edge := Bedge {left_pt : pt; right_pt : pt;
-    _ : p_x left_pt < p_x right_pt}.
+    _ : p_x left_pt <= p_x right_pt}.
 
 Definition edge_eqb (e1 e2 : edge) : bool :=
    let: Bedge a1 b1 p1 := e1 in
    let: Bedge a2 b2 p2 := e2 in
    (a1 == a2) && (b1 == b2).
 
-Lemma edge_cond (e : edge) : p_x (left_pt e) < p_x (right_pt e).
+Lemma edge_cond (e : edge) : p_x (left_pt e) <= p_x (right_pt e).
 Proof.  by move: e => [l r c]. Qed.
    
 Lemma edge_eqP : Equality.axiom edge_eqb.
@@ -75,4 +75,34 @@ have [/eqP <-|/eqP anb] := boolP(ptsa == ptsb).
   by apply : ReflectF => [][].
 by apply: ReflectF=> [][].
 Qed.
+
+Print Bool.reflect.
+
+Record event := Bevent {point : pt; incoming : seq edge; outgoing : seq edge}.
+
+Search "sort".
+
+
+(*returns true if e1 is under e2*)
+Definition compare_incoming (e1 e2 : edge) : bool :=
+  let: Bedge a1 b1 p1 := e1 in
+  let: Bedge a2 b2 p2 := e2 in
+  let: Bpt a1_x a1_y := a1 in
+  let: Bpt b1_x b1_y := b1 in
+  let: Bpt a2_x a2_y := a2 in
+     (a1_x * b1_y - b1_x * a1_y - (a1_x * a2_y - a2_x * a1_y) + b1_x * a2_y - a2_x * b1_y)<=0.
+
+Lemma c1 : (1%:Q <= 3%:Q).
+by [].
+Qed.
+
+Lemma c2 : (2%:Q <= 3%:Q).
+by [].
+Qed.
+
+Check @Bedge (Bpt 3%:Q 4%:Q) (Bpt 4%:Q 4%:Q) isT.
+
+Compute compare_incoming (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ) (@Bedge  (Bpt 2%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
+
+
 
