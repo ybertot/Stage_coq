@@ -90,19 +90,44 @@ Definition compare_incoming (e1 e2 : edge) : bool :=
   let: Bpt a1_x a1_y := a1 in
   let: Bpt b1_x b1_y := b1 in
   let: Bpt a2_x a2_y := a2 in
-     (a1_x * b1_y - b1_x * a1_y - (a1_x * a2_y - a2_x * a1_y) + b1_x * a2_y - a2_x * b1_y)<=0.
+     (b1_x * a1_y - a1_x * b1_y - (a2_x * a1_y - a1_x * a2_y) + a2_x * b1_y - b1_x * a2_y)<=0.
 
-Lemma c1 : (1%:Q <= 3%:Q).
-by [].
-Qed.
-
-Lemma c2 : (2%:Q <= 3%:Q).
-by [].
-Qed.
 
 Check @Bedge (Bpt 3%:Q 4%:Q) (Bpt 4%:Q 4%:Q) isT.
 
-Compute compare_incoming (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ) (@Bedge  (Bpt 2%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
+Compute compare_incoming  (@Bedge  (Bpt 3%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ).
 
+
+(*returns true if e1 is under e2*)
+Definition compare_outgoing (e1 e2 : edge) : bool :=
+  let: Bedge a1 b1 p1 := e1 in
+  let: Bedge a2 b2 p2 := e2 in
+  let: Bpt a1_x a1_y := a1 in
+  let: Bpt b1_x b1_y := b1 in
+  let: Bpt b2_x b2_y := b2 in
+     (b2_x * b1_y - b1_x * b2_y - (a1_x * b1_y - b1_x * a1_y) + a1_x * b2_y - b2_x * a1_y)<=0.
+
+Compute compare_outgoing (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 1%:Q) isT ) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
+
+Definition sort_incoming (incoming : seq edge) : seq edge :=
+  sort compare_incoming incoming.
+Definition sort_outgoing (outgoing : seq edge) : seq edge :=
+  sort compare_outgoing outgoing.
+
+
+Definition E1 : edge := (@Bedge  (Bpt 2%:Q 5%:Q) (Bpt 3%:Q 3%:Q) isT).
+
+Definition E2 : edge := (@Bedge  (Bpt 3%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
+Definition E3 : edge := (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
+Definition sorted_inc := map left_pt (sort_incoming [:: E1; E2; E3]).
+Eval lazy in sorted_inc. 
+
+
+Definition E4 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 6%:Q) isT).
+Definition E5 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 5%:Q 3%:Q) isT).
+Definition E6 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 3%:Q) isT).
+
+Definition sorted_out := map right_pt (sort_outgoing [:: E4; E5; E6]).
+Eval lazy in sorted_out. 
 
 
