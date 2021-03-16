@@ -76,12 +76,36 @@ have [/eqP <-|/eqP anb] := boolP(ptsa == ptsb).
 by apply: ReflectF=> [][].
 Qed.
 
-Print Bool.reflect.
-
 Record event := Bevent {point : pt; incoming : seq edge; outgoing : seq edge}.
 
-Search "sort".
+(* As in insertion sort, the add_event function assumes that event are
+  sorted in evs (lexicographically, first coordinate, then second coordinate
+  of the point.  On the other hand, no effort is made to sort the various
+  edges in each list.  *)
+Fixpoint add_event (p : pt) (e : edge) (incoming : bool) (evs : seq event) :
+  seq event :=
+  match evs with
+  | nil => if incoming then [:: Bevent p [:: e] [::]]
+           else [:: Bevent p [::] [:: e]]
+  | Bevent p1 i1 o1 as ev1 :: evs' =>
+    if p == p1 then
+      if incoming then Bevent p1 (e :: i1) o1 :: evs'
+      else Bevent p1 i1 (e :: o1) :: evs' else
+    if p_x p < p_x p1 then Bevent p [:: e] [::] :: evs else
+    if p_y p < p_y p1 then Bevent p [:: e] [::] :: evs else
+    ev1 :: add_event p e incoming evs'
+  end.
 
+(* We should be able to prove that the sequence of events produced by
+  edges to events is sorted lexicographically on the coordinates of
+  the points. *)
+Fixpoint edges_to_events (s : seq edge) : seq event :=
+  match s with
+  | nil => nil
+  | e :: s' =>
+    add_event (left_pt e) e false
+      (add_event (right_pt e) e true (edges_to_events s'))
+  end.
 
 (*returns true if e1 is under e2*)
 Definition compare_incoming (e1 e2 : edge) : bool :=
