@@ -155,4 +155,24 @@ Definition E6 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 3%:Q) isT).
 Definition sorted_out := map right_pt (sort_outgoing [:: E4; E5; E6]).
 Eval lazy in sorted_out. 
 
+Definition lexPtEv (e1 e2 : event) : bool :=
+  let: Bevent p1 _ _ := e1 in
+  let: Bevent p2 _ _ := e2 in
+  (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
 
+Lemma add_event_sort p e inc evs : sorted lexPtEv evs ->
+  sorted lexPtEv (add_event p e inc evs).
+Proof.
+elim: evs => [ | [p1 i1 o1] evs Ih /=].
+  by case: inc.
+move=> path_evs.
+have [/eqP pp1 | /eqP pnp1] := boolP(p == p1).
+  case: inc Ih.
+    by case: evs path_evs => [ | [p2 i2 o2] evs'].
+  by case: evs path_evs => [ | [p2 i2 o2] evs'].
+move/path_sorted/Ih: (path_evs) {Ih} => Ih.
+have [ pltp1 | pnltp1] /= := boolP(p_x p < p_x p1).
+  by rewrite pltp1.
+have [pp1 | pnp1'] /= := boolP (p_x p == p_x p1).
+  have [ pltp1 | pnltp1'] /= := boolP(p_y p < p_y p1).
+    by rewrite pp1 pltp1 orbT.
