@@ -7,11 +7,11 @@ Unset Printing Implicit Defensive.
 Print archiType.
 Variable R : archiType.*)
 
-Import GRing.Theory Num.Theory Num.ExtraDef.
+Import Order.TTheory GRing.Theory Num.Theory Num.ExtraDef.
 
 Open Scope ring_scope.
 
-Record pt := Bpt {p_x : archiType; p_y : archiType}.
+Record pt := Bpt {p_x : rat; p_y : rat}.
 
 Definition pt_eqb (a b : pt) : bool :=
   let: Bpt a_x a_y := a in
@@ -82,19 +82,25 @@ Record event := Bevent {point : pt; incoming : seq edge; outgoing : seq edge}.
   sorted in evs (lexicographically, first coordinate, then second coordinate
   of the point.  On the other hand, no effort is made to sort the various
   edges in each list.  *)
-Fixpoint add_event (p : pt) (e : edge) (incoming : bool) (evs : seq event) :
+Fixpoint add_event (p : pt) (e : edge) (inc : bool) (evs : seq event) :
   seq event :=
   match evs with
-  | nil => if incoming then [:: Bevent p [:: e] [::]]
+  | nil => if inc then [:: Bevent p [:: e] [::]]
            else [:: Bevent p [::] [:: e]]
-  | Bevent p1 i1 o1 as ev1 :: evs' =>
+  | ev1 :: evs' =>
+    let p1 := point ev1 in
     if p == p1 then
-      if incoming then Bevent p1 (e :: i1) o1 :: evs'
-      else Bevent p1 i1 (e :: o1) :: evs' else
-    if p_x p < p_x p1 then Bevent p [:: e] [::] :: evs else
-    if (p_x p == p_x p1) && (p_y p < p_y p1) then
-       Bevent p [:: e] [::] :: evs else
-    ev1 :: add_event p e incoming evs'
+      if inc then Bevent p1 (e :: incoming ev1) (outgoing ev1) :: evs'
+      else Bevent p1 (incoming ev1) (e :: outgoing ev1) :: evs' else
+    if p_x p < p_x p1 then
+      if inc then
+        Bevent p [:: e] [::] :: evs else
+        Bevent p [::] [:: e] :: evs
+    else if (p_x p == p_x p1) && (p_y p < p_y p1) then
+       if inc then
+         Bevent p [:: e] [::] :: evs else
+         Bevent p [::] [:: e] :: evs else
+    ev1 :: add_event p e inc evs'
   end.
 
 (* We should be able to prove that the sequence of events produced by
@@ -156,23 +162,78 @@ Definition sorted_out := map right_pt (sort_outgoing [:: E4; E5; E6]).
 Eval lazy in sorted_out. 
 
 Definition lexPtEv (e1 e2 : event) : bool :=
-  let: Bevent p1 _ _ := e1 in
-  let: Bevent p2 _ _ := e2 in
+  let p1 := point e1 in let p2 := point e2 in
   (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
+
+Lemma add_event_preserve_first p e inc ev evs :
+  (0 < size (add_event p e inc (ev :: evs)))%N /\
+  (point (head ev (add_event p e inc (ev :: evs))) = p \/
+   point (head ev (add_event p e inc (ev :: evs))) = point ev).
+Proof.
+rewrite /=.
+case: ev => [p1 i1 o1].
+have [/eqP -> | /eqP pnp1] := boolP(p == p1).
+  by split; case: inc => //=; left.
+have [pltp1 /= | pnltp1] := boolP(p_x p < p_x p1).
+  split.
+    by case: inc.
+  by case:inc; left.
+have [/eqP pxqpx1 /= | pxnpx1 /=] := boolP (p_x p == p_x p1).
+  have [/eqP pyltpy1 /= | pynltpy1 /=] := boolP (p_y p < p_y p1).
+    by case:inc; (split;[ | left]).
+  by split;[ | right].
+by split;[ | right].
+Qed.
 
 Lemma add_event_sort p e inc evs : sorted lexPtEv evs ->
   sorted lexPtEv (add_event p e inc evs).
 Proof.
-elim: evs => [ | [p1 i1 o1] evs Ih /=].
+elim: evs => [ | ev1 evs Ih /=].
   by case: inc.
 move=> path_evs.
-have [/eqP pp1 | /eqP pnp1] := boolP(p == p1).
+have [/eqP pp1 | /eqP pnp1] := boolP(p == point ev1).
   case: inc Ih.
-    by case: evs path_evs => [ | [p2 i2 o2] evs'].
-  by case: evs path_evs => [ | [p2 i2 o2] evs'].
+    by case: evs path_evs => [ | ev2 evs'].
+  by case: evs path_evs => [ | ev2 evs'].
 move/path_sorted/Ih: (path_evs) {Ih} => Ih.
-have [ pltp1 | pnltp1] /= := boolP(p_x p < p_x p1).
-  by rewrite pltp1.
-have [pp1 | pnp1'] /= := boolP (p_x p == p_x p1).
-  have [ pltp1 | pnltp1'] /= := boolP(p_y p < p_y p1).
-    by rewrite pp1 pltp1 orbT.
+have [ pltp1 | pnltp1] /= := boolP(p_x p < p_x (point ev1)).
+  by case: inc {Ih}=> /=; (apply/andP; split=> //); rewrite /lexPtEv /= pltp1.
+have [/eqP pp1 | pnp1'] /= := boolP (p_x p == p_x (point ev1)).
+  have pyneq : p_y p != p_y (point ev1).
+    apply/eqP=> pp1'; case pnp1.
+    move: p (point ev1) {pnp1 Ih pnltp1} pp1 pp1'.
+    by move=> [a b][c d] /= -> ->.
+  have [ pltp1 | pnltp1'] /= := boolP(p_y p < p_y (point ev1)).
+    by case: (inc); rewrite /= path_evs andbT /lexPtEv /= pp1 eqxx pltp1 orbT.
+  have p1ltp : p_y (point ev1) < p_y p.
+    by rewrite ltNge le_eqVlt negb_or pyneq pnltp1'.
+  case evseq : evs => [ | [p2 i2 o2] evs2].
+    by case: (inc)=> /=; rewrite /lexPtEv /= pp1 eqxx p1ltp orbT.
+  rewrite -evseq.
+  case aeq : (add_event p e inc evs) => [ | e' evs3].
+    have := add_event_preserve_first p e inc
+           {| point := p2; incoming:= i2; outgoing := o2 |} evs2.
+      by rewrite -evseq aeq => [[]].
+  case: (add_event_preserve_first p e inc
+         {| point := p2; incoming:= i2; outgoing := o2 |} evs2)=> _.
+  rewrite -evseq aeq /= => [] [eqp | eqp2].
+    apply/andP; split; last by move: Ih; rewrite aeq.
+    by rewrite /lexPtEv eqp pp1 eqxx p1ltp orbT.
+  apply/andP; split; last by move: Ih; rewrite aeq.
+  move: path_evs; rewrite evseq /= andbC => /andP[] _.
+  by rewrite /lexPtEv /= eqp2.
+have p1ltp : p_x (point ev1) < p_x p.
+  by rewrite ltNge le_eqVlt negb_or pnp1' pnltp1.
+case evseq : evs => [ | [p2 i2 o2] evs2].
+  by case: (inc)=> /=; rewrite /lexPtEv /= p1ltp.
+case aeq : (add_event p e inc evs) => [ | e' evs3].
+  case: (add_event_preserve_first p e inc
+       {| point := p2; incoming:= i2; outgoing := o2 |} evs2).
+  by rewrite -evseq aeq.
+case: (add_event_preserve_first p e inc
+     {| point := p2; incoming:= i2; outgoing := o2 |} evs2) => _.
+have path_e'evs3 : path lexPtEv e' evs3 by move: Ih; rewrite aeq.
+rewrite -evseq aeq /= => [][e'p | e'p2]; rewrite path_e'evs3 andbT.
+  by rewrite /lexPtEv e'p p1ltp.
+by move: path_evs; rewrite evseq /= andbC /lexPtEv e'p2=> /andP[].
+Qed.
