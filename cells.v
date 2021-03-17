@@ -92,7 +92,8 @@ Fixpoint add_event (p : pt) (e : edge) (incoming : bool) (evs : seq event) :
       if incoming then Bevent p1 (e :: i1) o1 :: evs'
       else Bevent p1 i1 (e :: o1) :: evs' else
     if p_x p < p_x p1 then Bevent p [:: e] [::] :: evs else
-    if p_y p < p_y p1 then Bevent p [:: e] [::] :: evs else
+    if (p_x p == p_x p1) && (p_y p < p_y p1) then
+       Bevent p [:: e] [::] :: evs else
     ev1 :: add_event p e incoming evs'
   end.
 
