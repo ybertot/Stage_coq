@@ -11,7 +11,7 @@ Import GRing.Theory Num.Theory Num.ExtraDef.
 
 Open Scope ring_scope.
 
-Record pt := Bpt {p_x : archiType; p_y : archiType}.
+Record pt := Bpt {p_x : rat; p_y : rat}.
 
 Definition pt_eqb (a b : pt) : bool :=
   let: Bpt a_x a_y := a in
@@ -140,18 +140,32 @@ Definition sort_outgoing (outgoing : seq edge) : seq edge :=
 
 
 Definition E1 : edge := (@Bedge  (Bpt 2%:Q 5%:Q) (Bpt 3%:Q 3%:Q) isT).
-
-Definition E2 : edge := (@Bedge  (Bpt 3%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
+Definition E2 : edge := (@Bedge  (Bpt (@Rat (7%:Z, 3%:Z) isT)  10%:Q) (Bpt 3%:Q 3%:Q) isT).
 Definition E3 : edge := (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
+
 Definition sorted_inc := map left_pt (sort_incoming [:: E1; E2; E3]).
 Eval lazy in sorted_inc. 
-
 
 Definition E4 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 6%:Q) isT).
 Definition E5 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 5%:Q 3%:Q) isT).
 Definition E6 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 3%:Q) isT).
-
 Definition sorted_out := map right_pt (sort_outgoing [:: E4; E5; E6]).
-Eval lazy in sorted_out. 
+Eval lazy in sorted_out.
 
+Lemma sort_out out : sorted compare_outgoing (sort_outgoing out).
+Proof.
+rewrite /=.
+elim : out => [//= | e out _ ].
+rewrite /sort_outgoing sort_sorted => [ //= |].
+rewrite /total => e1 e2 .
+rewrite -implyNb.
+apply /implyP .
+rewrite /compare_outgoing.
+Admitted.
 
+Definition vertical_intersection_point (a : pt) (e : edge) : pt := 
+  let: Bpt a_x a_y := pt in
+  let: Bedge b bc p := e in
+  let: Bpt b_x b_y := b in
+  let: Bpt c_x c_y := c in
+  let height2 = .
