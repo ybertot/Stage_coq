@@ -107,36 +107,35 @@ Fixpoint edges_to_events (s : seq edge) : seq event :=
       (add_event (right_pt e) e true (edges_to_events s'))
   end.
 
+(* returns true if p is under e *)
+Definition point_under_edge (p : pt) (e : edge) : bool :=
+  let: Bpt p_x p_y := p in
+  let: Bedge a b _ := e in
+  let: Bpt a_x a_y := a in
+  let: Bpt b_x b_y := b in
+     (b_x * p_y - p_x * b_y - (a_x * p_y - p_x * a_y) + a_x * b_y - b_x * a_y)<=0.
+
 (*returns true if e1 is under e2*)
 Definition compare_incoming (e1 e2 : edge) : bool :=
-  let: Bedge a1 b1 p1 := e1 in
-  let: Bedge a2 b2 p2 := e2 in
-  let: Bpt a1_x a1_y := a1 in
-  let: Bpt b1_x b1_y := b1 in
-  let: Bpt a2_x a2_y := a2 in
-     (b1_x * a1_y - a1_x * b1_y - (a2_x * a1_y - a1_x * a2_y) + a2_x * b1_y - b1_x * a2_y)<=0.
+  let: Bedge a _ _ := e1 in
+    point_under_edge a e2.
 
+(*returns true if e1 is under e2*)
+Definition compare_outgoing (e1 e2 : edge) : bool :=
+  let: Bedge _ b _ := e1 in
+  point_under_edge b e2.
 
 Check @Bedge (Bpt 3%:Q 4%:Q) (Bpt 4%:Q 4%:Q) isT.
 
 Compute compare_incoming  (@Bedge  (Bpt 3%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ).
 
 
-(*returns true if e1 is under e2*)
-Definition compare_outgoing (e1 e2 : edge) : bool :=
-  let: Bedge a1 b1 p1 := e1 in
-  let: Bedge a2 b2 p2 := e2 in
-  let: Bpt a1_x a1_y := a1 in
-  let: Bpt b1_x b1_y := b1 in
-  let: Bpt b2_x b2_y := b2 in
-     (b2_x * b1_y - b1_x * b2_y - (a1_x * b1_y - b1_x * a1_y) + a1_x * b2_y - b2_x * a1_y)<=0.
-
 Compute compare_outgoing (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 1%:Q) isT ) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
 
-Definition sort_incoming (incoming : seq edge) : seq edge :=
-  sort compare_incoming incoming.
-Definition sort_outgoing (outgoing : seq edge) : seq edge :=
-  sort compare_outgoing outgoing.
+Definition sort_incoming (inc : seq edge) : seq edge :=
+  sort compare_incoming inc.
+Definition sort_outgoing (out : seq edge) : seq edge :=
+  sort compare_outgoing out.
 
 
 Definition E1 : edge := (@Bedge  (Bpt 2%:Q 5%:Q) (Bpt 3%:Q 3%:Q) isT).
@@ -163,9 +162,19 @@ apply /implyP .
 rewrite /compare_outgoing.
 Admitted.
 
-Definition vertical_intersection_point (a : pt) (e : edge) : pt := 
-  let: Bpt a_x a_y := pt in
-  let: Bedge b bc p := e in
+(* returns the point of the intersection between a vertical edge
+ intersecting p and the edge e if it exists, None if it doesn't *)
+Definition vertical_intersection_point (p : pt) (e : edge) : option pt := 
+  let: Bpt p_x p_y := p in
+  let: Bedge a b _ := e in
+  let: Bpt a_x a_y := a in
   let: Bpt b_x b_y := b in
-  let: Bpt c_x c_y := c in
-  let height2 = .
+  if (p_x < a_x) || (b_x < p_x) then None else 
+  let: u := point_under_edge p e in 
+  let: l1 := b_x - a_x in
+  let: d := b_y < a_y in 
+  let: h1 := if d then a_y - b_y else b_y - a_y in
+  let: h2 := if xorb d u then p_x - a_x else b_x - p_x in
+  let: y := (h1 * h2) / l1 in
+  Some(Bpt p_x y).
+
