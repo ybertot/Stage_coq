@@ -3,14 +3,33 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-(*Section with_rcf.
-Print archiType.
-Variable R : archiType.*)
 
 Import Order.TTheory GRing.Theory Num.Theory Num.ExtraDef.
 
 Open Scope ring_scope.
 
+Let mul : rat -> rat -> rat := @GRing.mul _.
+Let add : rat -> rat -> rat := @GRing.add _.
+Let sub : rat -> rat -> rat := (fun x y => x - y).
+Let opp : rat -> rat := @GRing.opp _.
+Let zero : rat := 0.
+Let one : rat := 1.
+
+Search comRingType.
+Let R2_theory :=
+   @mk_rt rat zero one add mul sub opp
+    (@eq rat)
+    (@add0r rat_ZmodType) (@addrC rat_ZmodType) (@addrA rat_ZmodType) (@mul1r rat_Ring) (@mulrC rat_comRing)
+      (@mulrA rat_Ring) (@mulrDl rat_Ring) (fun x y : rat => erefl (x - y)) (@addrN rat_ZmodType).
+
+Ltac mc_ring :=
+rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
+    -?[@GRing.mul _]/mul
+    -?[@GRing.opp _]/opp -?[1]/one -?[0]/zero;
+match goal with |- @eq ?X _ _ => change X with rat end;
+ring.
+
+Add Ring R2_Ring : R2_theory.
 Record pt := Bpt {p_x : rat; p_y : rat}.
 
 Definition pt_eqb (a b : pt) : bool :=
@@ -115,12 +134,16 @@ Fixpoint edges_to_events (s : seq edge) : seq event :=
   end.
 
 (* returns true if p is under e *)
-Definition point_under_edge (p : pt) (e : edge) : bool :=
+Definition pue_formula (p : pt) (e : edge) : rat :=
   let: Bpt p_x p_y := p in
   let: Bedge a b _ := e in
   let: Bpt a_x a_y := a in
   let: Bpt b_x b_y := b in
-     (b_x * p_y - p_x * b_y - (a_x * p_y - p_x * a_y) + a_x * b_y - b_x * a_y)<=0.
+     (b_x * p_y - p_x * b_y - (a_x * p_y - p_x * a_y) + a_x * b_y - b_x * a_y).
+
+(* returns true if p is under e *)
+Definition point_under_edge (p : pt) (e : edge) : bool :=
+  pue_formula p e <=0.
 
 (*returns true if e1 is under e2*)
 Definition compare_incoming (e1 e2 : edge) : bool :=
@@ -131,6 +154,8 @@ Definition compare_incoming (e1 e2 : edge) : bool :=
 Definition compare_outgoing (e1 e2 : edge) : bool :=
   let: Bedge _ b _ := e1 in
   point_under_edge b e2.
+
+
 
 Check @Bedge (Bpt 3%:Q 4%:Q) (Bpt 4%:Q 4%:Q) isT.
 
@@ -159,6 +184,32 @@ Definition sorted_out := map right_pt (sort_outgoing [:: E4; E5; E6]).
 Eval lazy in sorted_out.
 
 
+
+
+Lemma pue_formula_opposite e1 e2: left_pt e1 = left_pt e2 -> pue_formula (right_pt e2) e1 = - pue_formula (right_pt e1) e2.
+Proof.
+  move: e1 e2 => [[ax ay] [b_x b_y] ab] [[cx cy] [dx dy] cd]/=.
+  move =>[] -> ->{ab cd}.
+  mc_ring.
+Qed.
+
+
+
+Lemma compare_outgoing_total p :{in [pred e | left_pt e == p], total compare_outgoing} .
+Proof.
+Admitted.
+
+
+
+
+Lemma sort_out : forall p s, all [pred e | left_pt e == p] s ->
+  sorted compare_outgoing (sort compare_outgoing s).
+Proof.
+rewrite /=.
+move => p s.
+apply /sort_sorted_in /compare_outgoing_total.
+Qed.
+
 Lemma sort_out out : sorted compare_outgoing (sort_outgoing out).
 Proof.
 rewrite /=.
@@ -168,7 +219,10 @@ rewrite /total => e1 e2 .
 rewrite -implyNb.
 apply /implyP .
 rewrite /compare_outgoing.
+Check sort_sorted_in.
 Admitted.
+
+
 
 (* returns the point of the intersection between a vertical edge
  intersecting p and the edge e if it exists, None if it doesn't *)
