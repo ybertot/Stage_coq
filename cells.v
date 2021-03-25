@@ -296,11 +296,30 @@ Lemma vertical_none p e :
   let: Bpt a_x a_y := a in
   let: Bpt b_x b_y := b in
  (p_x < a_x) || (b_x < p_x) -> vertical_intersection_point p e = None.
-
 Proof.
 move: p e => [px py] [[ax ay] [b_x b_y] ab] h /=.
-by apply ifT.
+by apply /ifT.
 Qed.
+
+
+
+
+
+
+Lemma vertical_correct pt e : 
+  let: Bpt pt_x pt_y := pt in
+  let: Bedge a b _ := e in
+  let: Bpt a_x a_y := a in
+  let: Bpt b_x b_y := b in
+  let: slope := (b_y-a_y)/(b_x-a_x) in
+  let: yintercept := b_y - slope * b_x in
+ ~~ ((pt_x < a_x) || (b_x < pt_x)) -> 
+    let: i := match(vertical_intersection_point pt e) with None => (Bpt 0 0) | Some(point) => point end in 
+ ((p_x i) == pt_x) && ((p_y i) == slope * pt_x + yintercept).
+Proof.
+move: pt e => [ptx pty] [[ax ay] [bx b_y] /= ab]h .
+Admitted.
+
 
 
 Definition lexPtEv (e1 e2 : event) : bool :=
