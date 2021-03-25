@@ -241,7 +241,7 @@ Qed.
 
 Lemma compare_incoming_total p :{in [pred e | right_pt e == p] &, total compare_incoming} .
 Proof.
-Check sort_sorted_in.
+
 rewrite /total.
 move => ab cd /eqP lp /eqP lp2.
 have: right_pt ab = right_pt cd.
@@ -252,10 +252,8 @@ apply /implyP.
 rewrite /compare_incoming /point_under_edge.
 move : ab cd h => [a b ab][c d cd] /= h.
 rewrite h -ltNge pue_formula_opposite -pue_formula_cycle.
-
 rewrite oppr_gt0.
 apply ltW.
-
 Qed.
 
 
@@ -291,6 +289,19 @@ Definition vertical_intersection_point (p : pt) (e : edge) : option pt :=
   let: h2 := if xorb d u then p_x - a_x else b_x - p_x in
   let: y := (h1 * h2) / l1 in
   Some(Bpt p_x y).
+
+Lemma vertical_none p e :
+  let: Bpt p_x p_y := p in
+  let: Bedge a b _ := e in
+  let: Bpt a_x a_y := a in
+  let: Bpt b_x b_y := b in
+ (p_x < a_x) || (b_x < p_x) -> vertical_intersection_point p e = None.
+
+Proof.
+move: p e => [px py] [[ax ay] [b_x b_y] ab] h /=.
+by apply ifT.
+Qed.
+
 
 Definition lexPtEv (e1 e2 : event) : bool :=
   let p1 := point e1 in let p2 := point e2 in
