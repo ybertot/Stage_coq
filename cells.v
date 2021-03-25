@@ -8,28 +8,7 @@ Import Order.TTheory GRing.Theory Num.Theory Num.ExtraDef.
 
 Open Scope ring_scope.
 
-Let mul : rat -> rat -> rat := @GRing.mul _.
-Let add : rat -> rat -> rat := @GRing.add _.
-Let sub : rat -> rat -> rat := (fun x y => x - y).
-Let opp : rat -> rat := @GRing.opp _.
-Let zero : rat := 0.
-Let one : rat := 1.
 
-Search comRingType.
-Let R2_theory :=
-   @mk_rt rat zero one add mul sub opp
-    (@eq rat)
-    (@add0r rat_ZmodType) (@addrC rat_ZmodType) (@addrA rat_ZmodType) (@mul1r rat_Ring) (@mulrC rat_comRing)
-      (@mulrA rat_Ring) (@mulrDl rat_Ring) (fun x y : rat => erefl (x - y)) (@addrN rat_ZmodType).
-
-Ltac mc_ring :=
-rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
-    -?[@GRing.mul _]/mul
-    -?[@GRing.opp _]/opp -?[1]/one -?[0]/zero;
-match goal with |- @eq ?X _ _ => change X with rat end;
-ring.
-
-Add Ring R2_Ring : R2_theory.
 Record pt := Bpt {p_x : rat; p_y : rat}.
 
 Definition pt_eqb (a b : pt) : bool :=
@@ -133,17 +112,18 @@ Fixpoint edges_to_events (s : seq edge) : seq event :=
       (add_event (right_pt e) e true (edges_to_events s'))
   end.
 
-(* returns true if p is under e *)
-Definition pue_formula (p : pt) (e : edge) : rat :=
+
+(* returns true if p is under A B *)
+Definition pue_formula (p : pt) (a : pt) (b : pt) : rat :=
   let: Bpt p_x p_y := p in
-  let: Bedge a b _ := e in
   let: Bpt a_x a_y := a in
   let: Bpt b_x b_y := b in
      (b_x * p_y - p_x * b_y - (a_x * p_y - p_x * a_y) + a_x * b_y - b_x * a_y).
 
 (* returns true if p is under e *)
 Definition point_under_edge (p : pt) (e : edge) : bool :=
-  pue_formula p e <=0.
+  let: Bedge a b _ := e in 
+  pue_formula p a b <=0.
 
 (*returns true if e1 is under e2*)
 Definition compare_incoming (e1 e2 : edge) : bool :=
@@ -184,22 +164,99 @@ Definition sorted_out := map right_pt (sort_outgoing [:: E4; E5; E6]).
 Eval lazy in sorted_out.
 
 
+Section ring_sandbox.
+
+Variable R : comRingType.
+Definition R' := (R : Type).
+
+Let mul : R' -> R' -> R' := @GRing.mul _.
+Let add : R' -> R' -> R' := @GRing.add _.
+Let sub : R' -> R' -> R' := (fun x y => x - y).
+Let opp : R' -> R' := @GRing.opp _.
+Let zero : R' := 0.
+Let one : R' := 1.
 
 
-Lemma pue_formula_opposite e1 e2: left_pt e1 = left_pt e2 -> pue_formula (right_pt e2) e1 = - pue_formula (right_pt e1) e2.
+Let R2_theory :=
+   @mk_rt R' zero one add mul sub opp
+    (@eq R')
+    (@add0r R) (@addrC R) (@addrA R) (@mul1r R) (@mulrC R)
+      (@mulrA R) (@mulrDl R) (fun x y : R' => erefl (x - y)) (@addrN R).
+
+Ltac mc_ring :=
+rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
+    -?[@GRing.mul _]/mul
+    -?[@GRing.opp _]/opp -?[1]/one -?[0]/zero;
+match goal with |- @eq ?X _ _ => change X with R' end;
+ring.
+
+Add Ring R2_Ring : R2_theory.
+
+(* returns true if p is under A B *)
+Definition pue_f (p_x p_y a_x a_y b_x b_y : R')  : R' :=
+     (b_x * p_y - p_x * b_y - (a_x * p_y - p_x * a_y) + a_x * b_y - b_x * a_y).
+
+Lemma pue_f_o p_x p_y a_x a_y b_x b_y:  pue_f p_x p_y a_x a_y b_x b_y = - pue_f  b_x b_y a_x a_y p_x p_y.
 Proof.
-  move: e1 e2 => [[ax ay] [b_x b_y] ab] [[cx cy] [dx dy] cd]/=.
-  move =>[] -> ->{ab cd}.
+  rewrite /pue_f.
   mc_ring.
 Qed.
 
-
-
-Lemma compare_outgoing_total p :{in [pred e | left_pt e == p], total compare_outgoing} .
+Lemma pue_f_c p_x p_y a_x a_y b_x b_y:  pue_f p_x p_y a_x a_y b_x b_y =  pue_f   b_x b_y p_x p_y a_x a_y.
 Proof.
-Admitted.
+  rewrite /pue_f.
+  mc_ring.
+Qed.
+End ring_sandbox.
 
+Lemma pue_formula_opposite a b d:  pue_formula d a b = - pue_formula b a d.
+Proof.
+  move: a b d => [ax ay] [b_x b_y] [dx dy]/=.
+  apply :pue_f_o.
+Qed.
 
+Lemma pue_formula_cycle a b d : pue_formula d a b = pue_formula b d a.
+Proof.
+  move: a b d => [ax ay] [b_x b_y] [dx dy]/=.
+  apply :pue_f_c.
+Qed.
+  
+Lemma compare_outgoing_total p :{in [pred e | left_pt e == p] &, total compare_outgoing} .
+Proof.
+Check sort_sorted_in.
+rewrite /total.
+move => ab cd /eqP lp /eqP lp2.
+have: left_pt ab = left_pt cd.
+  by rewrite lp lp2.
+move => h {lp lp2}.
+rewrite -implyNb.
+apply /implyP.
+rewrite /compare_outgoing /point_under_edge.
+move : ab cd h => [a b ab][c d cd] /= h.
+rewrite -ltNge h.
+rewrite pue_formula_opposite/=.
+rewrite oppr_gt0.
+apply ltW.
+Qed.
+
+Lemma compare_incoming_total p :{in [pred e | right_pt e == p] &, total compare_incoming} .
+Proof.
+Check sort_sorted_in.
+rewrite /total.
+move => ab cd /eqP lp /eqP lp2.
+have: right_pt ab = right_pt cd.
+  by rewrite lp lp2.
+move => h {lp lp2}.
+rewrite -implyNb.
+apply /implyP.
+rewrite /compare_incoming /point_under_edge.
+move : ab cd h => [a b ab][c d cd] /= h.
+rewrite h -ltNge pue_formula_opposite -pue_formula_cycle.
+
+rewrite oppr_gt0.
+apply ltW.
+
+Qed.
 
 
 Lemma sort_out : forall p s, all [pred e | left_pt e == p] s ->
@@ -210,18 +267,13 @@ move => p s.
 apply /sort_sorted_in /compare_outgoing_total.
 Qed.
 
-Lemma sort_out out : sorted compare_outgoing (sort_outgoing out).
+Lemma sort_inc : forall p s, all [pred e | right_pt e == p] s ->
+  sorted compare_incoming (sort compare_incoming s).
 Proof.
 rewrite /=.
-elim : out => [//= | e out _ ].
-rewrite /sort_outgoing sort_sorted => [ //= |].
-rewrite /total => e1 e2 .
-rewrite -implyNb.
-apply /implyP .
-rewrite /compare_outgoing.
-Check sort_sorted_in.
-Admitted.
-
+move => p s.
+apply /sort_sorted_in /compare_incoming_total.
+Qed.
 
 
 (* returns the point of the intersection between a vertical edge
