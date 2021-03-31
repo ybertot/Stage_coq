@@ -216,10 +216,20 @@ rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
 match goal with |- @eq ?X _ _ => change X with R' end;
 field.
 
-Example field_playground (x y : R' ) : x != 0 -> y != 0 -> (x * y) / (x * y) = 1.
+Example field_playground (x y : R' ) : x != 0 -> y != 0 ->
+ (x * y) / (x * y) = 1 /\
+ (x * x * y) / y = (x * x * x) / x /\
+ (x + y) / y = 1 + x / y.
 Proof.
-move=> xn0 yn0; mc_field.
-by split; apply/eqP.
+move=> xn0 yn0.
+split.
+  mc_field.
+  by split; apply/eqP.
+split.
+  mc_field.
+  by split; apply/eqP.
+mc_field.
+by apply/eqP.
 Qed.
 
 (* returns true if p is under A B *)
@@ -237,6 +247,16 @@ Proof.
   rewrite /pue_f.
   mc_ring.
 Qed.
+
+Lemma pue_f_i (a_x a_y b_x b_y p_x : R') (edge_condition : a_x != b_x) :
+  pue_f a_x a_y b_x b_y p_x
+    ((p_x - a_x) * ((b_y - a_y) / (b_x - a_x)) + a_y) = 0.
+Proof.
+rewrite /pue_f.
+mc_field.
+by rewrite /add /opp /zero; apply/eqP; rewrite subr_eq0 eq_sym.
+Qed.
+
 End ring_sandbox.
 
 Lemma pue_formula_opposite a b d:  pue_formula d a b = - pue_formula b a d.
@@ -251,6 +271,17 @@ Proof.
   apply :pue_f_c.
 Qed.
   
+Lemma pue_formula_intersection a b p (edge_condition : p_x a < p_x b) :
+  pue_formula a b
+    {| p_x := p_x p;
+       p_y := (p_x p - p_x a) * ((p_y b - p_y a) / (p_x b - p_x a)) +
+           p_y a|} = 0.
+Proof.
+move: a b p edge_condition => [a_x a_y] [b_x b_y] [p_x p_y] /= edge_condition.
+apply: pue_f_i.
+by move: edge_condition; rewrite lt_neqAle => /andP[-> _].
+Qed.
+
 Lemma compare_outgoing_total p :{in [pred e | left_pt e == p] &, total compare_outgoing} .
 Proof.
 Check sort_sorted_in.
