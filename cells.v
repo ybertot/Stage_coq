@@ -1,4 +1,6 @@
 From mathcomp Require Import all_ssreflect all_algebra.
+Require Export Field.
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -183,6 +185,8 @@ Let R2_theory :=
     (@add0r R) (@addrC R) (@addrA R) (@mul1r R) (@mulrC R)
       (@mulrA R) (@mulrDl R) (fun x y : R' => erefl (x - y)) (@addrN R).
 
+Add Ring R2_Ring : R2_theory.
+
 Ltac mc_ring :=
 rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
     -?[@GRing.mul _]/mul
@@ -190,7 +194,33 @@ rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
 match goal with |- @eq ?X _ _ => change X with R' end;
 ring.
 
-Add Ring R2_Ring : R2_theory.
+Let inv : R' -> R' := @GRing.inv _.
+Let div : R' -> R' -> R' := fun x y => mul x (inv y).
+
+Definition R2_sft : field_theory zero one add mul sub opp div inv (@eq R').
+Proof.
+constructor.
+- exact R2_theory.
+- have // : one <> zero by apply/eqP; rewrite oner_eq0.
+- have // : forall p q : R', div p q = mul p (inv q) by [].
+- have // : forall p : R', p <> zero -> mul (inv p) p = one.
+  by move=> *; apply/mulVf/eqP.
+Qed.
+
+Add Field Qfield : R2_sft.
+
+Ltac mc_field :=
+rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
+    -?[@GRing.mul _]/mul -[@GRing.inv _]/inv
+    -?[@GRing.opp _]/opp -?[1]/one -?[0]/zero;
+match goal with |- @eq ?X _ _ => change X with R' end;
+field.
+
+Example field_playground (x y : R' ) : x != 0 -> y != 0 -> (x * y) / (x * y) = 1.
+Proof.
+move=> xn0 yn0; mc_field.
+by split; apply/eqP.
+Qed.
 
 (* returns true if p is under A B *)
 Definition pue_f (p_x p_y a_x a_y b_x b_y : R')  : R' :=
