@@ -3,7 +3,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-
+Require Import NArithRing.
 Import Order.TTheory GRing.Theory Num.Theory Num.ExtraDef.
 
 Open Scope ring_scope.
@@ -31,14 +31,14 @@ Qed.
 Canonical pt_eqType := EqType pt (EqMixin pt_eqP).
 
 Record edge := Bedge {left_pt : pt; right_pt : pt;
-    _ : p_x left_pt <= p_x right_pt}.
+    _ : p_x left_pt < p_x right_pt}.
 
 Definition edge_eqb (e1 e2 : edge) : bool :=
    let: Bedge a1 b1 p1 := e1 in
    let: Bedge a2 b2 p2 := e2 in
    (a1 == a2) && (b1 == b2).
 
-Lemma edge_cond (e : edge) : p_x (left_pt e) <= p_x (right_pt e).
+Lemma edge_cond (e : edge) : p_x (left_pt e) < p_x (right_pt e).
 Proof.  by move: e => [l r c]. Qed.
    
 Lemma edge_eqP : Equality.axiom edge_eqb.
@@ -139,7 +139,7 @@ Definition compare_outgoing (e1 e2 : edge) : bool :=
 
 Check @Bedge (Bpt 3%:Q 4%:Q) (Bpt 4%:Q 4%:Q) isT.
 
-Compute compare_incoming  (@Bedge  (Bpt 3%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ).
+Compute compare_incoming  (@Bedge  (Bpt 2%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ).
 
 
 Compute compare_outgoing (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 1%:Q) isT ) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
@@ -166,7 +166,7 @@ Eval lazy in sorted_out.
 
 Section ring_sandbox.
 
-Variable R : comRingType.
+Variable R : fieldType.
 Definition R' := (R : Type).
 
 Let mul : R' -> R' -> R' := @GRing.mul _.
@@ -207,6 +207,35 @@ Proof.
   rewrite /pue_f.
   mc_ring.
 Qed.
+
+Lemma pue_f_inter p_x  a_x a_y b_x b_y :  b_x != a_x -> (pue_f p_x ((p_x - a_x)* ((b_y - a_y)/(b_x - a_x)) + a_y) a_x a_y b_x b_y) == 0.
+Proof.
+rewrite /pue_f.
+rewrite -subr_eq0 => h.
+set slope := (_ / _).
+rewrite /pue_f.
+rewrite (mulrDr b_x).
+rewrite (mulrDr a_x).
+rewrite -(orbF (_==0)).
+rewrite -(negbTE   h).
+rewrite -mulf_eq0 .
+rewrite ! ( mulrBl (b_x - a_x), fun x y => mulrDl  x y (b_x - a_x)).
+
+rewrite /slope !mulrA !mulfVK //.
+apply/eqP; mc_ring.
+Qed.
+
+Lemma pue_f_inters p_x p_y a_x a_y b_x b_y  :  b_x != a_x -> p_y = ((p_x - a_x) * ((b_y - a_y) / (b_x - a_x)) + a_y) ->
+pue_f p_x p_y a_x a_y b_x b_y == 0.
+Proof.
+move => h ->.
+by apply pue_f_inter; rewrite h.
+Qed.
+
+
+
+
+
 End ring_sandbox.
 
 Lemma pue_formula_opposite a b d:  pue_formula d a b = - pue_formula b a d.
@@ -221,6 +250,7 @@ Proof.
   apply :pue_f_c.
 Qed.
   
+
 Lemma compare_outgoing_total p :{in [pred e | left_pt e == p] &, total compare_outgoing} .
 Proof.
 Check sort_sorted_in.
@@ -256,12 +286,12 @@ rewrite oppr_gt0.
 apply ltW.
 Qed.
 
-
 Lemma sort_out : forall p s, all [pred e | left_pt e == p] s ->
   sorted compare_outgoing (sort compare_outgoing s).
 Proof.
 rewrite /=.
 move => p s.
+
 apply /sort_sorted_in /compare_outgoing_total.
 Qed.
 
@@ -282,13 +312,7 @@ Definition vertical_intersection_point (p : pt) (e : edge) : option pt :=
   let: Bpt a_x a_y := a in
   let: Bpt b_x b_y := b in
   if (p_x < a_x) || (b_x < p_x) then None else 
-  let: u := point_under_edge p e in 
-  let: l1 := b_x - a_x in
-  let: d := b_y < a_y in 
-  let: h1 := if d then a_y - b_y else b_y - a_y in
-  let: h2 := if xorb d u then p_x - a_x else b_x - p_x in
-  let: y := (h1 * h2) / l1 in
-  Some(Bpt p_x y).
+  Some(Bpt p_x ((p_x - a_x) * ((b_y - a_y) / (b_x - a_x)) + a_y)).
 
 Lemma vertical_none p e :
   let: Bpt p_x p_y := p in
@@ -303,14 +327,10 @@ Qed.
 
 
 Definition point_on_edge (p: pt) (e :edge) : bool :=
-  let: Bpt pt_x pt_y := p in
   let: Bedge a b _ := e in
   let: Bpt a_x a_y := a in
   let: Bpt b_x b_y := b in
-  let: slope := (b_y-a_y)/(b_x-a_x) in
-  let: yintercept := b_y - slope * b_x in
- ((a_x <= pt_x) && (pt_x <= b_x)) && (pt_y == slope * pt_x + yintercept).
-
+  pue_formula p a b == 0.
 
 Lemma vertical_correct p e : 
 let: Bpt pt_x pt_y := p in
@@ -319,13 +339,23 @@ let: Bpt pt_x pt_y := p in
   let: Bpt b_x b_y := b in
     match(vertical_intersection_point p e) with None => ((pt_x < a_x) || (b_x < pt_x)) | Some(i) => point_on_edge i e end.
 Proof.
-move: p e => [ptx pty] [[ax ay] [bx b_y]  ab] .
-case : (vertical_intersection_point {| p_x := ptx; p_y := pty |} (Bedge ab)) .
-rewrite /point_on_edge.
-move : ab => /= ab [axx ayy] /=.
-Admitted.
+move: p e => [ptx pty] [[ax ay] [bx b_y]  /=ab] .
+case : ifP => h.
+by [].
+have: ax != bx.
+rewrite mc_1_10.Num.Theory.neqr_lt ab //=.
+rewrite /pue_formula.
+set py := ((b_y - ay) / (bx - ax) * ptx + (ay - (b_y - ay) / (bx - ax) * ax)).
+move => h2.
+
+apply pue_f_inters.
+by apply /eqP /nesym /eqP .
+by rewrite /py.
+Qed.
 
 
+
+Definition scan (points : seq events)
 
 Definition lexPtEv (e1 e2 : event) : bool :=
   let p1 := point e1 in let p2 := point e2 in
