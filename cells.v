@@ -384,18 +384,51 @@ by rewrite /py.
 Qed.
 
 Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::] [::].
+
 Print head.
 
+Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
+    match rest with
+       | [::] => [::]
+       | c::[::] => let op1 := vertical_intersection_point p (last E1 (edges c)) in
+                    match op1 with 
+                       | None => [::]
+                       | Some(p1) =>
+                        Bcell  (p::p1::(pts c)) (edges c)::[::]
+                    end
+       | c::q =>  Bcell  (p::(pts c)) (edges c)::closing_rest p q
+    end.
+
+Definition closing_cells (p : pt) (open_cells: seq cell) : (seq cell) :=
+    let contact_cells := open_cells(*cells_containing_event e open_cells*) in
+    match contact_cells with
+      | [::] => [::]
+      | only_cell::[::] => 
+                      let op0 := vertical_intersection_point p (head E1 (edges only_cell)) in 
+                      let op1 := vertical_intersection_point p (last  E1(edges only_cell) ) in
+                      match (op0,op1) with 
+                          |(None,_) |(_,None)=> [::]
+                          |(Some(p0),Some(p1)) =>
+                              Bcell  (p0::p1::(pts only_cell)) (edges only_cell)::[::]
+                      end
+      | c::q => let op0 := vertical_intersection_point p (head E1(edges c)) in 
+                    match op0 with 
+                       | None => [::]
+                       | Some(p0) =>
+                        Bcell  (p0::p::(pts c)) (edges c) :: (closing_rest p q)
+                    end
+    end.
 
 
 
 Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell): seq cell:=
-   let e := (head dummy_event events) in
+   let e := (hd dummy_event events) in
    let p := point e in
    let inc_edges := incoming e in
    let out_edges := outgoing e in
-   let c := cell_which_contains_event open_cells e in
+    
    let option_pts := map (vertical_intersection_point p) (edges c) in
+   let 
 
   
 
