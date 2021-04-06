@@ -383,13 +383,26 @@ by apply /eqP /nesym /eqP .
 by rewrite /py.
 Qed.
 
+Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::] [::].
+Print head.
 
 
-Definition scan (points : seq events)
+
+
+Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell): seq cell:=
+   let e := (head dummy_event events) in
+   let p := point e in
+   let inc_edges := incoming e in
+   let out_edges := outgoing e in
+   let c := cell_which_contains_event open_cells e in
+   let option_pts := map (vertical_intersection_point p) (edges c) in
+
+  
 
 Definition lexPtEv (e1 e2 : event) : bool :=
   let p1 := point e1 in let p2 := point e2 in
   (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
+
   
 Lemma add_event_preserve_first p e inc ev evs :
   (0 < size (add_event p e inc (ev :: evs)))%N /\
