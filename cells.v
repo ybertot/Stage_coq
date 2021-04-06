@@ -75,7 +75,7 @@ have [/eqP <-|/eqP anb] := boolP(ptsa == ptsb).
   by apply : ReflectF => [][].
 by apply: ReflectF=> [][].
 Qed.
-
+Canonical cell_eqType := EqType cell (EqMixin cell_eqP).
 Record event := Bevent {point : pt; incoming : seq edge; outgoing : seq edge}.
 
 (* As in insertion sort, the add_event function assumes that event are
@@ -386,6 +386,13 @@ Qed.
 Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::] [::].
 
 Print head.
+(*if a cell doesn't contain a point, then either both edges are strictly under p or strictly over p*)
+Definition contains_point (p :pt) (c : cell)  : bool :=
+   let e1 := head E1 (edges c) in
+   let e2 := last E1 (edges c) in
+   let: Bedge a b _ := e1 in 
+   let: Bedge c d _ := e2 in 
+      pue_formula p a b * pue_formula p c d <= 0.
 
 Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
     match rest with
@@ -399,8 +406,7 @@ Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
        | c::q =>  Bcell  (p::(pts c)) (edges c)::closing_rest p q
     end.
 
-Definition closing_cells (p : pt) (open_cells: seq cell) : (seq cell) :=
-    let contact_cells := open_cells(*cells_containing_event e open_cells*) in
+Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
     match contact_cells with
       | [::] => [::]
       | only_cell::[::] => 
@@ -419,16 +425,21 @@ Definition closing_cells (p : pt) (open_cells: seq cell) : (seq cell) :=
                     end
     end.
 
+Fixpoint contains (A : eqType) (s : seq A) (a:A)  : bool :=
+    match s with
+      | [::] => false
+      | b :: m => (b == a) || (contains m a)
+    end.
 
 
 Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell): seq cell:=
-   let e := (hd dummy_event events) in
+   let e := (head dummy_event events) in
    let p := point e in
-   let inc_edges := incoming e in
-   let out_edges := outgoing e in
-    
-   let option_pts := map (vertical_intersection_point p) (edges c) in
-   let 
+   let contact_cells := [seq x <- open_cells | contains_point p x]  in
+   let closed := closing_cells p contact_cells in 
+   let closed_cells := closed++closed_cells in
+   let open_cells :=  [seq x <- open_cells | ~~ (@contains cell_eqType contact_cells  x)] 
+            in open_cells.
 
   
 
