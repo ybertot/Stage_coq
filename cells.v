@@ -57,24 +57,27 @@ Qed.
 
 Canonical edge_eqType := EqType edge (EqMixin edge_eqP).
 
-Record cell := Bcell  {pts : list pt; edges : list edge}.
+Record cell := Bcell  {pts : list pt; low : edge; high : edge}.
 
 Definition cell_eqb (ca cb : cell) : bool :=
-  let: Bcell ptsa edgesa := ca in
-  let: Bcell ptsb edgesb := cb in
-  (ptsa == ptsb) && (edgesa == edgesb).
+  let: Bcell ptsa lowa higha := ca in
+  let: Bcell ptsb lowb highb:= cb in
+  (ptsa == ptsb) && (lowa == lowb) && (higha == highb).
 
 
 Lemma cell_eqP : Equality.axiom cell_eqb.
 Proof.
 rewrite /Equality.axiom.
-move => [ptsa edgesa] [ptsb edgesb] /=.
+move => [ptsa lowa higha] [ptsb lowb highb] /=.
 have [/eqP <-|/eqP anb] := boolP(ptsa == ptsb).
-  have [/eqP <-|/eqP anb] := boolP(edgesa == edgesb).
-    by apply:ReflectT.
-  by apply : ReflectF => [][].
+  have [/eqP <-|/eqP anb] := boolP(lowa == lowb).
+    have [/eqP <-|/eqP anb] := boolP(higha == highb).
+      by apply:ReflectT.
+    by apply : ReflectF => [][].
+  by apply: ReflectF=> [][].
 by apply: ReflectF=> [][].
 Qed.
+
 Canonical cell_eqType := EqType cell (EqMixin cell_eqP).
 Record event := Bevent {point : pt; incoming : seq edge; outgoing : seq edge}.
 
@@ -388,8 +391,8 @@ Definition dummy_edge : edge := (@Bedge  (Bpt 0%:Q 0%:Q) (Bpt 1%:Q 0%:Q) isT).
 
 (*if a cell doesn't contain a point, then either both edges are strictly under p or strictly over p*)
 Definition contains_point (p :pt) (c : cell)  : bool :=
-   let e1 := head dummy_edge (edges c) in
-   let e2 := last dummy_edge (edges c) in
+   let e1 := low c in
+   let e2 := high c in
    let: Bedge a b _ := e1 in 
    let: Bedge c d _ := e2 in 
       pue_formula p a b * pue_formula p c d <= 0.
@@ -397,31 +400,31 @@ Definition contains_point (p :pt) (c : cell)  : bool :=
 Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
     match rest with
        | [::] => [::]
-       | c::[::] => let op1 := vertical_intersection_point p (last dummy_edge (edges c)) in
+       | c::[::] => let op1 := vertical_intersection_point p (high c) in
                     match op1 with 
                        | None => [::]
                        | Some(p1) =>
-                        Bcell  (p::p1::(pts c)) (edges c)::[::]
+                        Bcell  (p::p1::(pts c)) (low c) (high c)::[::]
                     end
-       | c::q =>  Bcell  (p::(pts c)) (edges c)::closing_rest p q
+       | c::q =>  Bcell  (p::(pts c)) (low c) (high c)::closing_rest p q
     end.
 
 Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
     match contact_cells with
       | [::] => [::]
       | only_cell::[::] => 
-                      let op0 := vertical_intersection_point p (head dummy_edge (edges only_cell)) in 
-                      let op1 := vertical_intersection_point p (last  dummy_edge (edges only_cell) ) in
+                      let op0 := vertical_intersection_point p (low only_cell) in 
+                      let op1 := vertical_intersection_point p (high only_cell) in
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              Bcell  (p0::p1::(pts only_cell)) (edges only_cell)::[::]
+                              Bcell  (p0::p1::(pts only_cell)) (low only_cell)(high only_cell)::[::]
                       end
-      | c::q => let op0 := vertical_intersection_point p (head dummy_edge (edges c)) in 
+      | c::q => let op0 := vertical_intersection_point p (low c) in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        Bcell  (p0::p::(pts c)) (edges c) :: (closing_rest p q)
+                        Bcell  (p0::p::(pts c)) (low c) (high c) :: (closing_rest p q)
                     end
     end.
 
@@ -441,35 +444,35 @@ Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) 
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              (Bcell  (p1::p0::[::]) (low_e::high_e::[::]))::[::]
+                              (Bcell  (p1::p0::[::]) low_e high_e) ::[::]
                       end
     | only_out::[::] =>  let op0 := vertical_intersection_point p low_e in 
                       let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              (Bcell  (p::p0::[::]) (low_e::only_out::[::]))::(Bcell  (p1::p::[::]) (only_out::high_e::[::]))::[::]
+                              (Bcell  (p::p0::[::]) low_e only_out)::(Bcell  (p1::p::[::]) only_out high_e)::[::]
                       end
     | c::q => let op0 := vertical_intersection_point p c in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        (Bcell  (p::p0::[::]) (low_e::c::[::])) :: opening_cells p q c high_e
+                        (Bcell  (p::p0::[::]) low_e c) :: opening_cells p q c high_e
                     end
 end.
 
 Fixpoint extract_h (cells : seq cell) : edge :=
   match cells with 
    [::] => dummy_edge
-   |last_cell ::[::] => last  dummy_edge (edges last_cell)
+   |last_cell ::[::] => high last_cell
    |c::q => extract_h q
   end.
 
 Definition extract_l_h_edges (cells : seq cell) : edge*edge :=
   match cells with
     | [::] => (dummy_edge, dummy_edge)
-    | only_cell ::[::] => (head dummy_edge (edges only_cell),last  dummy_edge (edges only_cell))
-    | c::q =>(head dummy_edge (edges c), extract_h q)
+    | only_cell ::[::] => (low only_cell, high only_cell)
+    | c::q => (low c, extract_h q)
 end.
 
 Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell:=
