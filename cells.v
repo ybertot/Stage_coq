@@ -481,8 +481,7 @@ Fixpoint insert_open (open_cells : seq cell) (new_open_cells : seq cell) (low_e 
     | c::q => if ((high c) == low_e) then c::(new_open_cells ++ q) else c::(insert_open q new_open_cells low_e)
   end.
 
-Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
-   let e := (head dummy_event events) in
+Definition step (e: event) (open_cells : seq cell) (closed_cells : seq cell) : (seq cell) * (seq cell) :=
    let p := point e in
    let contact_cells := [seq x <- open_cells | contains_point p x]  in
    let (lower_edge,higher_edge) := extract_l_h_edges contact_cells in 
@@ -490,9 +489,14 @@ Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq c
    let closed_cells := closed++closed_cells in
    let open_cells :=  [seq x <- open_cells | ~~(contains contact_cells  x)] in
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge++open_cells in
-   insert_open open_cells new_open_cells lower_edge.
+   (insert_open open_cells new_open_cells lower_edge, closed_cells).
 
-  
+Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
+   match events with 
+      | [::] => closed_cells
+      | e::q => let (open, closed) := (step e open_cells closed_cells) in  scan q open closed
+ end.
+
 
 Definition lexPtEv (e1 e2 : event) : bool :=
   let p1 := point e1 in let p2 := point e2 in
