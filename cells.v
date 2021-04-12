@@ -475,15 +475,22 @@ Definition extract_l_h_edges (cells : seq cell) : edge*edge :=
     | c::q => (low c, extract_h q)
 end.
 
-Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell:=
+Fixpoint insert_open (open_cells : seq cell) (new_open_cells : seq cell) (low_e : edge) : seq cell :=
+  match open_cells with 
+    | [::] => new_open_cells
+    | c::q => if ((high c) == low_e) then c::(new_open_cells ++ q) else c::(insert_open q new_open_cells low_e)
+  end.
+
+Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
    let e := (head dummy_event events) in
    let p := point e in
    let contact_cells := [seq x <- open_cells | contains_point p x]  in
    let (lower_edge,higher_edge) := extract_l_h_edges contact_cells in 
    let closed := closing_cells p contact_cells in 
    let closed_cells := closed++closed_cells in
-   let open_cells :=  [seq x <- open_cells | ~~(contains contact_cells  x)] 
-            in opening_cells p (outgoing e) lower_edge higher_edge++open_cells. (*need to sort edges here*)
+   let open_cells :=  [seq x <- open_cells | ~~(contains contact_cells  x)] in
+   let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge++open_cells in
+   insert_open open_cells new_open_cells lower_edge.
 
   
 
