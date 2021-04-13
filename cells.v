@@ -409,6 +409,9 @@ Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
        | c::q =>  Bcell  (p::(pts c)) (low c) (high c)::closing_rest p q
     end.
 
+Definition no_dup_seq (A : eqType) (a b : A) : (seq A) :=
+      if (a == b) then a::[::] else a::b::[::].
+      
 Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
     match contact_cells with
       | [::] => [::]
@@ -418,13 +421,13 @@ Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              Bcell  (p0::p1::(pts only_cell)) (low only_cell)(high only_cell)::[::]
+                              Bcell  ((no_dup_seq p0 p1)++(pts only_cell)) (low only_cell) (high only_cell)::[::]
                       end
       | c::q => let op0 := vertical_intersection_point p (low c) in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        Bcell  (p0::p::(pts c)) (low c) (high c) :: (closing_rest p q)
+                        Bcell  ((no_dup_seq p0 p)++(pts c)) (low c) (high c) :: (closing_rest p q)
                     end
     end.
 
@@ -444,20 +447,20 @@ Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) 
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              (Bcell  (p1::p0::[::]) low_e high_e) ::[::]
+                              (Bcell  (no_dup_seq p1 p0)low_e high_e) ::[::]
                       end
     | only_out::[::] =>  let op0 := vertical_intersection_point p low_e in 
                       let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              (Bcell  (p::p0::[::]) low_e only_out)::(Bcell  (p1::p::[::]) only_out high_e)::[::]
-                      end
+                                (Bcell  (no_dup_seq p p0) low_e only_out)::(Bcell  (no_dup_seq p1 p) only_out high_e)::[::]
+                            end
     | c::q => let op0 := vertical_intersection_point p c in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        (Bcell  (p::p0::[::]) low_e c) :: opening_cells p q c high_e
+                        (Bcell  (no_dup_seq p p0) low_e c) :: opening_cells p q c high_e
                     end
 end.
 
