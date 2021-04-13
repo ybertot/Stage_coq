@@ -266,9 +266,6 @@ by apply pue_f_inter; rewrite h.
 Qed.
 
 
-
-
-
 End ring_sandbox.
 
 Lemma pue_formula_opposite a b d:  pue_formula d a b = - pue_formula b a d.
@@ -284,7 +281,7 @@ Proof.
 Qed.
   
 
-Lemma compare_outgoing_total p :{in [pred e | left_pt e == p] &, total compare_outgoing} .
+Lemma compare_outgoing_total p : {in [pred e | left_pt e == p] &, total compare_outgoing} .
 Proof.
 Check sort_sorted_in.
 rewrite /total.
@@ -302,7 +299,7 @@ rewrite oppr_gt0.
 apply ltW.
 Qed.
 
-Lemma compare_incoming_total p :{in [pred e | right_pt e == p] &, total compare_incoming} .
+Lemma compare_incoming_total p : {in [pred e | right_pt e == p] &, total compare_incoming} .
 Proof.
 
 rewrite /total.
@@ -478,6 +475,7 @@ Definition extract_l_h_edges (cells : seq cell) : edge*edge :=
     | c::q => (low c, extract_h q)
 end.
 
+
 Fixpoint insert_open (open_cells : seq cell) (new_open_cells : seq cell) (low_e : edge) : seq cell :=
   match open_cells with 
     | [::] => new_open_cells
@@ -494,11 +492,35 @@ Definition step (e: event) (open_cells : seq cell) (closed_cells : seq cell) : (
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge++open_cells in
    (insert_open open_cells new_open_cells lower_edge, closed_cells).
 
+Fixpoint init_cells (p : pt) (low_e : edge) (edges : seq edge) :=
+    match edges with
+      | [::] => [::]
+      | c::q => (Bcell (p::[::]) low_e c) :: init_cells p c q
+    end.
+
+
+
+(* Lemma step_opening (e : event) (open : seq cell) (closed : seq cell) :  *)
+(*   let (open2, close2) := step e open closed in *)
+(*     ((size close2) == (size closed + size (outgoing e)+1  ) && (length open2 == (length open) - (length incoming e) + (length outgoing e)). *)
+
 Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
    match events with 
       | [::] => closed_cells
       | e::q => let (open, closed) := (step e open_cells closed_cells) in  scan q open closed
  end.
+
+
+Definition start (events : seq event) : seq cell :=
+    match events with
+      | [::] => [::]
+      | e :: q => 
+          let p := point e in let out := outgoing e in
+          match out with 
+            | [::] => [::]                  
+            | first :: rest => scan q (init_cells p first rest) [::]
+            end
+      end. 
 
 
 Definition lexPtEv (e1 e2 : event) : bool :=
