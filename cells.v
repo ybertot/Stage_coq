@@ -492,6 +492,22 @@ Definition step (e: event) (open_cells : seq cell) (closed_cells : seq cell) : (
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge++open_cells in
    (insert_open open_cells new_open_cells lower_edge, closed_cells).
 
+
+Lemma step_size_close (e : event) (open : seq cell) (closed : seq cell) :  
+   let (open2, close2) := step e open closed in 
+     (size close2 = size closed + size (outgoing e) + 1)%N.
+Proof.
+rewrite /step.
+rewrite /extract_l_h_edges.
+case: [seq x <- open | contains_point (point e) x].
+
+rewrite size_cat.
+
+
+Lemma step_size_open (e : event) (open : seq cell) (closed : seq cell) :  
+   let (open2, close2) := step e open closed in (size open2 = size open - size (incoming e) + size (outgoing e))%N.
+
+
 Fixpoint init_cells (p : pt) (low_e : edge) (edges : seq edge) :=
     match edges with
       | [::] => [::]
@@ -500,9 +516,6 @@ Fixpoint init_cells (p : pt) (low_e : edge) (edges : seq edge) :=
 
 
 
-(* Lemma step_opening (e : event) (open : seq cell) (closed : seq cell) :  *)
-(*   let (open2, close2) := step e open closed in *)
-(*     ((size close2) == (size closed + size (outgoing e)+1  ) && (length open2 == (length open) - (length incoming e) + (length outgoing e)). *)
 
 Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
    match events with 
