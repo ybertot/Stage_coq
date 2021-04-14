@@ -122,10 +122,10 @@ Definition display_cell scale (c : cell) (buf : string) : string :=
 Definition dtest (s : seq nat) :=
   match test s with
   | Some v =>
-    concat newline ([:: "%!PS"; "100 100 translate"; "newpath";
+    concat newline ([:: ""; "%!PS"; "100 100 translate"; "newpath";
     foldr (display_cell (cats 
     newline    
     "20 mul "%string)) 
-    (concat newline [:: "stroke"; "showpage"; newline]) v])%string
+    (concat newline [:: "stroke"; "showpage"; "EOF"; ""]) v])%string
   | None => EmptyString
   end.
