@@ -9,4 +9,12 @@ Definition one_triangle : seq nat :=
 Definition two_triangles : seq nat :=
   [:: 1; 2; 5; 1; 1; 2; 6; 17; 5; 1; 6; 17] ++ one_triangle.
 
+(* To exploit this computation and produce a postscript file, you should
+just type the following command on a unix system, where draw.v is the name
+of this file
+
+  coqc draw.v 2>/dev/null | tail -n +2 | head -n -3 > example.ps
+
+You can then display example.ps with a postscript viewer or convert it to
+other formats. *)
 Compute dtest two_triangles.
