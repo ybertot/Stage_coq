@@ -15,7 +15,7 @@ Notation "[ 'edge' 'of' p1 , p2 ]" := (@Bedge p1 p2 is_true_true)
 
 
 (* Une notation pour les nombres rationnels qui sont en fait des entiers. *)
-Notation "[ 'rat' 'of' 'int' x ]" := (Rat (fracq_subproof (x, Posz 1))).
+Notation "[ 'rat' 'of' 'int' x ]" := (Rat (fracq_subproof (Posz x, Posz 1))).
 
 Notation "[ 'rat' 'of' x , y ]" :=  (Rat (fracq_subproof (x, y))).
 
@@ -26,7 +26,38 @@ Definition rat_of_nat (x : nat) : rat :=  x%:R.
 
 Coercion rat_of_nat : nat >-> rat.
 
-(* Un essai de la fonction scan sur un triangle. *)
+Definition mk_edge (a b c d : nat) : option edge :=
+  let a' := a%:R in
+  let b' := b%:R in
+  let c' := c%:R in
+  let d' := d%:R in
+  match (a' < c') as x return (a' < c') = x -> option edge with
+  | true => fun h =>
+     Some (@Bedge {| p_x := a'; p_y := b'|} {| p_x := c'; p_y := d'|} h)
+  | false => fun _ => None
+  end erefl.
+
+Fixpoint seq_nat_to_edges (s : seq nat) : option (seq edge) :=
+  match s with
+  | nil => Some nil
+  | a :: b :: c :: d :: tl =>
+    match mk_edge a b c d with
+    | Some e =>
+       match seq_nat_to_edges tl with Some r => Some (e :: r) | _ => None end
+    | _ => None
+    end
+  | _ => None
+  end.
+
+Definition test (s : seq nat) : option (seq cell) :=
+  match seq_nat_to_edges s with
+  | Some v => Some (start (edges_to_events v))
+  | _ => None
+  end.
+
+Definition newline := 
+  String (Ascii.Ascii false true false true false false false false)
+        EmptyString.
 
 Definition digits := "0123456789"%string.
 
@@ -52,8 +83,6 @@ Definition int_to_string (n : int) (buf : string) :=
   | Negz n => nat_to_string n.+1 (concat "" [:: " opp "; buf]%string)
   end.
 
-Compute (int_to_string (-(2%:R))) "".
-
 Definition rat_to_string (scale : string) (r : rat) (buffer : string) :=
   let v := valq r in
   if (v.2 == 1) then
@@ -62,8 +91,6 @@ Definition rat_to_string (scale : string) (r : rat) (buffer : string) :=
      int_to_string v.1 (concat "" [:: " "; scale; " ";
        (int_to_string v.2 (concat "" [:: " div "; buffer]))]%string).
 
-Compute rat_to_string "100 mul" 5 "".
-
 Definition cats (s1 s2: string) := concat "" [:: s1; s2].
 
 Definition display_segment (scale : string)
@@ -71,7 +98,7 @@ Definition display_segment (scale : string)
   rat_to_string scale (p_x p1) (rat_to_string scale (p_y p1)
     (cats "moveto "
       (rat_to_string scale (p_x p2) (rat_to_string scale (p_y p2)
-         (cats "lineto " buffer))))).
+         (concat "" ([:: "lineto"; newline; buffer])%string))))).
 
 Fixpoint iterate_cell_border (scale : string) (f : string -> pt -> pt -> string -> string)
   (last : pt) (s : seq pt) (buffer : string) :=
@@ -91,6 +118,164 @@ Definition display_cell_border scale s buffer :=
 
 Definition display_cell scale (c : cell) (buf : string) : string :=
   display_cell_border scale (pts c) buf.
+
+(* Example with a single triangle. *)
+
+Definition one_triangle :=
+  ([:: 2; 2; 3; 5; 2; 2; 4; 4; 3; 5; 4; 4])%N.
+
+Definition two_triangles :=
+  ([:: 1; 2; 5; 1; 5; 1; 6; 17; 1; 2; 6; 17;
+      2; 2; 3; 5; 2; 2; 4; 4; 3; 5; 4; 4])%N.
+
+(* The result of the next command should be 2. *)
+Compute if test one_triangle is Some v then size v else 0%N.
+Compute test one_triangle.
+
+Compute if test two_triangles is Some v then size v else 0%N.
+Compute test two_triangles.
+
+Definition cell0 := {| pts := [::]; low := Bedge (isT : p_x {| p_x := 0; p_y := 1|} < p_x {| p_x := 1; p_y := 1|}); high := Bedge (isT : p_x {| p_x := 0; p_y := 1|} < p_x {| p_x := 1; p_y := 1|})|}.
+Compute if test two_triangles is Some v then Some (nth cell0 v 6) else None.
+
+Definition expected_result :=
+  [:: {| pts :=
+          [:: {|p_x := 6%:R; p_y := 17%:R |};
+              {|p_x := 5%:R; p_y := 14%:R |};
+              {|p_x := 5%:R; p_y := 1%:R |}];
+          low :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 5%:R; p_y := 1%:R |} <
+                   p_x {| p_x := 6%:R; p_y := 17%:R |}));
+          high :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 1%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 6%:R; p_y := 17%:R |}))
+          |};
+      {| pts :=
+          [:: {|p_x := 5%:R; p_y := 1%:R |};
+              {|p_x := 5%:R; p_y := 14%:R |};
+              {|p_x := 4%:R; p_y := 11%:R |};
+              {|p_x := 4%:R; p_y := (5%:R / 4%:R) |}];
+          low :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 1%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 5%:R; p_y := 1%:R |}));
+          high :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 1%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 6%:R; p_y := 17%:R |}))
+          |};
+     {| pts :=
+          [:: {|p_x := 4%:R; p_y := (5%:R / 4%:R) |};
+              {|p_x := 4%:R; p_y := 4%:R |};
+              {|p_x := 2%:R; p_y := 2%:R |};
+              {|p_x := 2%:R; p_y := (7%:R / 4%:R) |}];
+          low :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 1%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 5%:R; p_y := 1%:R |}));
+          high :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 2%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 4%:R; p_y := 4%:R |}))
+          |};
+     {| pts :=
+          [:: {|p_x := 4%:R; p_y := 4%:R |};
+              {|p_x := 3%:R; p_y := 5%:R |};
+              {|p_x := 3%:R; p_y := 3%:R |}];
+          low :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 2%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 4%:R; p_y := 4%:R |}));
+          high :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 3%:R; p_y := 5%:R |} <
+                   p_x {| p_x := 4%:R; p_y := 4%:R |}))
+          |};
+     {| pts :=
+          [:: {|p_x := 4%:R; p_y := 4%:R |};
+              {|p_x := 4%:R; p_y := 11%:R |};
+              {|p_x := 3%:R; p_y := 8%:R |};
+              {|p_x := 3%:R; p_y := 5%:R |}];
+          low :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 3%:R; p_y := 5%:R |} <
+                   p_x {| p_x := 4%:R; p_y := 4%:R |}));
+          high :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 1%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 6%:R; p_y := 17%:R |}))
+          |};
+     {| pts :=
+          [:: {|p_x := 3%:R; p_y := 3%:R |};
+              {|p_x := 3%:R; p_y := 5%:R |};
+              {|p_x := 2%:R; p_y := 2%:R |}];
+          low :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 2%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 4%:R; p_y := 4%:R |}));
+          high :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 2%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 3%:R; p_y := 5%:R |}));
+          |};
+     {| pts :=
+          [:: {|p_x := 3%:R; p_y := 5%:R |};
+              {|p_x := 3%:R; p_y := 8%:R |};
+              {|p_x := 2%:R; p_y := 5%:R |};
+              {|p_x := 2%:R; p_y := 2%:R |}];
+          low :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 2%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 3%:R; p_y := 5%:R |}));
+          high :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 1%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 6%:R; p_y := 17%:R |}));
+
+          |};
+     {| pts :=
+          [:: {|p_x := 2%:R; p_y := (7%:R / 4%:R) |};
+              {|p_x := 2%:R; p_y := 5%:R |};
+              {|p_x := 1%:R; p_y := 2%:R |}];
+          low :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 1%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 5%:R; p_y := 1%:R |}));
+          high :=
+            Bedge
+               (erefl
+                  (p_x {| p_x := 1%:R; p_y := 2%:R |} <
+                   p_x {| p_x := 6%:R; p_y := 17%:R |}))
+          |}].
+
+Compute (concat newline ([:: "%!PS"; "100 100 translate newpath ";
+    (display_cell (cats "20 mul " newline)
+         (nth cell0 expected_result 0)
+                 (cats "stroke showpage" newline))])%string).
+
+Compute  (concat newline ([:: "%!PS"; "100 100 translate newpath ";
+    (foldr (display_cell (cats "20 mul " newline))
+                 (cats "stroke showpage" newline) expected_result)])%string)
+
+.
+
 
 Compute (* map (fun c => display_cell "50 mul " c "") *) (start [::
      Bevent {| p_x := 2; p_y := 2 |}
