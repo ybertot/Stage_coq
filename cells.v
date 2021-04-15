@@ -440,14 +440,13 @@ Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
     end.
 
 
-
-
-
-Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) : (seq cell) :=
+(* at each step we create the cell under the first outgoing edge and when there's only one left,
+we create the two last cells, having no outgoing edge is a special case than need to be treated on its own *)
+Fixpoint opening_cells_ok (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) : (seq cell) :=
 
   match out with
     | [::] => let op0 := vertical_intersection_point p low_e in 
-                      let op1 := vertical_intersection_point p high_e in
+              let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
@@ -465,9 +464,24 @@ Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        (Bcell  (no_dup_seq (p::p0::[::])) low_e c) :: opening_cells p q c high_e
+                        (Bcell  (no_dup_seq (p::p0::[::])) low_e c) :: opening_cells_ok p q c high_e
                     end
 end.
+
+(* here we're dealing with the case where the point is on the external outline *)
+Definition opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) : (seq cell) :=
+  if (point_on_edge p low_e) then (* in that case we're skipping the first cell which would be outside *)
+    match out with
+      | [::] => [::] (* here it would mean there are no outgoing edge on the outline, this should be the final point or the envelope isn't convex*)
+      | c::q => opening_cells_ok p q c high_e 
+    end
+  else
+  if (point_on_edge p high_e) then
+    match (rev out) with
+      | [::] => [::]
+      | l::q => opening_cells_ok p (rev q) low_e l
+    end
+  else opening_cells_ok p out low_e high_e.
 
 Fixpoint extract_h (cells : seq cell) : edge :=
   match cells with 
