@@ -525,7 +525,7 @@ Definition step (e: event) (open_cells : seq cell) (closed_cells : seq cell) : (
    let (lower_edge, higher_edge) := extract_l_h_edges contact_cells in 
    let last_cell_not_contact := extract_last_cell open_cells contact_cells in
    let closed := closing_cells p contact_cells in 
-   let closed_cells := closed++closed_cells in
+   let closed_cells := closed_cells++closed in
    let open_cells :=  [seq x <- open_cells | ~~(contains contact_cells  x)] in
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge in
 
