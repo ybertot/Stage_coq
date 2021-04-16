@@ -1,3 +1,4 @@
+
 From mathcomp Require Import all_ssreflect all_algebra.
 Require Export Field.
 
@@ -385,8 +386,9 @@ Qed.
 
 Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::] [::].
 Definition dummy_edge : edge := (@Bedge  (Bpt 0%:Q 0%:Q) (Bpt 1%:Q 0%:Q) isT).
+Definition dummy_cell : cell := (@Bcell  ((Bpt 0%:Q 0%:Q)::[::]) dummy_edge dummy_edge).
 
-(*if a cell doesn't contain a point, then either both edges are strictly under p or strictly over p*)
+(* if a cell doesn't contain a point, then either both edges are strictly under p or strictly over p *)
 Definition contains_point (p : pt) (c : cell)  : bool :=
    let e1 := low c in
    let e2 := high c in
@@ -460,11 +462,11 @@ Fixpoint opening_cells_ok (p : pt) (out : seq edge) (low_e : edge) (high_e : edg
                           |(Some(p0),Some(p1)) =>
                                 (Bcell  (no_dup_seq (p::p0::[::])) low_e only_out)::(Bcell  (no_dup_seq (p1::p::[::])) only_out high_e)::[::]
                             end
-    | c::q => let op0 := vertical_intersection_point p c in 
+    | c::q => let op0 := vertical_intersection_point p low_e in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        (Bcell  (no_dup_seq (p::p0::[::])) low_e c) :: opening_cells_ok p q c high_e
+                        (Bcell  (no_dup_seq(p::p0::[::])) low_e c) :: opening_cells_ok p q c high_e
                     end
 end.
 
@@ -525,7 +527,7 @@ Definition step (e: event) (open_cells : seq cell) (closed_cells : seq cell) : (
    let closed := closing_cells p contact_cells in 
    let closed_cells := closed++closed_cells in
    let open_cells :=  [seq x <- open_cells | ~~(contains contact_cells  x)] in
-   let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge++open_cells in
+   let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge in
 
    (insert_open_cell open_cells new_open_cells contact_cells, closed_cells).
 
@@ -652,3 +654,4 @@ rewrite -evseq aeq /= => [][e'p | e'p2]; rewrite path_e'evs3 andbT.
   by rewrite /lexPtEv e'p p1ltp.
 by move: path_evs; rewrite evseq /= andbC /lexPtEv e'p2=> /andP[].
 Qed.
+
