@@ -455,7 +455,7 @@ Fixpoint opening_cells_ok (p : pt) (out : seq edge) (low_e : edge) (high_e : edg
     | [::] => let op0 := vertical_intersection_point p low_e in 
               let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
-                          |(None,_) |(_,None)=> dummy_cell::[::]
+                          |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
                               (Bcell  (no_dup_seq (p1::p::p0::[::])) low_e high_e) ::[::]
                       end
@@ -463,13 +463,13 @@ Fixpoint opening_cells_ok (p : pt) (out : seq edge) (low_e : edge) (high_e : edg
     | only_out::[::] =>  let op0 := vertical_intersection_point p low_e in 
                       let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
-                          |(None,_) |(_,None)=> dummy_cell::[::]
+                          |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
                                 (Bcell  (no_dup_seq (p::p0::[::])) low_e only_out)::(Bcell  (no_dup_seq (p1::p::[::])) only_out high_e)::[::]
                             end
     | c::q => let op0 := vertical_intersection_point p low_e in 
                     match op0 with 
-                       | None => dummy_cell::[::]
+                       | None => [::]
                        | Some(p0) =>
                         (Bcell  (no_dup_seq(p::p0::[::])) low_e c) :: opening_cells_ok p q c high_e
                     end
@@ -541,7 +541,7 @@ Lemma opening_cells_ok_eq  p out low_e high_e:
     | [::] => let op0 := vertical_intersection_point p low_e in 
               let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
-                          |(None,_) |(_,None)=> dummy_cell::[::]
+                          |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
                               (Bcell  (no_dup_seq (p1::p::p0::[::])) low_e high_e) ::[::]
                       end
@@ -549,13 +549,13 @@ Lemma opening_cells_ok_eq  p out low_e high_e:
     | only_out::[::] =>  let op0 := vertical_intersection_point p low_e in 
                       let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
-                          |(None,_) |(_,None)=> dummy_cell::[::]
+                          |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
                                 (Bcell  (no_dup_seq (p::p0::[::])) low_e only_out)::(Bcell  (no_dup_seq (p1::p::[::])) only_out high_e)::[::]
                             end
     | c::q => let op0 := vertical_intersection_point p low_e in 
                     match op0 with 
-                       | None => dummy_cell::[::]
+                       | None => [::]
                        | Some(p0) =>
                         (Bcell  (no_dup_seq(p::p0::[::])) low_e c) :: opening_cells_ok p q c high_e
                     end
