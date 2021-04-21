@@ -80,7 +80,28 @@ by apply: ReflectF=> [][].
 Qed.
 
 Canonical cell_eqType := EqType cell (EqMixin cell_eqP).
+
 Record event := Bevent {point : pt; incoming : seq edge; outgoing : seq edge}.
+
+Definition event_eqb (ea eb : event) : bool :=
+  let: Bevent pta inca outa := ea in
+  let: Bevent ptb incb outb := eb in
+  (pta == ptb) && (inca == incb) && (outa == outb).
+
+Lemma event_eqP : Equality.axiom event_eqb.
+Proof.
+rewrite /Equality.axiom.
+move => [pta inca outa] [ptb incb outb] /=.
+have [/eqP <-|/eqP anb] := boolP(pta == ptb).
+  have [/eqP <-|/eqP anb] := boolP(inca == incb).
+    have [/eqP <-|/eqP anb] := boolP(outa == outb).
+      by apply:ReflectT.
+    by apply : ReflectF => [][].
+  by apply: ReflectF=> [][].
+by apply: ReflectF=> [][].
+Qed.
+
+Canonical event_eqType := EqType event (EqMixin event_eqP).
 
 (* As in insertion sort, the add_event function assumes that event are
   sorted in evs (lexicographically, first coordinate, then second coordinate
@@ -418,11 +439,11 @@ Fixpoint no_dup_seq (A : eqType) (s : seq A) : (seq A) :=
 Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
     match rest with
        | [::] => [::]
-       | c::[::] => let op1 := vertical_intersection_point p (high c) in
+       | [:: c] => let op1 := vertical_intersection_point p (high c) in
                     match op1 with 
                        | None => [::]
                        | Some(p1) =>
-                        Bcell  ((no_dup_seq (p::p1::[::]))++(pts c)) (low c) (high c)::[::]
+                        Bcell  ((no_dup_seq [:: p; p1])++(pts c)) (low c) (high c)::[::]
                     end
        | c::q =>  Bcell  (p::(pts c)) (low c) (high c)::closing_rest p q
     end.
@@ -432,19 +453,19 @@ Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
 Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
     match contact_cells with
       | [::] => [::]
-      | only_cell::[::] => 
+      | [:: only_cell] => 
                       let op0 := vertical_intersection_point p (low only_cell) in 
                       let op1 := vertical_intersection_point p (high only_cell) in
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              Bcell  ((no_dup_seq (p0::p::p1::[::]))++(pts only_cell)) (low only_cell) (high only_cell)::[::]
+                              Bcell  ((no_dup_seq [:: p0; p; p1])++(pts only_cell)) (low only_cell) (high only_cell)::[::]
                       end
       | c::q => let op0 := vertical_intersection_point p (low c) in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        Bcell  ((no_dup_seq (p0::p::[::]))++(pts c)) (low c) (high c) :: (closing_rest p q)
+                        Bcell  ((no_dup_seq ([:: p0; p]))++(pts c)) (low c) (high c) :: (closing_rest p q)
                     end
     end.
 
@@ -452,27 +473,28 @@ Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
 we create the two last cells *)
 Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) : (seq cell) :=
 
-  match out with
+      match out with
     | [::] => let op0 := vertical_intersection_point p low_e in 
               let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              (Bcell  (no_dup_seq (p1::p::p0::[::])) low_e high_e) ::[::]
+                              (Bcell  (no_dup_seq ([:: p1; p; p0])) low_e high_e) ::[::]
                       end
-
-    | only_out::[::] =>  let op0 := vertical_intersection_point p low_e in 
+    
+    | [:: only_out] =>  let op0 := vertical_intersection_point p low_e in 
                       let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                                (Bcell  (no_dup_seq (p::p0::[::])) low_e only_out)::(Bcell  (no_dup_seq (p1::p::[::])) only_out high_e)::[::]
-                      end
+                                (Bcell  (no_dup_seq ([:: p; p0])) low_e only_out)::(Bcell  (no_dup_seq ([:: p1; p])) only_out high_e)::[::]
+                            end
+
     | c::q => let op0 := vertical_intersection_point p low_e in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        (Bcell  (no_dup_seq(p::p0::[::])) low_e c) :: opening_cells p q c high_e
+                        (Bcell  (no_dup_seq([:: p; p0])) low_e c) :: opening_cells p q c high_e
                     end
 end.
 
@@ -480,14 +502,14 @@ end.
 Fixpoint extract_h (cells : seq cell) : edge :=
   match cells with 
    [::] => dummy_edge
-   | last_cell ::[::] => high last_cell
+   | [:: last_cell] => high last_cell
    | c::q => extract_h q
   end.
 
 Definition extract_l_h_edges (cells : seq cell) : edge * edge :=
   match cells with
     | [::] => (dummy_edge, dummy_edge)
-    | only_cell ::[::] => (low only_cell, high only_cell)
+    | [:: only_cell] => (low only_cell, high only_cell)
     | c::q => (low c, extract_h q)
 end.
 
@@ -506,7 +528,7 @@ Fixpoint insert_open_cell (open_cells : seq cell) (new_open_cells : seq cell) (l
 Fixpoint extract_last_cell (open_cells : seq cell) (contact_cells : seq cell) : seq cell :=
   match open_cells with
     | [::] => [::]
-    | c::q => if (contains contact_cells c) then c::[::] else extract_last_cell q contact_cells 
+    | c::q => if (contains contact_cells c) then [:: c] else extract_last_cell q contact_cells 
   end.
 
 
@@ -521,16 +543,11 @@ Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : 
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge in
    (insert_open_cell open_cells new_open_cells contact_cells, closed_cells).
 
-Definition alive_edges_will_be_closed open closed (current_event : event) (future_events : seq event):=
-forall c, contains open c -> exists e,   contains (outgoing e) (low c) /\ contains (outgoing e) (high c) /\ (contains (current_event::future_events) e)->
+Definition alive_edges_will_be_closed open closed (current_event : event) (future_events : seq event) : Prop := 
+forall c, contains open c -> exists e,   contains (outgoing e) (low c) /\ contains (outgoing e) (high c) /\ (contains (current_event::future_events) e) ->
 let (open2, _) := step current_event open closed in 
 forall c, contains open2 c -> exists e, contains future_events e /\ contains (outgoing e) (low c) /\ contains (outgoing e) (high c).
 
-
-Definition step_only_alive_edges first_e second_e open closed  :=
-(forall c, contains open c -> valid_cell c (p_x (point first_e)))
--> let (open2, _) := step first_e open closed in 
-(forall c, contains open2 c -> valid_cell c (p_x (point second_e))).
 
 Lemma opening_cells_eq  p out low_e high_e:
   opening_cells   p out low_e high_e =
@@ -540,21 +557,22 @@ Lemma opening_cells_eq  p out low_e high_e:
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              (Bcell  (no_dup_seq (p1::p::p0::[::])) low_e high_e) ::[::]
+                              (Bcell  (no_dup_seq ([:: p1; p; p0])) low_e high_e) ::[::]
                       end
-
+    
     | only_out::[::] =>  let op0 := vertical_intersection_point p low_e in 
                       let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                                (Bcell  (no_dup_seq (p::p0::[::])) low_e only_out)::(Bcell  (no_dup_seq (p1::p::[::])) only_out high_e)::[::]
+                                (Bcell  (no_dup_seq ([:: p; p0])) low_e only_out)::(Bcell  (no_dup_seq ([:: p1; p])) only_out high_e)::[::]
                             end
+
     | c::q => let op0 := vertical_intersection_point p low_e in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        (Bcell  (no_dup_seq(p::p0::[::])) low_e c) :: opening_cells p q c high_e
+                        (Bcell  (no_dup_seq([:: p; p0])) low_e c) :: opening_cells p q c high_e
                     end
 end.
 Proof. by case: out. Qed.
@@ -624,10 +642,10 @@ Definition start (events : seq event) (bottom : edge) (top : edge): seq cell :=
           let p := point e in let out := outgoing e in
            scan q (opening_cells p out bottom top) [::]
       end. 
-
-Definition events_inside_bottom_top events bottom top := 
+(*
+Definition events_inside_bottom_top events bottom top : Prop := 
   (p_x (left_pt bottom) = p_x (left_pt top)) && (p_x (left_pt bottom) = p_x (left_pt top))
-
+*)
 Definition lexPtEv (e1 e2 : event) : bool :=
   let p1 := point e1 in let p2 := point e2 in
   (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
