@@ -543,11 +543,34 @@ Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : 
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge in
    (insert_open_cell open_cells new_open_cells contact_cells, closed_cells).
 
-Definition alive_edges_will_be_closed open closed (current_event : event) (future_events : seq event) : Prop := 
-forall c, contains open c -> exists e,   contains (outgoing e) (low c) /\ contains (outgoing e) (high c) /\ (contains (current_event::future_events) e) ->
-let (open2, _) := step current_event open closed in 
-forall c, contains open2 c -> exists e, contains future_events e /\ contains (outgoing e) (low c) /\ contains (outgoing e) (high c).
+Definition event_close_edge ed ev : bool :=
+ed \in outgoing ev.
 
+
+Definition alive_edges_will_be_closed open future_events : bool := 
+all (fun c => (has (event_close_edge (low c)) future_events) && (has (event_close_edge (high c)) future_events)) open.
+
+Lemma step_keeps_closeness open closed current_event (future_events : seq event) : 
+alive_edges_will_be_closed open (current_event::future_events) ->
+let (open2, _) := step current_event open closed in 
+alive_edges_will_be_closed open2 future_events.
+Admitted.
+
+Fixpoint adjacent_cells_aux open b: bool :=
+  match open with
+  | [::] => true
+  | a::q => (high b == low a) && adjacent_cells_aux q a
+  end.
+
+Definition adjacent_cells open : bool :=
+  match open with 
+  | [::] => true
+  | b::q => adjacent_cells_aux q b
+  end.
+
+Lemma step_keeps_adjacent open closed current_event (future_events : seq event) :
+adjacent_cells open -> let (open2, _) := step current_event open closed in adjacent_cells open2.
+Admitted.
 
 Lemma opening_cells_eq  p out low_e high_e:
   opening_cells   p out low_e high_e =
