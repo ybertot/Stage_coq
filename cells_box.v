@@ -547,13 +547,17 @@ Definition event_close_edge ed ev : bool :=
 ed \in outgoing ev.
 
 
-Definition alive_edges_will_be_closed open future_events : bool := 
+Definition close_alive_edges open future_events : bool := 
 all (fun c => (has (event_close_edge (low c)) future_events) && (has (event_close_edge (high c)) future_events)) open.
 
 Lemma step_keeps_closeness open closed current_event (future_events : seq event) : 
-alive_edges_will_be_closed open (current_event::future_events) ->
+close_alive_edges open (current_event::future_events) ->
 let (open2, _) := step current_event open closed in 
-alive_edges_will_be_closed open2 future_events.
+close_alive_edges open2 future_events.
+Proof.
+
+rewrite /close_alive_edges.
+rewrite /event_close_edge .
 Admitted.
 
 Fixpoint adjacent_cells_aux open b: bool :=
@@ -567,6 +571,12 @@ Definition adjacent_cells open : bool :=
   | [::] => true
   | b::q => adjacent_cells_aux q b
   end.
+
+(* toutes les arêtes présentes dans la liste des événements qui sont déjà vivantes sont dans la liste des cellules 
+   car dans un second temps la liste des cellules qu'on obtient à la fin doit contenir toutes les arêtes
+   après un certain événement il faut vérifier que on ouvre pour une certaine hauteur tout ce qu'on ferme.
+
+*)
 
 Lemma step_keeps_adjacent open closed current_event (future_events : seq event) :
 adjacent_cells open -> let (open2, _) := step current_event open closed in adjacent_cells open2.
