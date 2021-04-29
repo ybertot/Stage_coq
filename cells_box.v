@@ -519,13 +519,32 @@ Fixpoint insert_open (open_cells : seq cell) (new_open_cells : seq cell) (low_e 
     | c::q => if ((high c) == low_e) then c::(new_open_cells ++ q) else c::(insert_open q new_open_cells low_e)
   end.
 
+Definition insert_open_cell_2 (first_cells : seq cell) (new_open_cells : seq cell) (last: seq cell) : seq cell :=
+ first_cells++new_open_cells++last.
+
 Fixpoint insert_open_cell (open_cells : seq cell) (new_open_cells : seq cell) (last: seq cell) : seq cell :=
   match open_cells with 
     | [::] => new_open_cells
     | c::q => if (contains last c) then c::(new_open_cells ++ q) else c::(insert_open_cell q new_open_cells last)
   end.
 
-Fixpoint extract_last_cell (open_cells : seq cell) (contact_cells : seq cell) : seq cell :=
+Fixpoint open_cells_decomposition_fix open_cells pt first_cells contact last_cells : seq cell * seq cell * seq cell :=
+  match open_cells with
+    | [::] => (first_cells, contact, last_cells)
+    | Bcell lpt low high :: q  => if (contains_point pt (Bcell lpt low high)) then 
+                                 open_cells_decomposition_fix q pt first_cells (contact++[::Bcell lpt low high]) last_cells
+                                 else if (point_under_edge pt low) then
+                                          open_cells_decomposition_fix q pt first_cells contact (last_cells++[::Bcell lpt low high])
+                                      else open_cells_decomposition_fix q pt (first_cells++([::Bcell lpt low high])) contact last_cells
+    end.
+
+Definition open_cells_decomposition (open_cells : seq cell) (p : pt) : seq cell * seq cell * seq cell :=
+  match open_cells with
+    | [::] => ([::],[::],[::])
+    | _  => open_cells_decomposition_fix open_cells p [::] [::] [::]
+  end.
+
+Fixpoint extract_last_cell (open_cells : seq cell) (contact_cells : seq cell) : seq cell  :=
   match open_cells with
     | [::] => [::]
     | c::q => if (contains contact_cells c) then [:: c] else extract_last_cell q contact_cells 
@@ -534,30 +553,66 @@ Fixpoint extract_last_cell (open_cells : seq cell) (contact_cells : seq cell) : 
 
 Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : (seq cell) * (seq cell) :=
    let p := point e in
-   let contact_cells := [seq x <- open_cells | contains_point p x]  in
+   let '(first_cells, contact_cells, last_cells) := (open_cells_decomposition open_cells p) in
    let (lower_edge, higher_edge) := extract_l_h_edges contact_cells in 
-   let last_cell_not_contact := extract_last_cell open_cells contact_cells in
    let closed := closing_cells p contact_cells in 
    let closed_cells := closed_cells++closed in
-   let open_cells :=  [seq x <- open_cells | ~~(contains contact_cells  x)] in
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge in
-   (insert_open_cell open_cells new_open_cells contact_cells, closed_cells).
+   ((insert_open_cell_2 first_cells new_open_cells last_cells), closed_cells).
 
 Definition event_close_edge ed ev : bool :=
-ed \in outgoing ev.
+ed \in incoming ev.
 
+Definition end_edge edge events : bool :=
+has (event_close_edge edge) events.
 
 Definition close_alive_edges open future_events : bool := 
-all (fun c => (has (event_close_edge (low c)) future_events) && (has (event_close_edge (high c)) future_events)) open.
+all (fun c => (end_edge (low c) future_events) && (end_edge (high c) future_events)) open.
+
+Fixpoint close_edges_from_events events : bool :=
+  match events with
+  | [::] => true
+  | Bevent pt inc out ::future_events => all (fun edge => end_edge edge future_events) out && close_edges_from_events future_events
+  end.
+
+Lemma insert_opening_closeness open_cells new_open_cells last_cells events : 
+  close_alive_edges open_cells events -> close_alive_edges new_open_cells events ->
+  close_alive_edges last_cells events -> close_alive_edges (insert_open_cell open_cells new_open_cells last_cells) events.
+Proof.
+
+  rewrite /close_alive_edges.
+
+  case : open_cells.
+  move => Hopen Hnew Hlast /=.
+  exact Hnew.
+  move => q head  /=.
+
+  case :  (contains last_cells q) => [Hopen Hnew Hlast //=|].
+
+  rewrite /insert_open_cell.
+  case : open_cells.
+
 
 Lemma step_keeps_closeness open closed current_event (future_events : seq event) : 
-close_alive_edges open (current_event::future_events) ->
-let (open2, _) := step current_event open closed in 
-close_alive_edges open2 future_events.
+close_alive_edges open (current_event::future_events) && close_edges_from_events (current_event::future_events) ->
+close_alive_edges  (step current_event open closed).1  future_events.
 Proof.
 
 rewrite /close_alive_edges.
 rewrite /event_close_edge .
+intros H .
+
+rewrite /step.
+case H1 : (extract_l_h_edges
+[seq x <- open | contains_point (point current_event) x]) => [lower_edge higher_edge].
+
+(*case H1 : (step current_event open closed) => [open2 dummy].*)
+apply /allP.
+move => c0 c0in2.
+apply /andP.
+split.
+Search ((_,_).1).
+
 Admitted.
 
 Fixpoint adjacent_cells_aux open b: bool :=
@@ -580,6 +635,11 @@ Definition adjacent_cells open : bool :=
 
 Lemma step_keeps_adjacent open closed current_event (future_events : seq event) :
 adjacent_cells open -> let (open2, _) := step current_event open closed in adjacent_cells open2.
+rewrite /adjacent_cells.
+elim : open =>[ /= It| head q Ih /=].
+
+set opened  := opening_cells (point current_event) (outgoing current_event) dummy_edge dummy_edge.
+ case : opened => [//=|head q /=].
 Admitted.
 
 Lemma opening_cells_eq  p out low_e high_e:
