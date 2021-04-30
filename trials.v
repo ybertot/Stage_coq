@@ -49,9 +49,13 @@ Fixpoint seq_nat_to_edges (s : seq nat) : option (seq edge) :=
   | _ => None
   end.
 
+Definition dummy_low := @Bedge (Bpt 0%:Q 0%:Q) (Bpt 50%:Q 0%:Q) isT.
+
+Definition dummy_high := @Bedge (Bpt 0%:Q 50%:Q) (Bpt 50%:Q 50%:Q) isT.
+
 Definition test (s : seq nat) : option (seq cell) :=
   match seq_nat_to_edges s with
-  | Some v => Some (start (edges_to_events v))
+  | Some v => Some (start (edges_to_events v) dummy_low dummy_high )
   | _ => None
   end.
 
