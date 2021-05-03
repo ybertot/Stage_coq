@@ -14,6 +14,9 @@ We want to divide the space into multiple cells and to know which points are com
 * a list of event. 
     * an event is the start or the end of an edge, the data structure contains a point and all of the incoming and outgoing edges (an edge is incoming relatively to an edge if it ends at that event, considered from left to right and is outgoing if it starts at that event).
     * if two edges are crossing on the original drawing they must be divided into 4 sub-edges in the manner that no edges are crossing.
+    1. The list of events must verify that all edges starting from an event will be closed in a following one (ie all edges in the outgoing list from an event must be in an incoming list from another event that is later in the list).
+    2. for a certain event, every right extremity of its incoming edges must be equal to the left extremity of its outgoing edges and must be equal to the point of that event.
+    
 * two edges, constituing the "box" in which we're making cells,
     * every event (and by consequence every edge linked to those events) must be between those two edges.
     * there are no strong prerequisite on the shape of the box edges besides the one previously stated.
@@ -31,6 +34,9 @@ We want to divide the space into multiple cells and to know which points are com
 * the algorithms scans the space from left to right using the list of event, assuming it is sorted from lowest absciss to highest, and knowing that no two event can have the same absciss.
 
 * at each step the algorithm treats a new event, closing cells and opening new ones, thus maintaining a list of closed cells and a list of alive cells. 
-    * It must keep the alive cells sorted from lowest ordinate to highest one. 
-    * The alive cells must keep the following properties at all time : each edge constituting one of the alive cells will be closed in the list of remaining events. 
-    * The alive cells must all be adjacent to the following and previous cells, meaning there is no hole for a certain absciss. (every point will be in an alive cell that will end up closed, and thus every point will be in a cell in the end).
+    1. It must keep the alive cells sorted from lowest ordinate to highest one. 
+    2. Each edge constituting one of the alive cells will be closed in the list of remaining events, except the edges constituing the box.
+    3. The alive cells must all be adjacent to the following and previous cells, meaning there is no hole for a certain absciss. (every point will be in an alive cell that will end up closed, and thus every point will be in a cell in the end).
+
+* after the last event is treated, there are no more alive cells and we return the list of closed cells, corresponding to the cell decomposition we were looking for. 
+The way to search for adjacence between each cell in the graph should be that every cell having two points in common are adjacent, except if those two points constitute an edge( since each cell contains the lower and higher edge, there is an easy way to check).

@@ -579,24 +579,23 @@ Lemma insert_opening_closeness open_cells new_open_cells last_cells events :
   close_alive_edges open_cells events -> close_alive_edges new_open_cells events ->
   close_alive_edges last_cells events -> close_alive_edges (insert_open_cell open_cells new_open_cells last_cells) events.
 Proof.
-
-  rewrite /close_alive_edges.
-
-  case : open_cells.
-  move => Hopen Hnew Hlast /=.
-  exact Hnew.
-  move => q head  /=.
-
-  case :  (contains last_cells q) => [Hopen Hnew Hlast //=|].
-
-  rewrite /insert_open_cell.
-  
-  apply /andP.
-  split.
-  apply /andP.
-  split.
-
+elim open_cells => [//= | c open Ih] .
+move => C_open.
+rewrite /close_alive_edges in C_open.
+move => /allP in C_open.
+have  : (close_alive_edges open events).
+rewrite /close_alive_edges.
+apply /allP.
 Admitted.
+
+    
+
+  
+
+  
+  
+
+  
 
 
 Lemma step_keeps_closeness open closed current_event (future_events : seq event) : 
@@ -635,7 +634,8 @@ Definition adjacent_cells open : bool :=
 
 (* toutes les arêtes présentes dans la liste des événements qui sont déjà vivantes sont dans la liste des cellules 
    car dans un second temps la liste des cellules qu'on obtient à la fin doit contenir toutes les arêtes
-   après un certain événement il faut vérifier que on ouvre pour une certaine hauteur tout ce qu'on ferme.
+   après un certain événement 
+   il faut vérifier que on ouvre pour une certaine hauteur tout ce qu'on ferme.
 
 *)
 
