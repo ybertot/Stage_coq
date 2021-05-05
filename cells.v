@@ -449,7 +449,6 @@ Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
     end.
 
 
-
 Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
     match contact_cells with
       | [::] => [::]
@@ -465,7 +464,7 @@ Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        Bcell  ((no_dup_seq ([:: p0; p]))++(pts c)) (low c) (high c) :: (closing_rest p q)
+                        Bcell  ((no_dup_seq ([:: p0; p])) ++ (pts c)) (low c) (high c) :: (closing_rest p q)
                     end
     end.
 
@@ -481,7 +480,7 @@ Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) 
                           |(Some(p0),Some(p1)) =>
                               (Bcell  (no_dup_seq ([:: p1; p; p0])) low_e high_e) ::[::]
                       end
-    
+    (*
     | [:: only_out] =>  let op0 := vertical_intersection_point p low_e in 
                       let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
@@ -489,7 +488,7 @@ Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) 
                           |(Some(p0),Some(p1)) =>
                                 (Bcell  (no_dup_seq ([:: p; p0])) low_e only_out)::(Bcell  (no_dup_seq ([:: p1; p])) only_out high_e)::[::]
                             end
-
+*)
     | c::q => let op0 := vertical_intersection_point p low_e in 
                     match op0 with 
                        | None => [::]
@@ -498,19 +497,16 @@ Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) 
                     end
 end.
 
-
-Fixpoint extract_h (cells : seq cell) : edge :=
+Fixpoint extract_h (cells : seq cell) (high_e : edge) : edge :=
   match cells with 
-   [::] => dummy_edge
-   | [:: last_cell] => high last_cell
-   | c::q => extract_h q
+   [::] => high_e
+   | c::q => extract_h q (high c)
   end.
 
 Definition extract_l_h_edges (cells : seq cell) : edge * edge :=
   match cells with
     | [::] => (dummy_edge, dummy_edge)
-    | [:: only_cell] => (low only_cell, high only_cell)
-    | c::q => (low c, extract_h q)
+    | c::q => (low c, extract_h q (high c))
 end.
 
 Fixpoint insert_open (open_cells : seq cell) (new_open_cells : seq cell) (low_e : edge) : seq cell :=
@@ -522,16 +518,16 @@ Fixpoint insert_open (open_cells : seq cell) (new_open_cells : seq cell) (low_e 
 Definition insert_open_cell (first_cells : seq cell) (new_open_cells : seq cell) (last: seq cell) : seq cell :=
  first_cells++new_open_cells++last.
 
-
 Fixpoint open_cells_decomposition_fix open_cells pt first_cells contact last_cells : seq cell * seq cell * seq cell :=
   match open_cells with
     | [::] => (first_cells, contact, last_cells)
     | Bcell lpt low high :: q  => if (contains_point pt (Bcell lpt low high)) then 
-                                 open_cells_decomposition_fix q pt first_cells (contact++[::Bcell lpt low high]) last_cells
+                                 open_cells_decomposition_fix q pt first_cells (contact ++ [:: Bcell lpt low high]) last_cells
                                  else if (point_under_edge pt low) then
                                           open_cells_decomposition_fix q pt first_cells contact (last_cells++[::Bcell lpt low high])
-                                      else open_cells_decomposition_fix q pt (first_cells++([::Bcell lpt low high])) contact last_cells
+                                      else open_cells_decomposition_fix q pt (first_cells ++ ([:: Bcell lpt low high])) contact last_cells
     end.
+
 
 Definition open_cells_decomposition (open_cells : seq cell) (p : pt) : seq cell * seq cell * seq cell :=
   match open_cells with
@@ -545,7 +541,6 @@ Fixpoint extract_last_cell (open_cells : seq cell) (contact_cells : seq cell) : 
     | c::q => if (contains contact_cells c) then [:: c] else extract_last_cell q contact_cells 
   end.
 
-
 Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : (seq cell) * (seq cell) :=
    let p := point e in
    let '(first_cells, contact_cells, last_cells) := open_cells_decomposition open_cells p in
@@ -555,26 +550,66 @@ Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : 
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge in
    ((insert_open_cell first_cells new_open_cells last_cells), closed_cells).
 
+   Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
+    match events with 
+       | [::] => closed_cells
+       | e::q => let (open, closed) := (step e open_cells closed_cells) in  scan q open closed
+  end.
+ 
+ 
+ Definition get_high_low x low high : rat * rat :=
+ if x < low then (x, high) else if high < x then (low, x) else (low, high).
+ 
+ (*
+ Fixpoint search_l_h_edges (events : seq event) (low_x : rat) (high_x : rat) (low_y : rat) (high_y : rat) (proof : low_x < high_x): edge*edge :=
+   match events with
+   | [::] => (@Bedge (Bpt (low_x - 1%:Q) (low_y - 1%:Q)) (Bpt (high_x + 1%:Q) (low_y - 1%:Q)) _, @Bedge (Bpt (low_x - 1%:Q) (high_y + 1%:Q)) (Bpt (high_x + 1%:Q) (high_y + 1%:Q)) _)
+   | e::q => let p := point e in
+             let (lowx, highx) := get_high_low (p_x p) low_x high_x in
+             let (lowy, highy) := get_high_low (p_y p) low_y high_y in
+             search_l_h_edges q lowx highx lowy highy _
+   end.
+ 
+ Definition generate_outer_box (events : seq event) : edge * edge :=
+   match events with
+   | [::] => (dummy_edge,dummy_edge)
+   | e::q => let p := point e in search_l_h_edges q (p_x p) ((p_x p) +1%:Q) (p_y p) (p_y p) _ 
+   end.
+ 
+ *)
+ 
+ Definition start (events : seq event) (bottom : edge) (top : edge) : seq cell :=
+     match events with
+       | [::] => [::]
+       | e :: q => 
+           let p := point e in let out := outgoing e in
+            scan q (opening_cells p out bottom top) [::]
+       end. 
+Section proof_environment.
+Variable lower_edge higher_edge : edge.
+
 Definition event_close_edge ed ev : bool :=
 ed \in incoming ev.
 
 Definition end_edge edge events : bool :=
-has (event_close_edge edge) events.
+(edge \in [:: higher_edge; lower_edge]) || has (event_close_edge edge) events .
 
 Definition close_alive_edges open future_events : bool := 
 all (fun c => (end_edge (low c) future_events) && (end_edge (high c) future_events)) open.
 
+Definition close_out_from_event ev future : bool :=
+  all (fun edge => end_edge edge future) (outgoing ev).
+
 Fixpoint close_edges_from_events events : bool :=
   match events with
   | [::] => true
-  | Bevent pt inc out ::future_events => all (fun edge => end_edge edge future_events) out && close_edges_from_events future_events
+  | ev :: future_events => close_out_from_event ev future_events && close_edges_from_events future_events
   end.
 
 Lemma insert_opening_closeness first_cells new_open_cells last_cells events : 
   close_alive_edges first_cells events -> close_alive_edges new_open_cells events ->
   close_alive_edges last_cells events -> close_alive_edges (insert_open_cell first_cells new_open_cells last_cells) events.
 Proof.
-
 rewrite /close_alive_edges.
 move => C_first C_new C_last.
  rewrite /insert_open_cell all_cat all_cat.
@@ -587,19 +622,58 @@ split.
 by [].
 Qed.
 
+Lemma l_h_okay (open : seq cell) (e : event) (future : seq event):
+(open_cells_decomposition open (point e)).2 != nil -> close_alive_edges open (e::future) ->
+let(low, high) := extract_l_h_edges (open_cells_decomposition open (point e)).2 in 
+exists p0 p1,
+((vertical_intersection_point (point e) low) ==  Some(p0)) &&
+((vertical_intersection_point (point e) high) == Some (p1)).
+Proof.
+  rewrite /=.
+  set contact := (open_cells_decomposition open (point e)).2.
+  move => not_nil c_open.
+  rewrite /extract_l_h_edges .
+  move: not_nil.
+  case : contact => [//= | ].
+  move => c q Hc {Hc}.
+  
+Admitted.
+
+Lemma opening_cells_close event low_e high_e future :
+end_edge low_e future -> end_edge high_e future -> close_out_from_event event future ->
+close_alive_edges (opening_cells (point event) (outgoing event) low_e high_e) future.
+Proof.
+rewrite /close_out_from_event.
+move : low_e high_e.
+elim : (outgoing event) => [ | e0 q Ho].
+  move => low_e high_e end_low end_high.
+  move => close_events.
+  rewrite /opening_cells.
+  case : (vertical_intersection_point (point event) low_e) => [low_pt|]; last by [].
+  case : (vertical_intersection_point (point event) high_e) => [high_pt|]; last by [].
+  rewrite /=.
+  by rewrite end_low end_high.
+rewrite /=.
+move => low_e high_e end_low end_high.
+move => /andP [end0 close_future].
+case : (vertical_intersection_point (point event) low_e) => [low_pt|]; last by [].
+rewrite /=.
+rewrite end_low end0 /=.
+apply : Ho => //.
+Qed.
 
 Lemma step_keeps_closeness open closed current_event (future_events : seq event) : 
-close_alive_edges open (current_event::future_events) && close_edges_from_events (current_event::future_events) ->
+close_alive_edges open (current_event::future_events) -> close_out_from_event current_event future_events ->
 close_alive_edges  (step current_event open closed).1  future_events.
+
 Proof.
-
-
-intros H .
-
-
+move => close_open close_out.
 rewrite /step.
-
+rewrite /extract_l_h_edges.
+rewrite /extract_h.
 Admitted.
+
+
 
 Fixpoint adjacent_cells_aux open b: bool :=
   match open with
@@ -612,6 +686,7 @@ Definition adjacent_cells open : bool :=
   | [::] => true
   | b::q => adjacent_cells_aux q b
   end.
+  
 
 (* toutes les arêtes présentes dans la liste des événements qui sont déjà vivantes sont dans la liste des cellules 
    car dans un second temps la liste des cellules qu'on obtient à la fin doit contenir toutes les arêtes
@@ -639,7 +714,7 @@ Lemma opening_cells_eq  p out low_e high_e:
                           |(Some(p0),Some(p1)) =>
                               (Bcell  (no_dup_seq ([:: p1; p; p0])) low_e high_e) ::[::]
                       end
-    
+    (*
     | only_out::[::] =>  let op0 := vertical_intersection_point p low_e in 
                       let op1 := vertical_intersection_point p high_e in
                       match (op0,op1) with 
@@ -647,7 +722,7 @@ Lemma opening_cells_eq  p out low_e high_e:
                           |(Some(p0),Some(p1)) =>
                                 (Bcell  (no_dup_seq ([:: p; p0])) low_e only_out)::(Bcell  (no_dup_seq ([:: p1; p])) only_out high_e)::[::]
                             end
-
+*)
     | c::q => let op0 := vertical_intersection_point p low_e in 
                     match op0 with 
                        | None => [::]
@@ -684,41 +759,6 @@ Admitted.
 
 
 
-Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
-   match events with 
-      | [::] => closed_cells
-      | e::q => let (open, closed) := (step e open_cells closed_cells) in  scan q open closed
- end.
-
-
-Definition get_high_low x low high : rat * rat :=
-if x < low then (x, high) else if high < x then (low, x) else (low, high).
-
-(*
-Fixpoint search_l_h_edges (events : seq event) (low_x : rat) (high_x : rat) (low_y : rat) (high_y : rat) (proof : low_x < high_x): edge*edge :=
-  match events with
-  | [::] => (@Bedge (Bpt (low_x - 1%:Q) (low_y - 1%:Q)) (Bpt (high_x + 1%:Q) (low_y - 1%:Q)) _, @Bedge (Bpt (low_x - 1%:Q) (high_y + 1%:Q)) (Bpt (high_x + 1%:Q) (high_y + 1%:Q)) _)
-  | e::q => let p := point e in
-            let (lowx, highx) := get_high_low (p_x p) low_x high_x in
-            let (lowy, highy) := get_high_low (p_y p) low_y high_y in
-            search_l_h_edges q lowx highx lowy highy _
-  end.
-
-Definition generate_outer_box (events : seq event) : edge * edge :=
-  match events with
-  | [::] => (dummy_edge,dummy_edge)
-  | e::q => let p := point e in search_l_h_edges q (p_x p) ((p_x p) +1%:Q) (p_y p) (p_y p) _ 
-  end.
-
-*)
-
-Definition start (events : seq event) (bottom : edge) (top : edge): seq cell :=
-    match events with
-      | [::] => [::]
-      | e :: q => 
-          let p := point e in let out := outgoing e in
-           scan q (opening_cells p out bottom top) [::]
-      end. 
 (*
 Definition events_inside_bottom_top events bottom top : Prop := 
   (p_x (left_pt bottom) = p_x (left_pt top)) && (p_x (left_pt bottom) = p_x (left_pt top))
