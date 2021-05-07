@@ -63,7 +63,7 @@ Compute (* map (fun c => display_cell "50 mul " c "") *) (start [::
       [:: [edge of {| p_x := 5; p_y := 1|},
               {| p_x := 6; p_y := 17 |}];
           [edge of {| p_x := 1; p_y := 2|},
-             {|p_x := 6; p_y := 17 |}]] [::]]).
+             {|p_x := 6; p_y := 17 |}]] [::]] dummy_low dummy_high).
 Compute seq_nat_to_edges two_triangles.
 Definition edge1 :=  Bedge
                (erefl
@@ -97,13 +97,15 @@ Definition ev5 : event := nth ev0 tt_events 4.
 Definition ev6 : event := nth ev0 tt_events 5.
 Definition ev7 : event := nth ev0 tt_events 6.
 (* example of step-by-step execution. *)
-Lemma sandbox : start tt_events = nil.
+(*
+Lemma sandbox : start tt_events dummy_low dummy_high = nil.
 rewrite /start.
 rewrite /tt_events.
 set e := outgoing _.
 compute in e.
 rewrite /e.
 set es := (X in scan X).
+
 set c1 := (init_cells _ _ _).
 rewrite scan_eq.
 rewrite /es.
@@ -130,3 +132,4 @@ case nn: (step e0 c1 [::]) => [open closed].
 compute in nn.
 Admitted.
 
+*)
