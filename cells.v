@@ -355,28 +355,24 @@ move => p s.
 apply /sort_sorted_in /compare_incoming_total.
 Qed.
 
-Definition valid_edge e x := (p_x (left_pt e) <= x) /\ (x <= p_x (right_pt e)).
+Definition valid_edge e p := (p_x (left_pt e) <= p_x p) && (p_x p <= p_x (right_pt e)).
 Definition valid_cell c x := (valid_edge (low c) x) /\ (valid_edge (high c) x).
 
 (* returns the point of the intersection between a vertical edge
  intersecting p and the edge e if it exists, None if it doesn't *)
 Definition vertical_intersection_point (p : pt) (e : edge) : option pt := 
-  let: Bpt p_x p_y := p in
-  let: Bedge a b _ := e in
-  let: Bpt a_x a_y := a in
-  let: Bpt b_x b_y := b in
-  if (p_x < a_x) || (b_x < p_x) then None else 
-  Some(Bpt p_x ((p_x - a_x) * ((b_y - a_y) / (b_x - a_x)) + a_y)).
+
+  if valid_edge e p then Some(Bpt (p_x p) (((p_x p) - p_x (left_pt e))
+   * (((p_y (right_pt e)) - p_y (left_pt e)) /
+    ((p_x (right_pt e)) - p_x (left_pt e))) + p_y (left_pt e)))
+    else None.
 
 Lemma vertical_none p e :
-  let: Bpt p_x p_y := p in
-  let: Bedge a b _ := e in
-  let: Bpt a_x a_y := a in
-  let: Bpt b_x b_y := b in
- (p_x < a_x) || (b_x < p_x) -> vertical_intersection_point p e = None.
+  ~~ valid_edge e p -> vertical_intersection_point p e = None.
 Proof.
 move: p e => [px py] [[ax ay] [b_x b_y] ab] h /=.
-by apply /ifT.
+rewrite /vertical_intersection_point /=.
+by rewrite (negbTE h).
 Qed.
 
 
@@ -391,10 +387,11 @@ let: Bpt pt_x pt_y := p in
   let: Bedge a b _ := e in
   let: Bpt a_x a_y := a in
   let: Bpt b_x b_y := b in
-    match(vertical_intersection_point p e) with None => ((pt_x < a_x) || (b_x < pt_x)) | Some(i) => point_on_edge i e end.
+    match(vertical_intersection_point p e) with None => ~~ valid_edge e p | Some(i) => point_on_edge i e end.
 Proof.
 move: p e => [ptx pty] [[ax ay] [bx b_y]  /=ab] .
-case : ifP => h.
+rewrite /vertical_intersection_point.
+case : ifP => /= h ; last first.
 by [].
 have: ax != bx.
 rewrite mc_1_10.Num.Theory.neqr_lt ab //=.
@@ -404,7 +401,7 @@ move => h2.
 
 apply pue_f_inters.
 by apply /eqP /nesym /eqP .
-by rewrite /py.
+by [].
 Qed.
 
 Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::] [::].
@@ -607,8 +604,14 @@ Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : 
 Section proof_environment.
 Variable lower_edge higher_edge : edge.
 
-Lemma vertical_intersection_low_high edge p : bool :=
-(edge \in [:: higher_edge; lower_edge]) || has (event_close_edge edge) events.
+Definition lexPtEv (e1 e2 : event) : bool :=
+  let p1 := point e1 in let p2 := point e2 in
+  (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
+
+Definition inside_box p :=
+valid_edge lower_edge p /\ valid_edge higher_edge p.
+
+
 Definition event_close_edge ed ev : bool :=
 ed \in incoming ev.
 
@@ -665,40 +668,91 @@ Proof.
 Admitted.
 *)
 
-Definition vertical_some edge1 p :=
-exists i, (vertical_intersection_point p edge1) =  Some i.
+
+Lemma lexPtEvtrans ev a future : sorted  lexPtEv (ev::a::future) ->
+ sorted lexPtEv (ev :: future).
+Proof.
+rewrite /=.
+case : future => [//|b future].
+rewrite /=.
+move => /andP [] evLea /andP [] aLeb pathbf.
+rewrite pathbf andbT.
+move : evLea aLeb.
+rewrite /lexPtEv.
+(*case h : (p_x (point ev) < p_x (point a)) => /=.*)
+have [h | h'] := boolP (p_x (point ev) < p_x (point a)) => /=.
+move => _.
+have [h2 | h2'] := boolP (p_x (point a) < p_x (point b)) => /=.
+(* case h2 : (p_x (point a) < p_x (point b)) => /=.*)
+move => _.
+by rewrite (lt_trans h h2).
+move /andP => [/eqP <-] _.
+by rewrite h.
+move => /andP []/eqP <-  evLa /orP [] evLb .
+  by rewrite evLb.
+apply /orP .
+move : evLb => /andP [] /eqP <- aLb.
+
+rewrite (lt_trans evLa aLb).
+rewrite eq_refl  andbT  .
+by right.
+Qed.
+
+Lemma lexPtevAbsicca a b : (lexPtEv a b) -> (p_x (point a)) <= (p_x (point b)).
+Proof.
+rewrite /lexPtEv.
+move => /orP [] h.
+by rewrite mc_1_10.Num.Theory.ltrW.
+by move : h => /andP [] /eqP <-.
+Qed.
+
+
+
+Definition incoming_right_pt event := forall edge,
+edge \in incoming event -> (right_pt edge) = point event. 
 
 Lemma vertical_some_alive ed ev future :
-end_edge ed (ev::future) ->
-vertical_some ed (point ev).
+incoming_right_pt ev ->
+p_x (left_pt ed) < p_x (point ev) -> sorted lexPtEv (ev::future) ->
+end_edge ed (ev::future) -> inside_box (point ev) -> valid_edge ed (point ev).
 Proof.
+rewrite /incoming_right_pt.
+elim : future => [incEv lftedLev _ | b future Ih incEv lftedLev].
+  rewrite /end_edge.
+  move => /orP [].
+    by rewrite !inE /inside_box => /orP [] /eqP -> [].
+  rewrite has_seq1 /event_close_edge => edincEv insbox.
+  rewrite /valid_edge /andP mc_1_10.Num.Theory.ltrW. 
+    rewrite andTb.
+    have h2 : right_pt ed = point ev.
+      by apply incEv.
+    by rewrite h2.
+  by [].
+move => sorevBf.
+have sorevF : sorted lexPtEv (ev :: future).
+  by apply (lexPtEvtrans sorevBf ).
+move => endevbfut ins.
+have [h | h'] := boolP (end_edge ed (ev::future)).
+by rewrite Ih.
+move : endevbfut.
 rewrite /end_edge.
-move =>  /orP H.
-destruct H.
-apply  /orP.
-case ((ed \in [:: higher_edge; lower_edge])
-) => [h1 |h2].
+Admitted.
 
-.
-set edlh := (ed \in [:: higher_edge; lower_edge]).
-case : edlh => [e1 | e2] .
+
+
+
 
 Lemma l_h_okay (open : seq cell) (e : event) (future : seq event):
 open != nil -> close_alive_edges open (e::future) ->
 let '(_,_,_,lower,higher) := (open_cells_decomposition open (point e)) in 
 
-vertical_some lower (point e) /\ vertical_some higher (point e).
+valid_edge lower (point e) /\ valid_edge higher (point e).
 Proof.
   rewrite /=.
   set contact := (open_cells_decomposition open (point e)).2.
   move => not_nil c_open.
-
-  move: not_nil.
-  case : contact => [//= | ].
-  move => c q Hc {Hc}.
-  exists p0 : pt, (vertical_intersection_point (point e) (low c) == Some p0).
-  
 Admitted.
+
 Lemma opening_cells_close event low_e high_e future :
 end_edge low_e future -> end_edge high_e future -> close_out_from_event event future ->
 close_alive_edges (opening_cells (point event) (outgoing event) low_e high_e) future.
@@ -824,9 +878,7 @@ Definition events_inside_bottom_top events bottom top : Prop :=
 *)
 
 End proof_environment.
-Definition lexPtEv (e1 e2 : event) : bool :=
-  let p1 := point e1 in let p2 := point e2 in
-  (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
+
 
 
 Lemma add_event_preserve_first p e inc ev evs :
