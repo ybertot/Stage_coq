@@ -613,7 +613,7 @@ valid_edge lower_edge p /\ valid_edge higher_edge p.
 
 
 Definition event_close_edge ed ev : bool :=
-ed \in incoming ev.
+right_pt ed == point ev.
 
 Definition end_edge edge events : bool :=
 (edge \in [:: higher_edge; lower_edge]) || has (event_close_edge edge) events.
@@ -707,36 +707,52 @@ by move : h => /andP [] /eqP <-.
 Qed.
 
 
-
-Definition incoming_right_pt event := forall edge,
-edge \in incoming event -> (right_pt edge) = point event. 
-
 Lemma vertical_some_alive ed ev future :
-incoming_right_pt ev ->
+
 p_x (left_pt ed) < p_x (point ev) -> sorted lexPtEv (ev::future) ->
 end_edge ed (ev::future) -> inside_box (point ev) -> valid_edge ed (point ev).
 Proof.
-rewrite /incoming_right_pt.
-elim : future => [incEv lftedLev _ | b future Ih incEv lftedLev].
+
+elim : future => [ lftedLev _ | b future Ih lftedLev].
   rewrite /end_edge.
   move => /orP [].
     by rewrite !inE /inside_box => /orP [] /eqP -> [].
   rewrite has_seq1 /event_close_edge => edincEv insbox.
-  rewrite /valid_edge /andP mc_1_10.Num.Theory.ltrW. 
+  rewrite /valid_edge /andP ltW. 
     rewrite andTb.
     have h2 : right_pt ed = point ev.
-      by apply incEv.
+      by apply /eqP.
     by rewrite h2.
   by [].
 move => sorevBf.
 have sorevF : sorted lexPtEv (ev :: future).
   by apply (lexPtEvtrans sorevBf ).
 move => endevbfut ins.
-have [h | h'] := boolP (end_edge ed (ev::future)).
-by rewrite Ih.
-move : endevbfut.
-rewrite /end_edge.
-Admitted.
+have [/eqP h | h'] := boolP( right_pt ed == point b).
+rewrite /valid_edge.
+
+rewrite ltW => //.
+rewrite h.
+apply : lexPtevAbsicca .
+rewrite /= in sorevBf.
+by move /andP : sorevBf => [].
+move : (endevbfut).
+rewrite /end_edge .
+move => /orP [].
+move: ins => [] ins1 ins2.
+by rewrite !inE => /orP [] /eqP -> . 
+rewrite /= => /orP [] .
+rewrite /event_close_edge  /valid_edge => /eqP ->.
+rewrite ltW //.
+by rewrite le_eqVlt eqxx.
+rewrite /event_close_edge.
+rewrite (negbTE h') /=.
+move => endfut.
+apply : Ih => //.
+rewrite /end_edge /=.
+by rewrite endfut !orbT.
+Qed.
+
 
 
 
