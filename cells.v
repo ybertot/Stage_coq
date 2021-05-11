@@ -81,23 +81,21 @@ Qed.
 
 Canonical cell_eqType := EqType cell (EqMixin cell_eqP).
 
-Record event := Bevent {point : pt; incoming : seq edge; outgoing : seq edge}.
+Record event := Bevent {point : pt; outgoing : seq edge}.
 
 Definition event_eqb (ea eb : event) : bool :=
-  let: Bevent pta inca outa := ea in
-  let: Bevent ptb incb outb := eb in
-  (pta == ptb) && (inca == incb) && (outa == outb).
+  let: Bevent pta outa := ea in
+  let: Bevent ptb outb := eb in
+  (pta == ptb) && (outa == outb).
 
 Lemma event_eqP : Equality.axiom event_eqb.
 Proof.
 rewrite /Equality.axiom.
-move => [pta inca outa] [ptb incb outb] /=.
+move => [pta outa] [ptb outb] /=.
 have [/eqP <-|/eqP anb] := boolP(pta == ptb).
-  have [/eqP <-|/eqP anb] := boolP(inca == incb).
-    have [/eqP <-|/eqP anb] := boolP(outa == outb).
-      by apply:ReflectT.
-    by apply : ReflectF => [][].
-  by apply: ReflectF=> [][].
+  have [/eqP <-|/eqP anb] := boolP(outa == outb).
+    by apply:ReflectT.
+  by apply : ReflectF => [][].
 by apply: ReflectF=> [][].
 Qed.
 
@@ -110,21 +108,21 @@ Canonical event_eqType := EqType event (EqMixin event_eqP).
 Fixpoint add_event (p : pt) (e : edge) (inc : bool) (evs : seq event) :
   seq event :=
   match evs with
-  | nil => if inc then [:: Bevent p [:: e] [::]]
-           else [:: Bevent p [::] [:: e]]
+  | nil => if inc then [:: Bevent p [::]]
+           else [:: Bevent p [:: e]]
   | ev1 :: evs' =>
     let p1 := point ev1 in
     if p == p1 then
-      if inc then Bevent p1 (e :: incoming ev1) (outgoing ev1) :: evs'
-      else Bevent p1 (incoming ev1) (e :: outgoing ev1) :: evs' else
+      if inc then Bevent p1 (outgoing ev1) :: evs'
+      else Bevent p1 (e :: outgoing ev1) :: evs' else
     if p_x p < p_x p1 then
       if inc then
-        Bevent p [:: e] [::] :: evs else
-        Bevent p [::] [:: e] :: evs
+        Bevent p [::] :: evs else
+        Bevent p [:: e] :: evs
     else if (p_x p == p_x p1) && (p_y p < p_y p1) then
        if inc then
-         Bevent p [:: e] [::] :: evs else
-         Bevent p [::] [:: e] :: evs else
+         Bevent p [::] :: evs else
+         Bevent p [:: e] :: evs else
     ev1 :: add_event p e inc evs'
   end.
 
@@ -404,7 +402,7 @@ by apply /eqP /nesym /eqP .
 by [].
 Qed.
 
-Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::] [::].
+Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::].
 Definition dummy_edge : edge := (@Bedge  (Bpt 0%:Q 0%:Q) (Bpt 1%:Q 0%:Q) isT).
 Definition dummy_cell : cell := (@Bcell  ((Bpt 0%:Q 0%:Q)::[::]) dummy_edge dummy_edge).
 
@@ -753,11 +751,6 @@ rewrite /end_edge /=.
 by rewrite endfut !orbT.
 Qed.
 
-
-
-
-
-
 Lemma l_h_okay (open : seq cell) (e : event) (future : seq event):
 open != nil -> close_alive_edges open (e::future) ->
 let '(_,_,_,lower,higher) := (open_cells_decomposition open (point e)) in 
@@ -903,7 +896,7 @@ Lemma add_event_preserve_first p e inc ev evs :
    point (head ev (add_event p e inc (ev :: evs))) = point ev).
 Proof.
 rewrite /=.
-case: ev => [p1 i1 o1].
+case: ev => [p1 o1].
 have [/eqP -> | /eqP pnp1] := boolP(p == p1).
   by split; case: inc => //=; left.
 have [pltp1 /= | pnltp1] := boolP(p_x p < p_x p1).
@@ -939,15 +932,15 @@ have [/eqP pp1 | pnp1'] /= := boolP (p_x p == p_x (point ev1)).
     by case: (inc); rewrite /= path_evs andbT /lexPtEv /= pp1 eqxx pltp1 orbT.
   have p1ltp : p_y (point ev1) < p_y p.
     by rewrite ltNge le_eqVlt negb_or pyneq pnltp1'.
-  case evseq : evs => [ | [p2 i2 o2] evs2].
+  case evseq : evs => [ | [p2 o2] evs2].
     by case: (inc)=> /=; rewrite /lexPtEv /= pp1 eqxx p1ltp orbT.
   rewrite -evseq.
   case aeq : (add_event p e inc evs) => [ | e' evs3].
     have := add_event_preserve_first p e inc
-           {| point := p2; incoming:= i2; outgoing := o2 |} evs2.
+           {| point := p2; outgoing := o2 |} evs2.
       by rewrite -evseq aeq => [[]].
   case: (add_event_preserve_first p e inc
-         {| point := p2; incoming:= i2; outgoing := o2 |} evs2)=> _.
+         {| point := p2; outgoing := o2 |} evs2)=> _.
   rewrite -evseq aeq /= => [] [eqp | eqp2].
     apply/andP; split; last by move: Ih; rewrite aeq.
     by rewrite /lexPtEv eqp pp1 eqxx p1ltp orbT.
@@ -956,14 +949,14 @@ have [/eqP pp1 | pnp1'] /= := boolP (p_x p == p_x (point ev1)).
   by rewrite /lexPtEv /= eqp2.
 have p1ltp : p_x (point ev1) < p_x p.
   by rewrite ltNge le_eqVlt negb_or pnp1' pnltp1.
-case evseq : evs => [ | [p2 i2 o2] evs2].
+case evseq : evs => [ | [p2 o2] evs2].
   by case: (inc)=> /=; rewrite /lexPtEv /= p1ltp.
 case aeq : (add_event p e inc evs) => [ | e' evs3].
   case: (add_event_preserve_first p e inc
-       {| point := p2; incoming:= i2; outgoing := o2 |} evs2).
+       {| point := p2; outgoing := o2 |} evs2).
   by rewrite -evseq aeq.
 case: (add_event_preserve_first p e inc
-     {| point := p2; incoming:= i2; outgoing := o2 |} evs2) => _.
+     {| point := p2; outgoing := o2 |} evs2) => _.
 have path_e'evs3 : path lexPtEv e' evs3 by move: Ih; rewrite aeq.
 rewrite -evseq aeq /= => [][e'p | e'p2]; rewrite path_e'evs3 andbT.
   by rewrite /lexPtEv e'p p1ltp.
