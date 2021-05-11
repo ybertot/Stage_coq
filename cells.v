@@ -513,40 +513,34 @@ Fixpoint insert_open (open_cells : seq cell) (new_open_cells : seq cell) (low_e 
 Definition insert_open_cell (first_cells : seq cell) (new_open_cells : seq cell) (last: seq cell) : seq cell :=
  first_cells++new_open_cells++last.
 
-(*
-Fixpoint open_cells_decomposition_fix open_cells pt first_cells contact last_cells : seq cell * seq cell * seq cell :=
-  match open_cells with
-    | [::] => (first_cells, contact, last_cells)
-    | Bcell lpt low high :: q  => if (contains_point pt (Bcell lpt low high)) then 
-                                 open_cells_decomposition_fix q pt first_cells (contact ++ [:: Bcell lpt low high]) last_cells
-                                 else if (point_under_edge pt low) then
-                                          open_cells_decomposition_fix q pt first_cells contact (last_cells++[::Bcell lpt low high])
-                                      else open_cells_decomposition_fix q pt (first_cells ++ ([:: Bcell lpt low high])) contact last_cells
-    end.*)
 
 
-
-    (* only works if cells are sorted *)
-
-Fixpoint open_cells_decomposition_fix open_cells pt (first_cells : seq cell) contact last_cells (under : bool) (low_e : edge) (high_e : edge): seq cell * seq cell * seq cell * edge * edge :=
-
+Fixpoint open_cells_decomposition_contact open_cells pt contact high_e : seq cell * seq cell * edge :=
 match open_cells with
-        | [::] => (first_cells, contact, last_cells, low_e, high_e)
+        | [::] => (contact, [::], high_e)
         | Bcell lpt low high :: q  => 
-            if under then (
                 if (contains_point pt (Bcell lpt low high)) then 
-                    open_cells_decomposition_fix q pt first_cells ([:: Bcell lpt low high]) [::] (~~ under) low high
-                else open_cells_decomposition_fix q pt (rcons first_cells ( Bcell lpt low high)) [::] [::] under low high )
-            else
-                if (contains_point pt (Bcell lpt low high)) then 
-                    open_cells_decomposition_fix q pt first_cells (rcons contact (Bcell lpt low high)) [::] under low_e high
-                else (first_cells, contact, last_cells, low_e, high_e)
+                    open_cells_decomposition_contact q pt (rcons contact (Bcell lpt low high)) high
+                else (contact, open_cells, high_e)
         end.
 
+
+Fixpoint open_cells_decomposition_fix open_cells pt first_cells : seq cell * seq cell * seq cell * edge * edge :=
+
+match open_cells with
+        | [::] => (first_cells, [::], [::], dummy_edge, dummy_edge)
+        | Bcell lpt low high :: q  => 
+            if (contains_point pt (Bcell lpt low high)) then 
+                   let '(contact, last_cells, high_e) := open_cells_decomposition_contact q pt [::] high in
+                   (first_cells, (Bcell lpt low high)::contact,last_cells, low, high_e)
+            else open_cells_decomposition_fix q pt (rcons first_cells ( Bcell lpt low high))
+end.
+            
+(* only works if cells are sorted *)
 Definition open_cells_decomposition (open_cells : seq cell) (p : pt) : seq cell * seq cell * seq cell * edge * edge :=
   match open_cells with
     | [::] => ([::],[::],[::], dummy_edge, dummy_edge)
-    | _  => open_cells_decomposition_fix open_cells p [::] [::] [::] true dummy_edge dummy_edge
+    | _  => open_cells_decomposition_fix open_cells p [::] 
   end.
 
 Fixpoint extract_last_cell (open_cells : seq cell) (contact_cells : seq cell) : seq cell  :=
@@ -646,25 +640,6 @@ Qed.
 
 
 
-(*
-Lemma l_h_okay (open : seq cell) (e : event) (future : seq event):
-(open_cells_decomposition open (point e)).2 != nil -> close_alive_edges open (e::future) ->
-let(low, high) := extract_l_h_edges (open_cells_decomposition open (point e)).2 in 
-exists p0 p1,
-((vertical_intersection_point (point e) low) ==  Some(p0)) &&
-((vertical_intersection_point (point e) high) == Some (p1)).
-Proof.
-  rewrite /=.
-  set contact := (open_cells_decomposition open (point e)).2.
-  move => not_nil c_open.
-  rewrite /extract_l_h_edges .
-  move: not_nil.
-  case : contact => [//= | ].
-  move => c q Hc {Hc}.
-  exists p0 : pt, (vertical_intersection_point (point e) (low c) == Some p0).
-  
-Admitted.
-*)
 
 
 Lemma lexPtEvtrans ev a future : sorted  lexPtEv (ev::a::future) ->
@@ -751,15 +726,27 @@ rewrite /end_edge /=.
 by rewrite endfut !orbT.
 Qed.
 
+
+Lemma l_h_in_open (open : seq cell) (e : event) :
+
+open != nil ->
+let '(_,_,_,lower,higher) := (open_cells_decomposition open (point e)) in 
+exists lc hc, lc \in open /\ hc \in open /\ low lc = lower /\ high hc = higher.
+Proof.
+elim : open => [//=| c open IH].
+move => nnil.
+rewrite /open_cells_decomposition.
+
+Admitted.
+
 Lemma l_h_okay (open : seq cell) (e : event) (future : seq event):
+inside_box (point e) -> sorted lexPtEv (e::future) ->
 open != nil -> close_alive_edges open (e::future) ->
 let '(_,_,_,lower,higher) := (open_cells_decomposition open (point e)) in 
-
 valid_edge lower (point e) /\ valid_edge higher (point e).
 Proof.
-  rewrite /=.
-  set contact := (open_cells_decomposition open (point e)).2.
-  move => not_nil c_open.
+move =>  inside_e sort_events opnnil close_open.
+
 Admitted.
 
 Lemma opening_cells_close event low_e high_e future :

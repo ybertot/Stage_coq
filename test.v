@@ -33,37 +33,29 @@ Proof.  by case: events. Qed.
 
 
 Compute (* map (fun c => display_cell "50 mul " c "") *) (start [::
-     Bevent {| p_x := 1; p_y := 2 |} [::]
+     Bevent {| p_x := 1; p_y := 2 |} 
         [:: [edge of {| p_x := 1; p_y := 2 |},
                      {| p_x := 5; p_y := 1 |}];
             [edge of {| p_x := 1; p_y := 2 |},
                      {| p_x := 6; p_y := 17 |}]];
      Bevent {| p_x := 2; p_y := 2 |}
-        [::]
+        
         [:: [edge of {| p_x := 2; p_y := 2 |},
                      {| p_x := 4; p_y := 4 |}];
             [edge of {| p_x := 2; p_y := 2 |},
                      {| p_x := 3; p_y := 5 |}]];
      Bevent {| p_x := 3%:R; p_y := 5%:R |}
-        [:: [edge of {| p_x := 2; p_y := 2%:R |},
-                {| p_x := 3%:R; p_y := 5%:R|}]]
+        
         [:: [edge of {| p_x := 3%:R; p_y := 5%:R|},
                 {| p_x := 4%:R; p_y := 4%:R|}]];
     Bevent {| p_x := 4%:R; p_y := 4%:R |}
-      [:: [edge of {| p_x := 2%:R; p_y := 2%:R |},
-              {| p_x := 4%:R; p_y := 4%:R |}];
-          [edge of {| p_x := 3%:R; p_y := 5%:R |},
-              {| p_x := 4%:R; p_y := 4%:R |}]] [::];
+           [::];
     Bevent {| p_x := 5%:R; p_y := 1%:R |}
-      [:: [edge of {| p_x := 1%:R; p_y := 2%:R|},
-                   {| p_x := 5%:R; p_y := 1|}]]
       [:: [edge of {| p_x := 5; p_y := 1|},
                    {| p_x := 6; p_y := 17 |}]];
     Bevent {| p_x := 6; p_y := 17 |}
-      [:: [edge of {| p_x := 5; p_y := 1|},
-              {| p_x := 6; p_y := 17 |}];
-          [edge of {| p_x := 1; p_y := 2|},
-             {|p_x := 6; p_y := 17 |}]] [::]] dummy_low dummy_high).
+           [::]] dummy_low dummy_high).
+
 Compute seq_nat_to_edges two_triangles.
 Definition edge1 :=  Bedge
                (erefl
