@@ -753,8 +753,54 @@ Proof.
   case h : (open_cells_decomposition_contact _ _ _ _) => [[contact lc]high_final].
   move : (Ih (rcons contact_cells {| pts := pts; low := lowc; high := highc |}) highc).
   rewrite h.
+  move =>  /orP [->//|].
+  by move /andP => [/eqP -> /eqP ->]; rewrite last_rcons eqxx.
+by rewrite !eqxx orbT.
+Qed.
+
+Lemma high_edge_last_fix open_cells pt :
+forall first_cells contact last_cells low high_f,
+open_cells_decomposition_fix open_cells pt nil = (first_cells, contact, last_cells,low, high_f)   ->
+(exists c, (c \in open_cells) /\ (contains_point pt c)) ->
+(high (last dummy_cell contact) == high_f) .
+Proof.
+  rewrite /=.
+  elim : open_cells => [//= | c q IH].
+  move => f_c c_c l_c low highf H.
+  inversion H .
+  by rewrite /= eqxx /=.
+  move => f_c c_c l_c low highf.
+  rewrite /=.
+  case : c => [pts lowf highfi].
+  case : ifP => [contain |notcontain].
+  case h : (open_cells_decomposition_contact _ _ _ _) => [[contact last_c] highc].
+  rewrite /=.
+  move => H2.
+  inversion H2 .
+  move => exi.
+Admitted. 
+(*
+  have : (high_edge_last_contact q pt highfi [::]).
+  have : ((high (last dummy_cell ({|
+  pts := pts;
+  low := low;
+  high := highfi
+|} :: contact)) == highf) || ((({|
+pts := pts;
+low := low;
+high := highfi
+|} :: contact) == [::]) && (highfi == highf))).
+
+apply high_edge_last_contact.
+  rewrite high_edge_last_contact.
+  rewrite /open_cells_decomposition_fix in op_dec.
+*)
+
   
-  move => _.
+
+
+ 
+ 
 
 Lemma l_h_in_open (open : seq cell) (e : event) :
 
