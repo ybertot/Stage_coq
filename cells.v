@@ -504,14 +504,6 @@ Definition extract_l_h_edges (cells : seq cell) : edge * edge :=
     | c::q => (low c, extract_h q (high c))
 end.
 
-Fixpoint insert_open (open_cells : seq cell) (new_open_cells : seq cell) (low_e : edge) : seq cell :=
-  match open_cells with 
-    | [::] => new_open_cells
-    | c::q => if ((high c) == low_e) then c::(new_open_cells ++ q) else c::(insert_open q new_open_cells low_e)
-  end.
-
-Definition insert_open_cell (first_cells : seq cell) (new_open_cells : seq cell) (last: seq cell) : seq cell :=
- first_cells++new_open_cells++last.
 
 
 
@@ -555,7 +547,7 @@ Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : 
    let closed := closing_cells p contact_cells in 
    let closed_cells := closed_cells++closed in
    let new_open_cells := opening_cells p (outgoing e) lower_edge higher_edge in
-   ((insert_open_cell first_cells new_open_cells last_cells), closed_cells).
+   (first_cells++new_open_cells++last_cells, closed_cells).
 
    Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
     match events with 
@@ -623,11 +615,11 @@ Fixpoint close_edges_from_events events : bool :=
 
 Lemma insert_opening_closeness first_cells new_open_cells last_cells events : 
   close_alive_edges first_cells events -> close_alive_edges new_open_cells events ->
-  close_alive_edges last_cells events -> close_alive_edges (insert_open_cell first_cells new_open_cells last_cells) events.
+  close_alive_edges last_cells events -> close_alive_edges (first_cells++new_open_cells++ last_cells) events.
 Proof.
 rewrite /close_alive_edges.
 move => C_first C_new C_last.
- rewrite /insert_open_cell all_cat all_cat.
+ rewrite  all_cat all_cat.
 apply /andP.
 split.
   by [].
@@ -810,50 +802,83 @@ Qed.
 
 Lemma contact_preserve_cells open_cells pt high_e contact_cells :
 forall contact last_c high_c, 
-open_cells_decomposition_contact open_cells pt contact_cells high_e == (contact, last_c, high_c) ->
+open_cells_decomposition_contact open_cells pt contact_cells high_e = (contact, last_c, high_c) ->
 contact_cells ++ open_cells == contact ++ last_c.
 Proof.
 elim : open_cells contact_cells high_e => [/=| c q  IH] contact_cells high_e contact last_c high_c.
-  move => /eqP [] -> <- _.
+  move =>  [] -> <- _.
   by rewrite eqxx.
 case : c => [pts lowc highc].
 rewrite /=.
 case : ifP => [contain| notcontain].
   case h : (open_cells_decomposition_contact _ _ _ _)=> [[contact1 last_c1] high_c1].
-  move => /eqP [] <- <- _.
+  move =>  [] <- <- _.
   have h2: ((rcons contact_cells {| pts := pts; low := lowc; high := highc |}) ++ q == contact1 ++ last_c1) .
     apply (IH _ highc _ _ high_c1).
-    by rewrite h eqxx.
+    by rewrite h.
   move : h2 => /eqP  h2.
   rewrite -h2.
   by rewrite cat_rcons eqxx.
-move => /eqP [] -> -> _.
+move =>  [] -> -> _.
 by rewrite eqxx.
 Qed. 
 
 Lemma fix_preserve_cells open_cells pt fc :
 forall first_cells contact last_cells low high_f,
-open_cells_decomposition_fix open_cells pt fc == (first_cells, contact, last_cells, low, high_f) ->
-first_cells ++ contact ++ last_cells == fc ++ open_cells.
+open_cells_decomposition_fix open_cells pt fc = (first_cells, contact, last_cells, low, high_f) ->
+fc ++ open_cells == first_cells ++ contact ++ last_cells.
 Proof.
 elim : open_cells fc => [/=| c q IH] fc first_cells contact last_cells low_f high_f.
-  move => /eqP [] <- <- <- _ _ .
+  move =>  [] <- <- <- _ _ .
   by [].
 case : c => [pts lowc highc].
 rewrite /=.
 case : ifP => [contain| notcontain].
   case h : (open_cells_decomposition_contact _ _ _ _) => [[contact0 last_c0] high_c0].
-  move => /eqP [] -> <- <- -> Hhigh.
-  have h2 : contact0 ++ last_c0 == q.
-
-Admitted.
+  move =>  [] -> <- <- -> _.
+  by have /= /eqP -> := (contact_preserve_cells h) .
+move => h.
+have /eqP <- := (IH _ _ _ _ _ _ h).
+by rewrite cat_rcons.
+Qed.
 
 Lemma decomposition_preserve_cells open_cells pt : 
 forall first_cells contact last_cells low high_f,
 open_cells_decomposition open_cells pt  = (first_cells, contact, last_cells, low, high_f)   ->
-first_cells ++ contact ++ last_cells =  open_cells.
+open_cells = first_cells ++ contact ++ last_cells .
 Proof.
+case :  open_cells  => [/= | c q] fc c_c lc low_f high_f.
+  by move => [] <- <- <- _ _.
+rewrite /open_cells_decomposition.
+move => h.
+by have /= /eqP <- := (fix_preserve_cells h).
+Qed.
+
+Lemma higher_edge_new_cells e low_e high_e:
+forall new_open_cells,
+opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
+(high (last dummy_cell new_open_cells) == high_e).
+Proof.
+
+elim : (outgoing e) low_e  => [/= | ed out IH] low_e openc.
+  case : (vertical_intersection_point (point e) low_e) => [pl |  /= <-].
+    case : (vertical_intersection_point (point e) high_e) => [ph |  /= <-].
+      case : ifP. 
+        move => /eqP <-.
+        case : ifP.
+          by move => /eqP <- <- /=.
+        by move => /eqP _ <- /=.
+      by move => /eqP _ <- /=.
+    rewrite /=.
+    
+
+
+
+
+
 Admitted.
+
+
 
 
 Lemma l_h_in_open (open : seq cell) (e : event) :
