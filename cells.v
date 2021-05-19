@@ -854,22 +854,106 @@ move => h.
 by have /= /eqP <- := (fix_preserve_cells h).
 Qed.
 
+
+Lemma lower_edge_new_cells e low_e high_e:
+forall new_open_cells,
+opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
+valid_edge low_e (point e) -> valid_edge high_e (point e) ->
+(low (head dummy_cell new_open_cells) == low_e).
+Proof.
+case : (outgoing e) => [/= |/= c q] newop.
+  case valid : (vertical_intersection_point _ _) => [pl |//=].
+    case valid2 : (vertical_intersection_point _ _) => [ph |//=].
+      case : ifP.
+        move => /eqP <-.
+        case : ifP.
+          by move => /eqP <- <- /=.
+        by move => _ <- /=.
+      by move => _<- /=.
+    move => <- _ validh.
+    move : valid2.
+    by rewrite /vertical_intersection_point validh.
+  move => <- validl.
+  move : valid.
+  by rewrite /vertical_intersection_point validl.
+case valid : (vertical_intersection_point _ _) => [pl |//=].
+  case : ifP.
+    by move => /eqP <- <- /=.
+  by move => _ <- /=.
+move => _ validl _.
+move : valid.
+by rewrite /vertical_intersection_point validl.
+Qed.
+
+Definition out_left_event ev :=
+  forall e,
+  e \in (outgoing ev) -> left_pt e == point(ev).
+
 Lemma higher_edge_new_cells e low_e high_e:
 forall new_open_cells,
 opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
+valid_edge low_e (point e) -> valid_edge high_e (point e) ->
 (high (last dummy_cell new_open_cells) == high_e).
 Proof.
 
-elim : (outgoing e) low_e  => [/= | ed out IH] low_e openc.
-  case : (vertical_intersection_point (point e) low_e) => [pl |  /= <-].
-    case : (vertical_intersection_point (point e) high_e) => [ph |  /= <-].
+elim : (outgoing e) low_e  => [/= | ed q IH ] low_e openc.
+  case h1 : (vertical_intersection_point (point e) low_e) => [pl |  /= ].
+    case h2 : (vertical_intersection_point (point e) high_e) => [ph |  /= ].
       case : ifP. 
         move => /eqP <-.
         case : ifP.
           by move => /eqP <- <- /=.
         by move => /eqP _ <- /=.
       by move => /eqP _ <- /=.
-    rewrite /=.
+    move => <- _ validh.
+    move : h2.
+    by rewrite /vertical_intersection_point validh.
+  move => <- validl.
+  move : h1.
+  by rewrite /vertical_intersection_point validl.
+
+rewrite /=.
+case valid : (vertical_intersection_point (point e) low_e) => [pl |  /= ]; first last.
+  move => _ validl _.
+  move : valid.
+  by rewrite /vertical_intersection_point validl.
+case valid2 : (vertical_intersection_point (point e) high_e) => [ph |  /= ]; first last.
+  move => <- _ validh.
+  move : valid2.
+  by rewrite /vertical_intersection_point validh.
+have : (valid_edge ed (point e)).
+case : ifP => [ /eqP eq | /eqP neq].
+  rewrite -eq.
+  move => <- /=.
+  case : (opening_cells _ _ _).
+  rewrite /=.
+  have := (IH _ _ _ _ _).
+  move => a.
+
+  move => <- /=.
+    move => <- /=.
+    have := (IH low_e ).
+    move => -> .
+  
+  case : ifP. 
+  move => /eqP <- <-.
+  have tmp := (valid_edge ed (point e) = true).
+  apply (IH ed _ _ _ _ _).
+  rewrite /opening_cells.
+  easy.
+  case : ifP.
+    by move => /eqP <- <- /=.
+  by move => /eqP _ <- /=.
+by move => /eqP _ <- /=.
+move => <- _ validh.
+move : h2.
+by rewrite /vertical_intersection_point validh.
+move => <- validl.
+move : h1.
+
+    
+    
+    rewrite /= in h2.    
     
 
 
