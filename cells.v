@@ -938,20 +938,13 @@ rewrite /out_left_event.
 elim : (outgoing e) low_e  => [/= | ed q IH ] low_e outleft openc.
   case h1 : (vertical_intersection_point (point e) low_e) => [pl |  /= ].
     case h2 : (vertical_intersection_point (point e) high_e) => [ph |  /= ].
-      case : ifP. 
-        move => /eqP <-.
-        case : ifP.
-          by move => /eqP <- <- /=.
-        by move => /eqP _ <- /=.
-      by move => /eqP _ <- /= .
+      by move => <- [].
     move => <- _ validh.
     move : h2.
     by rewrite /vertical_intersection_point validh.
   move => <-  validl .
   move : h1.
   by rewrite /vertical_intersection_point validl.
-
-
 case valid : (vertical_intersection_point (point e) low_e) => [pl |  /= ]; first last.
   move =>  _ validl _.
   move :  valid.
@@ -966,12 +959,12 @@ have : (valid_edge ed (point e)).
   by rewrite outleft // inE eqxx.
 rewrite /=.
 rewrite valid.
+move : outleft.
+move => /allP  /andP [/eqP lfteq /allP outleft].
 move=> ved vlow vhigh.
 rewrite last_seq2; last by apply/eqP/open_not_nil.
-apply: IH=> //.
-by move=> e' e'in; apply: outleft; rewrite inE e'in orbT.
+by apply: IH.
 Qed.
-
 
 Lemma l_h_in_open (open : seq cell) (e : event) :
 
@@ -1030,16 +1023,16 @@ Admitted.
 
 
 
-Fixpoint adjacent_cells_aux open b: bool :=
+Fixpoint adjacent_cells_aux open e : bool :=
   match open with
   | [::] => true
-  | a::q => (high b == low a) && adjacent_cells_aux q a
+  | a::q => (e == low a) && adjacent_cells_aux q (high a)
   end.
 
 Definition adjacent_cells open : bool :=
   match open with 
   | [::] => true
-  | b::q => adjacent_cells_aux q b
+  | b::q => adjacent_cells_aux q (high b)
   end.
   
 
@@ -1050,14 +1043,78 @@ Definition adjacent_cells open : bool :=
 
 *)
 
-Lemma step_keeps_adjacent open closed current_event (future_events : seq event) :
-adjacent_cells open -> let (open2, _) := step current_event open closed in adjacent_cells open2.
-rewrite /adjacent_cells.
-elim : open =>[ /= It| head q Ih /=].
+Lemma adjacent_opening_aux  e low_e high_e:
+out_left_event e ->
+forall new_open_cells ,
+opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
+valid_edge low_e (point e) -> valid_edge high_e (point e) -> 
+adjacent_cells_aux new_open_cells low_e.
+Proof.
+rewrite /out_left_event.
+elim : (outgoing e) low_e  => [/= | ed q IH ] low_e outleft openc.
+  case h1 : (vertical_intersection_point (point e) low_e) => [pl |  /= ].
+    case h2 : (vertical_intersection_point (point e) high_e) => [ph |  /= ].
+      move => <-  _ /=  [] _.
+      by rewrite eqxx.
+      rewrite /=.
+    move => <- _ validh.
+    move : h2.
+    by rewrite /vertical_intersection_point validh.
+  move => <-  validl .
+  move : h1.
+  by rewrite /vertical_intersection_point validl.
+  case valid : (vertical_intersection_point (point e) low_e) => [pl |  /= ]; first last.
+  move =>  _ validl _.
+  move :  valid.
+  by rewrite /vertical_intersection_point validl.
+case valid2 : (vertical_intersection_point (point e) high_e) => [ph |  /= ]; first last.
+  move => <-   _ validh.
+  move : valid2.
+  by rewrite /vertical_intersection_point validh.
+move => <-.
+have : (valid_edge ed (point e)).
+  apply valid_edge_extremities.
+  by rewrite outleft // inE eqxx.
+rewrite /= valid.
+move : outleft.
+move => /allP  /andP [/eqP lfteq /allP outleft].
+move=> ved vlow vhigh.
+rewrite /= eqxx /=.
+by apply : IH.
+Qed.
 
-set opened  := opening_cells (point current_event) (outgoing current_event) dummy_edge dummy_edge.
- case : opened => [//=|head q /=].
+Lemma adjacent_opening  e low_e high_e:
+out_left_event e ->
+forall new_open_cells ,
+opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
+valid_edge low_e (point e) -> valid_edge high_e (point e) -> 
+adjacent_cells new_open_cells.
+Proof.
+move => outleft op.
+case : op => [//=| c q /= opening vlow vhigh].
+have := (adjacent_opening_aux outleft opening vlow vhigh).
+by move => /= /andP [_] .
+Qed.
+
+Lemma step_keeps_adjacent open closed e (future_events : seq event)  :
+out_left_event e ->
+forall open2 closed2, 
+ step e open closed = (open2,closed2) ->
+adjacent_cells open ->   adjacent_cells open2.
+Proof.
+rewrite /step .
+move => outleft open2 closed2 .
 Admitted.
+
+
+(*
+Lemma opening_cells_right_form e low_e high_e : 
+sorted edge_compare (outgoing e) ->           
+forall new_open_cells, 
+opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
+right_form opening_cells.
+*)
+
 
 Lemma opening_cells_eq  p out low_e high_e:
   opening_cells   p out low_e high_e =
