@@ -1096,15 +1096,58 @@ have := (adjacent_opening_aux outleft opening vlow vhigh).
 by move => /= /andP [_] .
 Qed.
 
+Lemma adjacent_cut l2 a lc :
+l2 != nil -> 
+
+high (last dummy_cell l2) = low a -> adjacent_cells l2 ->
+adjacent_cells (a::lc) ->
+adjacent_cells (l2 ++ a::lc).
+Proof.
+case : l2 => [//= | c2 q2 _].
+elim : q2 c2 => [/= c2 <- _ | c3 q3 IH]. 
+  by rewrite eqxx.
+move => c2.
+have c3q3nnil : (c3::q3)<>[::].
+by [].
+have := (last_seq2 dummy_cell c2 c3q3nnil).
+move => -> highc3 /= /andP [->  adjq3c3] /=. 
+by apply : IH.
+Qed.
+
+
+Lemma replacing_seq_adjacent l1 l2 fc lc : 
+l1 != nil -> l2 != nil -> 
+low (head dummy_cell l1) = low (head dummy_cell l2) ->
+high (last dummy_cell l1) = high (last dummy_cell l2) ->
+adjacent_cells (fc ++ l1 ++ lc) ->
+adjacent_cells (fc ++ l2 ++ lc).
+Proof.
+
+case : l1 => [//= | c1 q1 _ ] .
+case : l2 => [//= | c2 q2 _/= ].
+rewrite /adjacent_cells /=.
+case h: (fc ++ c1 :: q1 ++ lc) .
+have := (size_cat fc (c1::q1++lc)).
+rewrite h.
+have := (size_cat (c1::q1) lc).
+move => ->.
+by rewrite /= addnS.
+
+
+rewrite last_cons.
+
+
+
+
 Lemma step_keeps_adjacent open closed e (future_events : seq event)  :
 out_left_event e ->
 forall open2 closed2, 
- step e open closed = (open2,closed2) ->
-adjacent_cells open ->   adjacent_cells open2.
+ step e open closed = (open2, closed2) ->
+adjacent_cells open -> adjacent_cells open2.
 Proof.
 rewrite /step .
 move => outleft open2 closed2 .
-Admitted.
+case
 
 
 (*
