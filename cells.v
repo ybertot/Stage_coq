@@ -1034,7 +1034,22 @@ Definition adjacent_cells open : bool :=
   | [::] => true
   | b::q => adjacent_cells_aux q (high b)
   end.
-  
+
+Definition adj_rel := [rel x y : cell | high x == low y].
+
+Lemma adj_aux_path (x : cell) s :
+    adjacent_cells_aux s (high x) = path adj_rel x s.
+Proof.
+by elim: s x => [// | y s Ih] x /=; rewrite Ih.
+Qed.
+
+Definition adjacent_cells' open : bool :=
+    sorted adj_rel open.
+
+Lemma adjacent_cell'_eq open : adjacent_cells' open = adjacent_cells open.
+Proof.
+by case: open => [// | c l]; rewrite /adjacent_cells' /= -adj_aux_path.
+Qed.
 
 (* toutes les arêtes présentes dans la liste des événements qui sont déjà vivantes sont dans la liste des cellules 
    car dans un second temps la liste des cellules qu'on obtient à la fin doit contenir toutes les arêtes
