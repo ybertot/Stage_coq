@@ -735,7 +735,7 @@ Proof.
 by case : s.
 Qed.
 
-Lemma high_edge_last_contact open_cells pt high_e contact_cells :
+Lemma h_c_contact open_cells pt high_e contact_cells :
 forall contact last_c high_c, 
 open_cells_decomposition_contact open_cells pt contact_cells high_e =(contact,last_c, high_c) ->
 ((high (last dummy_cell contact) == high_c) && (contact != nil)) || ((contact == contact_cells) && (high_e == high_c)).
@@ -762,34 +762,37 @@ move => [] -> _ -> .
 by rewrite !eqxx orbT.
 Qed.
 
-Lemma high_edge_last_fix open_cells pt fc:
-forall first_cells contact last_cells low high_f,
-open_cells_decomposition_fix open_cells pt fc = (first_cells, contact, last_cells,low, high_f)   ->
+Lemma l_h_c_fix open_cells pt fc:
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition_fix open_cells pt fc = (first_cells, contact, last_cells, low_f, high_f)   ->
 (exists c, (c \in open_cells) /\ (contains_point pt c)) ->
-(high (last dummy_cell contact) == high_f) /\ contact != nil .
+(low (head dummy_cell contact) == low_f) /\ (high (last dummy_cell contact) == high_f) /\ contact != nil.
 Proof.
+  move => f_c c_c l_c lowf highf.
 rewrite /=.
 elim : open_cells fc => [/= | c q IH] fc.
-  move => _ c_c _ _ highf  _ /= [] x.
+  move =>   _ /= [] x.
    rewrite in_nil.
    move => /andP. 
    by rewrite andFb.
-move => f_c c_c l_c low highf.
+
 rewrite /=.
-case : c => [pts lowf highfi].
+case : c => [pts lowfi highfi].
 case : ifP => [contain |notcontain].  
 
   case h : (open_cells_decomposition_contact _ _ _ _) => [[contact last_c] high_c].
-  have tmp := high_edge_last_contact h.
+  move => [] _ <- _ <- <- /= exi.
+  rewrite eqxx.
+  have tmp := h_c_contact h.
   move : tmp => /orP [/andP [/eqP higheq cnnil]| /andP [/eqP cnil /eqP higheq]].
-    rewrite -higheq.
-    move => [] _ <- _ _  <- .
-    rewrite last_cons.
-    move => exi.
-    by case : contact h higheq cnnil .
-  move => [] _ <- _ _ <-.
+    rewrite -higheq /=.
+    
+     case : contact h higheq cnnil.
+        by [].
+        rewrite //=.
+ 
   rewrite cnil higheq.
-  move => exi /= .
+
   by rewrite eqxx.
 move /IH.
 move => IH' exi.
@@ -802,11 +805,11 @@ move : xin => /orP [ /eqP xeqp | xinq2].
 by exists x.
 Qed. 
 
-Lemma high_edge_last_decomposition open_cells pt :
-forall first_cells contact last_cells low high_f,
-open_cells_decomposition open_cells pt  = (first_cells, contact, last_cells,low, high_f)   ->
+Lemma l_h_c_decomposition open_cells pt :
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition open_cells pt  = (first_cells, contact, last_cells, low_f, high_f)   ->
 (exists c, (c \in open_cells) /\ (contains_point pt c)) ->
-(high (last dummy_cell contact) == high_f) /\ contact != nil .
+(low (head dummy_cell contact) == low_f) /\ (high (last dummy_cell contact) == high_f) /\ contact != nil .
 Proof.
 rewrite /=.
 case :  open_cells  => [/= | c q] fc c_c lc low_f high_f.
@@ -817,52 +820,11 @@ rewrite in_nil.
 
 rewrite /open_cells_decomposition .
 move => h.
-by have  := (high_edge_last_fix h).
+by have  := (l_h_c_fix h).
 Qed.
 
 
-Lemma low_edge_last_fix open_cells pt fc:
-forall first_cells contact last_cells low_f high,
-open_cells_decomposition_fix open_cells pt fc = (first_cells, contact, last_cells, low_f, high)   ->
-(exists c, (c \in open_cells) /\ (contains_point pt c)) ->
-(low (head dummy_cell contact) == low_f) .
-Proof.
-rewrite /=.
-move => f_c c_c l_c low_f high_f.
-elim : open_cells fc => [/= | c q IH] fc.
-  by move =>  [] _ <- _ <- _. (* can be changed by using exists on a nil seq*)
 
-rewrite /=.
-case : c => [pts lowf highfi].
-case : ifP => [contain |notcontain].  
-
-  case h : (open_cells_decomposition_contact _ _ _ _) => [[contact last_c] high_c].
-  by move => [] _ <- _ <- _ .
-move /IH.
-move => IH' exi.
-apply IH'.
-move : exi => [] x [xin xcontains].
-rewrite inE in xin .
-move : xin => /orP [ /eqP xeqp | xinq2].
-  rewrite -xeqp in notcontain.
-  by rewrite notcontain in xcontains.
-by exists x.
-Qed.
-
-
-Lemma low_edge_last_decomposition open_cells pt :
-forall first_cells contact last_cells low_f high_f,
-open_cells_decomposition open_cells pt  = (first_cells, contact, last_cells, low_f, high_f)   ->
-(exists c, (c \in open_cells) /\ (contains_point pt c)) ->
-(low (head dummy_cell contact) == low_f) .
-Proof.
-rewrite /=.
-case :  open_cells  => [/= | c q] fc c_c lc low_f high_f.
-  by move => [] _ <- _ <-_ .  (* can be changed by using exists on a nil seq*)
-rewrite /open_cells_decomposition .
-move => h.
-by have  := (low_edge_last_fix h).
-Qed.
 
 Lemma contact_preserve_cells open_cells pt high_e contact_cells :
 forall contact last_c high_c, 
@@ -1296,15 +1258,16 @@ Qed.
 Lemma step_keeps_adjacent open closed e (future_events : seq event)  :
 inside_box (point e) -> sorted lexPtEv (e::future_events)->
 close_alive_edges open (e :: future_events) ->
+out_left_event e ->
 open != nil ->
 (exists c : cell_eqType, c \in open /\ contains_point (point e) c) ->
-out_left_event e ->
+
 forall open2 closed2, 
  step e open closed = (open2, closed2) ->
 adjacent_cells open -> adjacent_cells open2.
 Proof.
 rewrite /step .
-move => insbox sorfut close_al opnnil exi outleft open2 closed2.
+move => insbox sorfut close_al outleft opnnil exi  open2 closed2.
 case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e] .
 move => [] <- _ adjopen.
 have openeq := decomposition_preserve_cells op_c_d.
@@ -1318,20 +1281,15 @@ have := (open_not_nil (outgoing e) lowv highv).
 case op_new : (opening_cells (point e) (outgoing e) low_e high_e) => [//= | q l ] qlnnil.
 have := (lower_edge_new_cells op_new lowv highv) => /eqP low_new.
 have := (higher_edge_new_cells outleft op_new lowv highv) => /eqP high_new.
-have := (low_edge_last_decomposition op_c_d  exi) => /eqP low_old.
-have := (high_edge_last_decomposition op_c_d  exi) => /eqP high_old.
-rewrite -high_new in high_old.
-rewrite -low_new in low_old.
-have := (adj  contact_cells (q::l) first_cells last_cells _ qlnnil low_old high_old adjopen).
-move => adj  dec2 highe outleft open2 closed2.
 
-case : dec4 => first_cells contact_cells [] <- _ adjopen.
+have := (l_h_c_decomposition op_c_d  exi).
+move => [] /eqP l_old [] /eqP h_old c_nnil.
+rewrite -high_new in h_old.
+rewrite -low_new in l_old.
+have := (adjacent_opening outleft op_new lowv highv) => adjnew.
 
-case :opening_cells.
-by [].
-apply : adj _ _ _ _ _ _. 
-Admitted.
-
+apply : (adj  contact_cells (q::l) first_cells last_cells c_nnil qlnnil l_old h_old adjopen adjnew).
+Qed.
 
 (*
 Lemma opening_cells_right_form e low_e high_e : 
