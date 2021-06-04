@@ -678,7 +678,7 @@ Proof.
 elim : future => [ lftedLev _ | b future Ih lftedLev].
   rewrite /end_edge.
   move => /orP [].
-    by rewrite !inE /inside_box => /orP [] /eqP -> [].
+    rewrite !inE /inside_box =>  /orP [] /eqP ->  /andP [] /andP [] _ _  /andP [] _ //. 
   rewrite has_seq1 /event_close_edge => edincEv insbox.
   rewrite /valid_edge /andP ltW. 
     rewrite andTb.
@@ -691,22 +691,22 @@ have sorevF : sorted lexPtEv (ev :: future).
   by apply (lexPtEvtrans sorevBf ).
 move => endevbfut ins.
 have [/eqP h | h'] := boolP( right_pt ed == point b).
-rewrite /valid_edge.
-
-rewrite ltW => //.
-rewrite h.
-apply : lexPtevAbsicca .
-rewrite /= in sorevBf.
-by move /andP : sorevBf => [].
+  rewrite /valid_edge.
+  rewrite ltW => //.
+  rewrite h.
+  apply : lexPtevAbsicca .
+  rewrite /= in sorevBf.
+  by move /andP : sorevBf => [].
 move : (endevbfut).
 rewrite /end_edge .
 move => /orP [].
-move: ins => [] ins1 ins2.
-by rewrite !inE => /orP [] /eqP -> . 
+  move: ins => ins1 ins2.
+  apply : (Ih lftedLev sorevF _ ins1).
+  by rewrite /end_edge /= ins2.
 rewrite /= => /orP [] .
-rewrite /event_close_edge  /valid_edge => /eqP ->.
-rewrite ltW //.
-by rewrite le_eqVlt eqxx.
+  rewrite /event_close_edge  /valid_edge => /eqP ->.
+  rewrite ltW //.
+  by rewrite le_eqVlt eqxx.
 rewrite /event_close_edge.
 rewrite (negbTE h') /=.
 move => endfut.
@@ -1293,15 +1293,6 @@ Definition cells_bottom_top cells : bool :=
 
 
 
-
-Lemma step_keeps_bottom_top open closed e  : 
-inside_box (point e) ->
-forall open2 closed2, 
- step e open closed = (open2, closed2) ->
-cells_bottom_top open -> cells_bottom_top open2.
-Proof.
-Admitted.
-
 Lemma exists_cell_aux low_e p open :
 cells_low_e_top open low_e -> adjacent_cells_aux open low_e ->
 (~ point_under_edge p low_e) -> ( point_under_edge p top) ->
@@ -1348,9 +1339,37 @@ Proof.
 case : open => [//= | c0 q].
 rewrite /cells_bottom_top => cbt.
 rewrite /inside_box.
-rewrite /adjacent_cells /=.
+rewrite /adjacent_cells /= => adjqhc0.
 have := (exists_cell_aux cbt _ _ _ ).
-Admitted.
+move : cbt.
+rewrite /cells_low_e_top =>  /andP [] /andP [] _ /= /eqP -> _ .
+rewrite eqxx adjqhc0 /= => exis /andP [] /andP [] /negP puepb puept _.
+by apply : (exis p _ puepb puept).
+Qed.
+
+
+
+
+Lemma step_keeps_bottom_top open closed e  : 
+inside_box (point e) ->
+adjacent_cells open ->
+forall open2 closed2, 
+ step e open closed = (open2, closed2) ->
+cells_bottom_top open -> cells_bottom_top open2.
+Proof.
+  move => insbox adjopen open2 closed2 step cbtopen.
+  have := (exists_cell cbtopen adjopen insbox) => exi.
+  move : step.
+  rewrite /step /=.
+  case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
+  move => [] <- _.
+  rewrite /cells_bottom_top /cells_low_e_top /=.
+  move : insbox.
+  rewrite /inside_box => /andP [] /andP [] npueb puet /andP [] vbot vtop.
+  have := open_not_nil (outgoing e) vbot vtop => opnnil.
+  
+ Admitted.
+
 
 (*
 Lemma opening_cells_right_form e low_e high_e : 
