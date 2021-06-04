@@ -590,7 +590,7 @@ Definition lexPtEv (e1 e2 : event) : bool :=
   (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
 
 Definition inside_box p :=
-valid_edge bottom p /\ valid_edge top p.
+(~~ point_under_edge p bottom  && point_under_edge p top ) && (valid_edge bottom p && valid_edge top p).
 
 
 Definition event_close_edge ed ev : bool :=
@@ -1332,7 +1332,7 @@ move => lowunder topabove.
   by rewrite hightop eq_sym => _ /andP [] ->.
 move => lowtop /=.
 
-rewrite /contains_point in cont .
+rewrite /contains_point in cont.
 move : lowunder cont  => /negP /= -> /= /negP phc0.
 have := (IH' lowtop adjaux phc0 topabove) .
 move => [] x [] xinq cpx.
