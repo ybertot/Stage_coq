@@ -1,0 +1,27 @@
+digraph G {
+     decomposition_preserve_cells, l_h_c_decomposition, step_keeps_adjacent [margin=0.35 shape=Msquare]; // Major lemmas
+     l_h_valid l_h_in_open [margin=0.35 shape=ellipse]; // Admitted lemmas
+     step_keeps_bottom_top [margin=0.35 shape=Mcircle]; // Major Admitted lemmas
+{ 
+    node [margin=0.35 shape=box ]
+
+  
+  h_c_contact -> l_h_c_fix -> l_h_c_decomposition;
+  contact_preserve_cells -> fix_preserve_cells -> decomposition_preserve_cells;
+l_h_in_open -> l_h_valid ;
+valid_edge_extremities -> higher_edge_new_cells;
+open_not_nil -> higher_edge_new_cells;
+open_not_nil -> step_keeps_adjacent;
+adj_aux_path -> replacing_seq_adjacent;
+adj_aux_path -> replacing_seq_adjacent_aux;
+replacing_seq_adjacent_aux -> replacing_seq_adjacent -> step_keeps_adjacent;
+lower_edge_new_cells -> step_keeps_adjacent;
+ higher_edge_new_cells -> step_keeps_adjacent;
+ decomposition_preserve_cells -> step_keeps_adjacent;
+l_h_c_decomposition -> step_keeps_adjacent;
+l_h_valid -> step_keeps_adjacent;
+adjacent_opening -> step_keeps_adjacent;
+exists_cell_aux -> exists_cell -> step_keeps_bottom_top
+}
+
+}

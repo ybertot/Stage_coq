@@ -1357,17 +1357,26 @@ forall open2 closed2,
  step e open closed = (open2, closed2) ->
 cells_bottom_top open -> cells_bottom_top open2.
 Proof.
-  move => insbox adjopen open2 closed2 step cbtopen.
-  have := (exists_cell cbtopen adjopen insbox) => exi.
-  move : step.
-  rewrite /step /=.
-  case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
-  move => [] <- _.
-  rewrite /cells_bottom_top /cells_low_e_top /=.
-  move : insbox.
-  rewrite /inside_box => /andP [] /andP [] npueb puet /andP [] vbot vtop.
-  have := open_not_nil (outgoing e) vbot vtop => opnnil.
-  
+move => insbox adjopen open2 closed2 step cbtopen.
+have := (exists_cell cbtopen adjopen insbox) => exi.
+move : step.
+rewrite /step /=.
+case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
+move => [] <- _.
+rewrite /cells_bottom_top /cells_low_e_top /=.
+move : insbox.
+rewrite /inside_box => /andP [] /andP [] npueb puet /andP [] vbot vtop.
+
+have := open_not_nil (outgoing e) vbot vtop => opnnil.
+have : (first_cells ++
+opening_cells (point e) (outgoing e) low_e high_e ++
+last_cells != [::]).
+  apply  /negP.
+  Search size nil.
+   rewrite -size_eq0 !size_cat /= !addn_eq0. 
+
+
+
  Admitted.
 
 

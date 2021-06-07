@@ -51,3 +51,5 @@ The lemma decomposition_preserve_cells makes sure the decomposition doesn't lose
 
 * after the last event is treated, there are no more alive cells and we return the list of closed cells, corresponding to the cell decomposition we were looking for. 
 The way to search for adjacence between each cell in the graph should be that every cell having two points in common are adjacent, except if those two points constitute an edge (since each cell contains the lower and higher edge, there is an easy way to check).
+
+
