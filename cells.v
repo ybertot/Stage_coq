@@ -1347,33 +1347,50 @@ rewrite eqxx adjqhc0 /= => exis /andP [] /andP [] /negP puepb puept _.
 by apply : (exis p _ puepb puept).
 Qed.
 
-
-
+Lemma l_h_valid2 (open : seq cell) (p : pt) :
+ inside_box p  -> 
+open != nil -> 
+let '(fc,c_c,last_c,lower,higher) := (open_cells_decomposition open p) in 
+valid_edge lower p /\ valid_edge higher p.
+Proof.
+Admitted.
 
 Lemma step_keeps_bottom_top open closed e  : 
 inside_box (point e) ->
 adjacent_cells open ->
+open != nil ->
 forall open2 closed2, 
  step e open closed = (open2, closed2) ->
 cells_bottom_top open -> cells_bottom_top open2.
 Proof.
-move => insbox adjopen open2 closed2 step cbtopen.
+move => insbox adjopen opnnil open2 closed2 step cbtopen.
 have := (exists_cell cbtopen adjopen insbox) => exi.
 move : step.
 rewrite /step /=.
 case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
 move => [] <- _.
 rewrite /cells_bottom_top /cells_low_e_top /=.
+assert (insbox' := insbox).
 move : insbox.
-rewrite /inside_box => /andP [] /andP [] npueb puet /andP [] vbot vtop.
 
-have := open_not_nil (outgoing e) vbot vtop => opnnil.
+rewrite /inside_box => /andP [] /andP [] npueb puet /andP [] vbot vtop.
+have := (l_h_valid2 insbox' opnnil ).
+rewrite op_c_d.
+move => [] vlowe vhighe.
+
+have := open_not_nil (outgoing e) vlowe vhighe => newnnil.
 have : (first_cells ++
 opening_cells (point e) (outgoing e) low_e high_e ++
 last_cells != [::]).
+move : newnnil => /negP.
+rewrite -size_eq0 => nsizeop0.
+
+
   apply  /negP.
-  Search size nil.
-   rewrite -size_eq0 !size_cat /= !addn_eq0. 
+  
+   rewrite -size_eq0 !size_cat /= !addn_eq0 .
+
+
 
 
 
