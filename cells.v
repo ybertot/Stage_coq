@@ -7,7 +7,7 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
 Require Import NArithRing.
-Import Order.TTheory GRing.Theory Num.Theory Num.ExtraDef.
+Import Order.TTheory GRing.Theory Num.Theory Num.ExtraDef Num.
 
 Open Scope ring_scope.
 
@@ -145,10 +145,14 @@ Definition pue_formula (p : pt) (a : pt) (b : pt) : rat :=
   let: Bpt b_x b_y := b in
      (b_x * p_y - p_x * b_y - (a_x * p_y - p_x * a_y) + a_x * b_y - b_x * a_y).
 
+
 (* returns true if p is under e *)
 Definition point_under_edge (p : pt) (e : edge) : bool :=
-  let: Bedge a b _ := e in 
-  pue_formula p a b <=0.
+  pue_formula p (left_pt e) (right_pt e) <= 0.
+
+  (* returns true if p is strictly under e *)
+Definition point_strictly_under_edge (p : pt) (e : edge) : bool :=
+  pue_formula p (left_pt e) (right_pt e) < 0.
 
 (*returns true if e1 is under e2*)
 Definition compare_incoming (e1 e2 : edge) : bool :=
@@ -408,7 +412,7 @@ Definition dummy_cell : cell := (@Bcell  ((Bpt 0%:Q 0%:Q)::[::]) dummy_edge dumm
 
 (* if a cell doesn't contain a point, then either both edges are strictly under p or strictly over p *)
 Definition contains_point (p : pt) (c : cell)  : bool :=
-   ~~ point_under_edge p (low c) && point_under_edge p (high c).
+   ~~ point_strictly_under_edge p (low c) && point_under_edge p (high c).
 
 
 Fixpoint contains (A : eqType) (s : seq A) (a : A) : bool :=
@@ -628,9 +632,6 @@ by [].
 Qed.
 
 
-
-
-
 Lemma lexPtEvtrans ev a future : sorted  lexPtEv (ev::a::future) ->
  sorted lexPtEv (ev :: future).
 Proof.
@@ -821,7 +822,55 @@ move => h.
 by have  := (l_h_c_fix h).
 Qed.
 
+Definition edge_above_vert (e1 : edge) (e2 : edge) : bool :=
+let: Bedge a1 b1 p1 := e1 in
+let: Bedge a2 b2 p2 := e2 in
+let maxleft := max (p_x a1) (p_x  a2) in
+let minright := min (p_x b1) (p_x  b2) in
+match vertical_intersection_point (Bpt maxleft 0%Q) e1 with
+ | None => false
+ | Some(p) => 
+  match vertical_intersection_point (Bpt minright 0%Q) e1 with
+    |None => false
+    | Some(p2) =>
+ point_under_edge p e2 && point_under_edge p2 e2
+  end
+end.
 
+Definition edge_above (e1 : edge) (e2 : edge) : bool :=
+  let: Bedge a1 b1 p1 := e1 in
+let: Bedge a2 b2 p2 := e2 in
+(point_under_edge a1 e2 && point_under_edge b1 e2 )
+|| (~~ point_under_edge a2 e1 && ~~point_under_edge b2 e1 ).
+
+
+Definition right_form (c : cell) : bool :=
+  edge_above_vert (low c) (high c).
+
+Lemma opening_cells_right_form e low_e high_e : 
+sorted edge_above_vert (outgoing e) ->           
+forall new_open_cells, 
+opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
+forall c, c \in new_open_cells /\ right_form c.
+Proof.
+Admitted.
+
+Lemma order_edges_viz_point (cells : seq cell) p :
+forall c, c \in cells ->
+valid_edge (low c) p -> valid_edge (high c) p ->
+edge_above_vert (low c) (high c) ->
+point_under_edge p (low c) -> point_under_edge p (high c).
+Proof.
+Admitted.
+
+Definition s_right_form (s : seq cell)  : bool :=
+  all (fun c => right_form c ) s.
+
+
+  Definition seq_valid (s : seq cell) (p : pt) : bool :=
+    all (fun c => (valid_edge (low c) p) && (valid_edge (high c) p)) s.
+  
+  
 Lemma contact_preserve_cells open_cells pt high_e contact_cells :
 forall contact last_c high_c, 
 open_cells_decomposition_contact open_cells pt contact_cells high_e = (contact, last_c, high_c) ->
@@ -876,6 +925,81 @@ move => h.
 by have /= /eqP <- := (fix_preserve_cells h).
 Qed.
 
+Lemma cont_imp_close c e :
+(  event_close_edge (low c) e) \/ (  event_close_edge (high c) e) ->
+right_form c ->
+ contains_point (point e) c.
+Proof.
+rewrite /contains_point /event_close_edge .
+move =>  [/eqP rlc | /eqP rhc].
+rewrite /right_form.
+rewrite /edge_above_vert.
+rewrite /point_under_edge /point_strictly_under_edge -rlc.
+rewrite
+ /pue_formula //=.
+ 
+case : (left_pt (low c)) => [llx lly].
+case : (right_pt (low c)) => [lrx lry] .
+case : (left_pt (high c)) => [hlx hly].
+case : (right_pt (high c)) => [hrx hry] .
+Admitted.
+
+Lemma contact_not_end open_cells e high_e contact_cells :
+s_right_form open_cells ->
+seq_valid open_cells (point e) ->
+forall contact last_c high_c, 
+open_cells_decomposition_contact open_cells (point e) contact_cells high_e = (contact, last_c, high_c) ->
+forall c, (c \in last_c) -> ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
+Proof.
+  
+  move => oprf opvalid c_c last_cells highc.
+elim op : open_cells oprf opvalid last_cells contact_cells high_e => [/= | c q  IH] op_rf opvalid last_c contact high_e.
+  by move =>  [] _ <-  _  .
+move => op_c.
+have c_eq := (contact_preserve_cells op_c).
+move : op_c.
+case ceq : c => [pts lowc high_c].
+rewrite /=.
+
+case : ifP => [contain | notcontain].
+  case h : (open_cells_decomposition_contact _ _ _ _)=> [[contact1 last_c1] high_c1].
+  move =>  [] a  <- b.
+  rewrite a b in h.
+  have q_rf: s_right_form q.
+    move : op_rf.
+    by rewrite /s_right_form /all => /andP [] _.
+  have qval : (seq_valid q (point e)).
+    move : opvalid.
+    by rewrite /s_right_form /all => /andP [] _.
+  apply : (IH q_rf qval last_c1 (rcons contact {| pts := pts; low := lowc; high := high_c |})  high_c h).
+move =>  [] conteq lc heq {IH}.
+move : notcontain.
+rewrite /contains_point /=.
+
+move =>/andP .
+have puehigh : point_under_edge (point e) high_c; first last.
+  rewrite puehigh => /andP.
+  rewrite andbT /= => a. 
+  have := negbNE a.
+
+
+Admitted.
+
+Lemma fix_not_end open_cells e fc :
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition_fix open_cells (point e) fc = (first_cells, contact, last_cells, low_f, high_f) ->
+
+forall c, (c \in first_cells) || (c \in last_cells) -> ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
+Proof.
+Admitted.
+
+Lemma decomposition_not_end open_cells e : 
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition open_cells (point e)  = (first_cells, contact, last_cells, low_f, high_f) ->
+forall c, (c \in first_cells) || (c \in last_cells) -> ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
+Proof.
+move => fc c_c l_c low_f high_f.
+Admitted.
 
 Lemma lower_edge_new_cells e low_e high_e:
 forall new_open_cells,
@@ -1022,10 +1146,21 @@ case : s  => [//= | c q  ]  /= _.
 by rewrite inE eqxx.
 Qed.
 
+Lemma not_under_not_strictly p ed : 
+~ point_under_edge p ed ->
+~ point_strictly_under_edge p ed.
+Proof.
+rewrite /point_strictly_under_edge.
+rewrite /point_under_edge leNgt /= => /negP => pue. 
+have pue2 := (negbNE pue).
+apply : negP.
+rewrite -leNgt.
+apply : (ltW pue2).
+Qed.
 
 Lemma exists_cell_aux low_e p open :
 cells_low_e_top open low_e -> adjacent_cells_aux open low_e ->
-(~ point_under_edge p low_e) -> (point_under_edge p top) ->
+(~ point_strictly_under_edge p low_e) -> (point_under_edge p top) ->
 (exists c : cell, c \in open /\ contains_point p c).
 Proof.
 elim : open low_e => [//= | c0 q IH ].
@@ -1055,7 +1190,8 @@ move => lowtop /=.
 
 rewrite /contains_point in cont.
 move : lowunder cont  => /negP /= -> /= /negP phc0.
-have := (IH' lowtop adjaux phc0 topabove) .
+have phc := (not_under_not_strictly phc0  ).
+have := (IH' lowtop adjaux phc topabove) .
 move => [] x [] xinq cpx.
 exists x .
 by rewrite in_cons xinq /= orbT cpx.
@@ -1074,7 +1210,8 @@ have := (exists_cell_aux cbt _ _ _ ).
 move : cbt.
 rewrite /cells_low_e_top =>  /andP [] /andP [] _ /= /eqP -> _ .
 rewrite eqxx adjqhc0 /= => exis /andP [] /andP [] /negP puepb puept _.
-by apply : (exis p _ puepb puept).
+have puespb :=  (not_under_not_strictly puepb).
+by apply : (exis p _ puespb puept).
 Qed.
 
 
@@ -1097,10 +1234,10 @@ exists (last dummy_cell cc).
 by rewrite !mem_cat headincc lastincc !orbT .
 Qed.
 
-Definition seq_valid (s : seq cell) (p : pt) : bool :=
-  all (fun c => (valid_edge (low c) p) && (valid_edge (high c) p)) s.
 
-(* Lemma step_keeps_valid (open : seq cell) (e :event) (future_events : seq event) *)
+(* Lemma step_keeps_valid (open : seq cell) (e :event) (future_events : seq event) :
+*)
+
 
 Lemma l_h_valid (open : seq cell) p :
 cells_bottom_top open -> adjacent_cells open  ->
@@ -1434,13 +1571,6 @@ rewrite -size_eq0 => nsizeop0.
  Admitted.
 
 
-(*
-Lemma opening_cells_right_form e low_e high_e : 
-sorted edge_compare (outgoing e) ->           
-forall new_open_cells, 
-opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
-right_form opening_cells.
-*)
 
 Lemma opening_cells_eq  p out low_e high_e:
   opening_cells   p out low_e high_e =
