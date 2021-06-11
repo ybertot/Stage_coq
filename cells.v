@@ -295,7 +295,7 @@ Lemma pue_f_eq p_x p_y a_x a_y :
 pue_f p_x p_y p_x p_y a_x a_y == 0.
 Proof.
 rewrite /pue_f /=.
-Search (_ - _ = _). 
+
 apply /eqP.
 mc_ring.
 Qed.
@@ -315,6 +315,25 @@ move => <-.
 apply pue_f_eq.
 Qed.
 
+Lemma pue_f_vert p_y a_x a_y b_x b_y : 
+ (pue_f  a_x a_y b_x b_y b_x p_y) == (b_x - a_x) * (p_y - b_y).
+Proof.
+rewrite /pue_f.
+apply /eqP.
+mc_ring.
+Qed.
+
+Lemma ax4 p_x p_y q_x q_y r_x r_y t_x t_y : 
+pue_f t_x t_y q_x q_y r_x r_y + pue_f p_x p_y t_x t_y r_x r_y
++ pue_f p_x p_y q_x q_y t_x t_y == pue_f p_x p_y q_x q_y r_x r_y.
+Proof.
+rewrite /pue_f.
+apply /eqP.
+  mc_ring.
+Qed.
+  
+
+
 End ring_sandbox.
 
 Lemma pue_formula_opposite a b d:  pue_formula d a b = - pue_formula b a d.
@@ -328,6 +347,22 @@ Proof.
   move: a b d => [ax ay] [b_x b_y] [dx dy]/=.
   apply :pue_f_c.
 Qed.
+
+Lemma pue_formula_vert a b c : (p_x b = p_x c) ->  
+pue_formula a b c == (p_x b - p_x a) * (p_y c - p_y b) .
+Proof.
+move: a b c => [ax ay] [b_x b_y] [cx cy]/= <-.
+apply : pue_f_vert.
+Qed.
+
+Lemma ax4_three_triangles p q r t : 
+pue_formula t q r + pue_formula p t r + pue_formula p q t 
+== pue_formula p q r.
+Proof.
+move : p q r t => [px py] [q_x q_y] [rx ry] [t_x t_y]/= .
+apply : ax4.
+Qed.
+
 
 Lemma pue_formula_two_points a b : 
 pue_formula a a b == 0 /\ pue_formula a b a == 0 /\
@@ -348,14 +383,6 @@ apply : negP.
 rewrite -leNgt.
 apply : (ltW pue2).
 Qed.
-
-Lemma not_strictly_above low_e high_e : 
-~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
-~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
-point_under_edge (right_pt (low_e)) (high_e). 
-Proof.
-rewrite /point_strictly_under_edge  /point_under_edge -leNgt pue_formula_opposite .
-Admitted.
 
 
 Lemma compare_outgoing_total p : {in [pred e | left_pt e == p] &, total compare_outgoing} .
@@ -413,6 +440,17 @@ Qed.
 Definition valid_edge e p := (p_x (left_pt e) <= p_x p) && (p_x p <= p_x (right_pt e)).
 Definition valid_cell c x := (valid_edge (low c) x) /\ (valid_edge (high c) x).
 
+
+Lemma not_strictly_above low_e high_e : 
+~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
+~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
+valid_edge (high_e) (right_pt (low_e)) ->
+point_under_edge (right_pt (low_e)) (high_e) .
+Proof.
+rewrite /point_strictly_under_edge  /point_under_edge -leNgt pue_formula_opposite .
+rewrite /valid_edge.
+Admitted.
+
 (* returns the point of the intersection between a vertical edge
  intersecting p and the edge e if it exists, None if it doesn't *)
 Definition vertical_intersection_point (p : pt) (e : edge) : option pt := 
@@ -432,16 +470,9 @@ Qed.
 
 
 Definition point_on_edge (p: pt) (e :edge) : bool :=
-  let: Bedge a b _ := e in
-  let: Bpt a_x a_y := a in
-  let: Bpt b_x b_y := b in
-  pue_formula p a b == 0.
+  pue_formula p (left_pt e) (right_pt e)   == 0.
 
 Lemma vertical_correct p e : 
-let: Bpt pt_x pt_y := p in
-  let: Bedge a b _ := e in
-  let: Bpt a_x a_y := a in
-  let: Bpt b_x b_y := b in
     match(vertical_intersection_point p e) with None => ~~ valid_edge e p | Some(i) => point_on_edge i e end.
 Proof.
 move: p e => [ptx pty] [[ax ay] [bx b_y]  /=ab] .
@@ -980,6 +1011,7 @@ Qed.
 Lemma close_imp_cont c e :
 (  event_close_edge (low c) e) \/ (  event_close_edge (high c) e) ->
 right_form c ->
+valid_edge (low c) (point e) /\ valid_edge (high c) (point e) ->
  contains_point (point e) c.
 Proof.
 rewrite /contains_point /event_close_edge .
@@ -987,7 +1019,7 @@ move =>  [/eqP rlc | /eqP rhc].
 rewrite /point_strictly_under_edge -rlc {rlc}.
 have := (pue_formula_two_points (right_pt (low c)) (left_pt (low c))) => [][] _ [] /eqP -> _ /=.
 rewrite /right_form /edge_below.
-move => /orP [] /andP [] //= .
+move => /orP [] /andP [] //= => pablhlow pabrhlow [] _ validrlhigh.
 
 
 
