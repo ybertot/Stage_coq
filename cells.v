@@ -331,8 +331,29 @@ rewrite /pue_f.
 apply /eqP.
   mc_ring.
 Qed.
-  
+ 
+Lemma pue_f_on_edge a_x a_y b_x b_y c_x c_y d_x d_y m_x m_y :
+pue_f a_x a_y b_x b_y m_x m_y == 0 -> 
+b_x != a_x ->
+pue_f c_x c_y d_x d_y m_x m_y == 
+(m_x-a_x) / (b_x-a_x) *  pue_f c_x c_y d_x d_y a_x a_y + (1 - (m_x-a_x) / (b_x-a_x)) * pue_f c_x c_y d_x d_y b_x b_y.
+Proof.
 
+move => abmeq0.
+rewrite -subr_eq0 => abeq0.
+
+set lambda := (_ / _).
+rewrite /pue_f.
+rewrite -subr_eq0.
+rewrite -(orbF (_==0)).
+
+rewrite -(negbTE   abeq0).
+rewrite -mulf_eq0 .
+rewrite ! ( mulrBl (b_x - a_x), fun x y => mulrDl  x y (b_x - a_x)).
+
+rewrite /lambda  //.
+apply /eqP.
+mc_ring.
 
 End ring_sandbox.
 
@@ -441,6 +462,35 @@ Definition valid_edge e p := (p_x (left_pt e) <= p_x p) && (p_x p <= p_x (right_
 Definition valid_cell c x := (valid_edge (low c) x) /\ (valid_edge (high c) x).
 
 
+Definition point_on_edge (p: pt) (e :edge) : bool :=
+  pue_formula p (left_pt e) (right_pt e) == 0.
+
+
+
+Lemma point_on_edge_under low_e high_e a : 
+~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
+~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
+point_on_edge a (high_e) ->
+~~ point_strictly_under_edge (a) (low_e).
+Proof.
+rewrite /point_on_edge.
+rewrite /point_strictly_under_edge .
+
+Admitted.
+
+
+Lemma not_strictly_above' low_e high_e p': 
+~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
+~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
+point_on_edge p' high_e ->  p_x (right_pt (low_e)) = p_x p'  ->
+point_under_edge (right_pt (low_e)) (high_e) .
+Proof.
+move => pablh pabrh poep' eqxp'p.
+have := pue_formula_vert (left_pt low_e) eqxp'p => /eqP puefcpp'. 
+(* here we need to prove that the puef is greater than 0 first *)
+
+Admitted.
+
 Lemma not_strictly_above low_e high_e : 
 ~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
 ~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
@@ -449,6 +499,7 @@ point_under_edge (right_pt (low_e)) (high_e) .
 Proof.
 rewrite /point_strictly_under_edge  /point_under_edge -leNgt pue_formula_opposite .
 rewrite /valid_edge.
+
 Admitted.
 
 (* returns the point of the intersection between a vertical edge
@@ -468,9 +519,6 @@ rewrite /vertical_intersection_point /=.
 by rewrite (negbTE h).
 Qed.
 
-
-Definition point_on_edge (p: pt) (e :edge) : bool :=
-  pue_formula p (left_pt e) (right_pt e)   == 0.
 
 Lemma vertical_correct p e : 
     match(vertical_intersection_point p e) with None => ~~ valid_edge e p | Some(i) => point_on_edge i e end.
