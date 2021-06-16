@@ -479,7 +479,7 @@ Definition point_on_edge (p: pt) (e :edge) : bool :=
 
 
 
-Lemma point_on_edge_under low_e high_e a : 
+Lemma point_on_edge_above low_e high_e a : 
 point_on_edge a (high_e) ->
 ~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
 ~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
@@ -508,6 +508,35 @@ by rewrite opprK mulr_ge0.
 Qed.
 
 
+Lemma point_on_edge_under low_e high_e a : 
+point_on_edge a (low_e) ->
+ point_under_edge (left_pt (low_e)) (high_e) ->
+ point_under_edge (right_pt (low_e)) (high_e) ->
+ point_under_edge (a) (high_e).
+Proof.
+move : low_e => [lr hr inH] /=.
+
+rewrite /point_on_edge /valid_edge => /andP [] /= poea /andP [] linfa ainfr.
+
+have pf := pue_formula_on_edge (left_pt high_e) (right_pt high_e) poea.
+rewrite /point_under_edge .
+rewrite -pue_formula_cycle => /= llrllh.
+rewrite -pue_formula_cycle => /= llrllrh.
+have diffa : (p_x lr - p_x a) <= 0.
+  by rewrite subr_cp0.
+have diffb : (p_x hr - p_x a) >= 0.
+  by rewrite subr_cp0.
+have difflh : (p_x lr - p_x hr) < 0.
+  by rewrite subr_cp0.
+rewrite -pue_formula_cycle -( ler_nmul2r difflh 0 _ ) mul0r mulrC.
+move : pf.
+rewrite [x in _ == x] addrC -subr_eq => /eqP <-.
+rewrite   /= addr_ge0//.
+   by rewrite mulr_le0 .
+rewrite -mulNr mulr_le0 // oppr_le0.
+by rewrite subr_cp0.
+Qed.
+
 Lemma not_strictly_above' low_e high_e p': 
 ~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
 ~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
@@ -517,8 +546,8 @@ Proof.
 move : low_e => [ll lr inL] /=.
 move => pablh pabrh poep' eqxp'p.
 have /= /eqP puefcpp' := pue_formula_vert (left_pt (Bedge inL)) eqxp'p .
-have := (point_on_edge_under poep' pablh pabrh ).
-rewrite /point_strictly_under_edge  -pue_formula_cycle -leNgt puefcpp'/point_under_edge.
+have := (point_on_edge_above poep' pablh pabrh ).
+rewrite /point_strictly_under_edge  -pue_formula_cycle -leNgt puefcpp' /point_under_edge.
 have inle: (p_x lr - p_x ll) >0.
   by rewrite subr_cp0.
 rewrite (pmulr_rge0 _ inle) => inp'lr.
@@ -543,6 +572,37 @@ by rewrite  mulr_ge0.
 Qed.
 
 
+
+Lemma not_strictly_under' low_e high_e p': 
+point_under_edge (left_pt (low_e)) (high_e) ->
+point_under_edge (right_pt (low_e)) (high_e) ->
+point_on_edge p' low_e ->  p_x (right_pt (high_e)) = p_x p'  ->
+~~ point_strictly_under_edge (right_pt (high_e)) (low_e).
+Proof.
+move : high_e => [hl hr inH] /=.
+move => pablh pabrh poep' eqxp'p.
+have /= /eqP puefcpp' := pue_formula_vert (left_pt (Bedge inH)) eqxp'p .
+have := (point_on_edge_under poep' pablh pabrh ).
+rewrite /point_under_edge  -pue_formula_cycle -leNgt puefcpp'.
+have inle: (p_x hr - p_x hl) >0.
+  by rewrite subr_cp0.
+rewrite (pmulr_rle0 _ inle )  => inp'hr.
+have :=  (ax4_three_triangles hr  (left_pt low_e) (right_pt low_e) p') => /eqP <-.
+move : poep'.
+rewrite /point_on_edge=> /andP [] /eqP pue0 valp'.
+rewrite pue0.
+have := (pue_formula_vert (right_pt low_e) eqxp'p  ).
+rewrite -pue_formula_cycle eqxp'p => /eqP ->.
+move : valp'.
+rewrite /valid_edge => /andP [] xlhp' xrhp'.
+have xrhp'0: p_x p' - p_x (right_pt low_e) <=0.
+  by rewrite subr_cp0.
+rewrite add0r addr_ge0//.
+  by rewrite mulr_le0.
+have := (pue_formula_vert (left_pt low_e) eqxp'p  ).
+rewrite pue_formula_opposite -pue_formula_cycle eqxp'p eqr_oppLR => /eqP ->.
+by rewrite -mulNr mulr_le0 // oppr_le0 subr_cp0.
+Qed.
 
 
 (* returns the point of the intersection between a vertical edge
@@ -571,17 +631,19 @@ rewrite /vertical_intersection_point.
 case : ifP => /= h ; last first.
 by [].
 have: ax != bx.
-rewrite mc_1_10.Num.Theory.neqr_lt ab //=.
+rewrite neq_lt ab //=.
 rewrite /pue_formula.
 set py := ((b_y - ay) / (bx - ax) * ptx + (ay - (b_y - ay) / (bx - ax) * ax)).
 move => h2.
-Admitted.
-(*
+rewrite /point_on_edge .
+apply /andP.
+split; last first.
+exact h.
 apply pue_f_inters.
 by apply /eqP /nesym /eqP .
 by [].
 Qed.
-*)
+
 
 
 Lemma exists_point_valid e p :
@@ -602,14 +664,29 @@ Lemma intersection_on_edge e p p' :
 vertical_intersection_point p e = Some (p') ->
 point_on_edge p' e /\ p_x p = p_x p'.
 Proof.
-
 have := vertical_correct p e.
-case : (vertical_intersection_point p e)=> [vp |//=].
-Search "option" .
-move => poe /=.
-Admitted.
+case vert : (vertical_intersection_point p e)=> [vp |//=].
+move: vert.
+rewrite /vertical_intersection_point.
+case : (valid_edge e p) => [| //].
+move => [] /= vpq  poe [].
+move => <-. 
+by rewrite poe -vpq /=.
+Qed.
 
 
+Lemma not_strictly_under low_e high_e : 
+point_under_edge (left_pt (low_e)) (high_e) ->
+point_under_edge (right_pt (low_e)) (high_e) ->
+valid_edge (low_e) (right_pt (high_e))  ->
+~~ point_strictly_under_edge (right_pt (high_e)) (low_e).
+Proof.
+  move => pableft pabright valright.
+have  := exists_point_valid valright.
+move => [] p' vip .
+have  := intersection_on_edge vip => [][] poep' eqx.
+apply :  not_strictly_under' pableft pabright poep' eqx.
+Qed.
 
 Lemma not_strictly_above low_e high_e : 
 ~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
@@ -1065,7 +1142,7 @@ Definition right_form (c : cell) : bool :=
   edge_below (low c) (high c).
 
 Lemma opening_cells_right_form e low_e high_e : 
-sorted edge_below (outgoing e) ->           
+sorted edge_below (outgoing e) ->
 forall new_open_cells, 
 opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
 forall c, c \in new_open_cells /\ right_form c.
@@ -1143,22 +1220,39 @@ by have /= /eqP <- := (fix_preserve_cells h).
 Qed.
 
 Lemma close_imp_cont c e :
-(  event_close_edge (low c) e) \/ (  event_close_edge (high c) e) ->
 right_form c ->
 valid_edge (low c) (point e) /\ valid_edge (high c) (point e) ->
- contains_point (point e) c.
+event_close_edge (low c) e \/  event_close_edge (high c) e->
+contains_point (point e) c.
 Proof.
 rewrite /contains_point /event_close_edge .
-move =>  [/eqP rlc | /eqP rhc].
-rewrite /point_strictly_under_edge -rlc {rlc}.
-have := (pue_formula_two_points (right_pt (low c)) (left_pt (low c))) => [][] _ [] /eqP -> _ /=.
-rewrite /right_form /edge_below.
-move => /orP [] /andP [] //= => pablhlow pabrhlow [] _ validrlhigh.
+move =>  rf val [/eqP rlc | /eqP rhc].
+move : rf val.
+  rewrite /point_strictly_under_edge -rlc {rlc}.
+  have := (pue_formula_two_points (right_pt (low c)) (left_pt (low c))) => [][] _ [] /eqP -> _ /=.
+  rewrite /right_form /edge_below.
+  move => /orP [] /andP [] //= => pablhlow pabrhlow [] _ validrlhigh.
+  apply :  not_strictly_above pablhlow pabrhlow validrlhigh.
+  move : rf val.
+rewrite /point_under_edge -rhc {rhc}.
+have := (pue_formula_two_points (right_pt (high c)) (left_pt (high c))) => [] [] _ [] /eqP -> _ /=.
+rewrite le0r /right_form /edge_below /= andbT=> /orP [] /andP [] //= => pablhlow pabrhlow [] valrhlow _ .
+apply : not_strictly_under pablhlow pabrhlow valrhlow.
+Qed.
 
-
-
-Admitted.
-
+Lemma contrapositive_close_imp_cont c e :
+right_form c ->
+valid_edge (low c) (point e) /\ valid_edge (high c) (point e) ->
+~ contains_point (point e) c ->
+~ event_close_edge (low c) e /\ ~ event_close_edge (high c) e.
+Proof.
+  move => rf val ev.
+have aimpb := (close_imp_cont rf val).
+have  := (contra_not  ( contains_point (point e) c) (event_close_edge (low c) e \/ event_close_edge (high c) e) aimpb ev) .
+move => /orP /= .
+rewrite negb_or.
+by move => /andP [] /negP a /negP.
+Qed.
 
 Lemma contact_not_end open_cells e high_e contact_cells :
 s_right_form open_cells ->
@@ -1167,8 +1261,7 @@ forall contact last_c high_c,
 open_cells_decomposition_contact open_cells (point e) contact_cells high_e = (contact, last_c, high_c) ->
 forall c, (c \in last_c) -> ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
 Proof.
-  
-  move => oprf opvalid c_c last_cells highc.
+move => oprf opvalid c_c last_cells highc.
 elim op : open_cells oprf opvalid last_cells contact_cells high_e => [/= | c q  IH] op_rf opvalid last_c contact high_e.
   by move =>  [] _ <-  _  .
 move => op_c.
@@ -1189,14 +1282,10 @@ case : ifP => [contain | notcontain].
     by rewrite /s_right_form /all => /andP [] _.
   apply : (IH q_rf qval last_c1 (rcons contact {| pts := pts; low := lowc; high := high_c |})  high_c h).
 move =>  [] conteq lc heq {IH}.
-move : notcontain.
-rewrite /contains_point /=.
 
-move =>/andP .
-have puehigh : point_under_edge (point e) high_c; first last.
-  rewrite puehigh => /andP.
-  rewrite andbT /= => a. 
-  have := negbNE a.
+
+have contr:= contrapositive_close_imp_cont _ _ _ .
+  
 
 
 Admitted.
