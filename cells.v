@@ -514,22 +514,36 @@ Lemma not_strictly_above' low_e high_e p':
 point_on_edge p' high_e ->  p_x (right_pt (low_e)) = p_x p'  ->
 point_under_edge (right_pt (low_e)) (high_e) .
 Proof.
+move : low_e => [ll lr inL] /=.
 move => pablh pabrh poep' eqxp'p.
-have := pue_formula_vert (left_pt low_e) eqxp'p => /eqP puefcpp'.
-(* here we need to prove that the puef is greater than 0 first *)
+have /= /eqP puefcpp' := pue_formula_vert (left_pt (Bedge inL)) eqxp'p .
+have := (point_on_edge_under poep' pablh pabrh ).
+rewrite /point_strictly_under_edge  -pue_formula_cycle -leNgt puefcpp'/point_under_edge.
+have inle: (p_x lr - p_x ll) >0.
+  by rewrite subr_cp0.
+rewrite (pmulr_rge0 _ inle) => inp'lr.
+have :=  (ax4_three_triangles lr  (left_pt high_e) (right_pt high_e) p') => /eqP <-.
+move : poep'.
+rewrite /point_on_edge=> /andP [] /eqP pue0 valp'.
+rewrite pue0.
+have := (pue_formula_vert (right_pt high_e) eqxp'p  ).
+rewrite -pue_formula_cycle eqxp'p => /eqP ->.
+move : valp'.
+rewrite /valid_edge => /andP [] xlhp' xrhp'.
+have xrhp'0: p_x p' - p_x (right_pt high_e) <=0.
+  by rewrite subr_cp0.
+rewrite add0r.
+rewrite -oppr_ge0 opprD /= addr_ge0//.
+  by rewrite -mulNr mulr_ge0 // oppr_ge0.
+have := (pue_formula_vert (left_pt high_e) eqxp'p  ).
+rewrite -pue_formula_opposite pue_formula_cycle eqxp'p => /eqP ->.
+have xlhp'0: p_x p' - p_x (left_pt high_e) >= 0.
+  by rewrite subr_cp0.
+by rewrite  mulr_ge0.
+Qed.
 
-Admitted.
 
-Lemma not_strictly_above low_e high_e : 
-~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
-~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
-valid_edge (high_e) (right_pt (low_e)) ->
-point_under_edge (right_pt (low_e)) (high_e) .
-Proof.
-rewrite /point_strictly_under_edge  /point_under_edge -leNgt pue_formula_opposite .
-rewrite /valid_edge.
 
-Admitted.
 
 (* returns the point of the intersection between a vertical edge
  intersecting p and the edge e if it exists, None if it doesn't *)
@@ -561,10 +575,53 @@ rewrite mc_1_10.Num.Theory.neqr_lt ab //=.
 rewrite /pue_formula.
 set py := ((b_y - ay) / (bx - ax) * ptx + (ay - (b_y - ay) / (bx - ax) * ax)).
 move => h2.
-
+Admitted.
+(*
 apply pue_f_inters.
 by apply /eqP /nesym /eqP .
 by [].
+Qed.
+*)
+
+
+Lemma exists_point_valid e p :
+(valid_edge e p) -> 
+exists p', vertical_intersection_point p e = Some (p').
+Proof.
+have := vertical_correct p e.
+case : (vertical_intersection_point p e)=> [vp |//=].
+  rewrite /point_on_edge.
+  move => a b.
+  by exists vp.
+move => a b.
+exists p.
+by rewrite b in a.
+Qed.
+
+Lemma intersection_on_edge e p p' :
+vertical_intersection_point p e = Some (p') ->
+point_on_edge p' e /\ p_x p = p_x p'.
+Proof.
+
+have := vertical_correct p e.
+case : (vertical_intersection_point p e)=> [vp |//=].
+Search "option" .
+move => poe /=.
+Admitted.
+
+
+
+Lemma not_strictly_above low_e high_e : 
+~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
+~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
+valid_edge (high_e) (right_pt (low_e)) ->
+point_under_edge (right_pt (low_e)) (high_e) .
+Proof.
+  move => pableft pabright valright.
+have  := exists_point_valid valright.
+move => [] p' vip .
+have  := intersection_on_edge vip => [][] poep' eqx.
+apply :  not_strictly_above' pableft pabright poep' eqx.
 Qed.
 
 Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::].
