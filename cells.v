@@ -289,6 +289,8 @@ pue_f p_x p_y a_x a_y b_x b_y == 0.
 Proof.
 move => h ->.
 by apply pue_f_inter; rewrite h.
+
+
 Qed.
 
 Lemma pue_f_eq p_x p_y a_x a_y : 
@@ -331,29 +333,30 @@ rewrite /pue_f.
 apply /eqP.
   mc_ring.
 Qed.
- 
+
+Lemma pue_f_linear l a b c d e f :
+l * pue_f a b c d e f = pue_f a (l*b) c (l*d) e (l*f).
+Proof.
+rewrite /pue_f.
+mc_ring.
+Qed.
+
 Lemma pue_f_on_edge a_x a_y b_x b_y c_x c_y d_x d_y m_x m_y :
 pue_f a_x a_y b_x b_y m_x m_y == 0 -> 
-b_x != a_x ->
-pue_f c_x c_y d_x d_y m_x m_y == 
-(m_x-a_x) / (b_x-a_x) *  pue_f c_x c_y d_x d_y a_x a_y + (1 - (m_x-a_x) / (b_x-a_x)) * pue_f c_x c_y d_x d_y b_x b_y.
+(b_x - a_x) * pue_f c_x c_y d_x d_y m_x m_y == 
+(m_x - a_x) * pue_f c_x c_y d_x d_y b_x b_y + (b_x - m_x) * pue_f c_x c_y d_x d_y a_x a_y.
 Proof.
-
-move => abmeq0.
-rewrite -subr_eq0 => abeq0.
-
-set lambda := (_ / _).
-rewrite /pue_f.
-rewrite -subr_eq0.
-rewrite -(orbF (_==0)).
-
-rewrite -(negbTE   abeq0).
-rewrite -mulf_eq0 .
-rewrite ! ( mulrBl (b_x - a_x), fun x y => mulrDl  x y (b_x - a_x)).
-
-rewrite /lambda  //.
+move => /eqP abmeq0 .
+have valrmy :  (b_x - a_x) * m_y = m_x * (b_y -a_y)- (a_x*b_y - b_x *a_y).
+  apply /eqP.
+  rewrite -subr_eq0.
+  apply /eqP.
+  rewrite -abmeq0 /pue_f.
+  mc_ring.
+rewrite pue_f_linear  /pue_f valrmy.
 apply /eqP.
 mc_ring.
+Qed.
 
 End ring_sandbox.
 
@@ -391,6 +394,15 @@ pue_formula a b b == 0.
 Proof.
 move : a b => [ax ay] [b_x b_y] /=.
 apply pue_f_two_points.
+Qed.
+
+Lemma pue_formula_on_edge a b c d m :
+pue_formula a b m == 0 -> 
+(p_x b - p_x a) * pue_formula c d m == 
+(p_x m - p_x a) * pue_formula c d b + (p_x b - p_x m) * pue_formula c d a.
+Proof.
+move : a b c d m => [ax ay] [b_x b_y] [cx cy] [dx dy] [mx my]/=.
+apply pue_f_on_edge.
 Qed.
 
 Lemma not_under_not_strictly p ed : 
@@ -463,20 +475,37 @@ Definition valid_cell c x := (valid_edge (low c) x) /\ (valid_edge (high c) x).
 
 
 Definition point_on_edge (p: pt) (e :edge) : bool :=
-  pue_formula p (left_pt e) (right_pt e) == 0.
+  (pue_formula p (left_pt e) (right_pt e) == 0) && (valid_edge e p).
 
 
 
 Lemma point_on_edge_under low_e high_e a : 
+point_on_edge a (high_e) ->
 ~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
 ~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
-point_on_edge a (high_e) ->
 ~~ point_strictly_under_edge (a) (low_e).
 Proof.
-rewrite /point_on_edge.
-rewrite /point_strictly_under_edge .
+move : high_e => [lr hr inH] /=.
 
-Admitted.
+rewrite /point_on_edge /valid_edge => /andP [] /= poea /andP [] linfa ainfr.
+
+have pf := pue_formula_on_edge (left_pt low_e) (right_pt low_e) poea.
+rewrite /point_strictly_under_edge -!leNgt.
+rewrite -pue_formula_cycle => llrllh.
+rewrite -pue_formula_cycle => llrllrh.
+have diffa : (p_x lr - p_x a) <= 0.
+  by rewrite subr_cp0.
+have diffb : (p_x hr - p_x a) >= 0.
+  by rewrite subr_cp0.
+have difflh : (p_x lr - p_x hr) < 0.
+  by rewrite subr_cp0.
+rewrite -pue_formula_cycle -( ler_nmul2l difflh _ 0) mulr0.
+move : pf.
+rewrite [x in _ == x] addrC -subr_eq => /eqP <-.
+rewrite -oppr_ge0 opprD /= addr_ge0//.
+  by rewrite -mulNr mulr_ge0 // oppr_ge0.
+by rewrite opprK mulr_ge0.
+Qed.
 
 
 Lemma not_strictly_above' low_e high_e p': 
@@ -486,7 +515,7 @@ point_on_edge p' high_e ->  p_x (right_pt (low_e)) = p_x p'  ->
 point_under_edge (right_pt (low_e)) (high_e) .
 Proof.
 move => pablh pabrh poep' eqxp'p.
-have := pue_formula_vert (left_pt low_e) eqxp'p => /eqP puefcpp'. 
+have := pue_formula_vert (left_pt low_e) eqxp'p => /eqP puefcpp'.
 (* here we need to prove that the puef is greater than 0 first *)
 
 Admitted.
