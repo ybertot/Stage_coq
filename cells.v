@@ -341,22 +341,41 @@ rewrite /pue_f.
 mc_ring.
 Qed.
 
+Lemma pue_f_on_edge_y a_x a_y b_x b_y m_x m_y :
+pue_f a_x a_y b_x b_y m_x m_y == 0 ->
+(b_x - a_x) * m_y = m_x * (b_y -a_y)- (a_x * b_y - b_x *a_y).
+Proof.
+move => /eqP abmeq0.
+apply /eqP.
+rewrite -subr_eq0.
+apply /eqP.
+rewrite -abmeq0 /pue_f.
+mc_ring.
+Qed.
+
 Lemma pue_f_on_edge a_x a_y b_x b_y c_x c_y d_x d_y m_x m_y :
 pue_f a_x a_y b_x b_y m_x m_y == 0 -> 
 (b_x - a_x) * pue_f c_x c_y d_x d_y m_x m_y == 
 (m_x - a_x) * pue_f c_x c_y d_x d_y b_x b_y + (b_x - m_x) * pue_f c_x c_y d_x d_y a_x a_y.
 Proof.
-move => /eqP abmeq0 .
-have valrmy :  (b_x - a_x) * m_y = m_x * (b_y -a_y)- (a_x*b_y - b_x *a_y).
-  apply /eqP.
-  rewrite -subr_eq0.
-  apply /eqP.
-  rewrite -abmeq0 /pue_f.
-  mc_ring.
-rewrite pue_f_linear  /pue_f valrmy.
+move => on_ed.
+rewrite pue_f_linear  /pue_f (pue_f_on_edge_y on_ed).
 apply /eqP.
 mc_ring.
 Qed.
+
+Lemma pue_f_triangle_on_edge a_x a_y b_x b_y p_x p_y p'_y :
+pue_f a_x a_y b_x b_y p_x p'_y == 0 -> 
+(b_x - a_x) * pue_f a_x a_y p_x p_y p_x p'_y == 
+(p_x - a_x) * pue_f a_x a_y p_x p_y b_x b_y .
+Proof.
+move => on_ed .
+rewrite pue_f_linear  /pue_f (pue_f_on_edge_y on_ed).
+apply /eqP.
+mc_ring.
+Qed.
+
+
 
 End ring_sandbox.
 
@@ -373,7 +392,7 @@ Proof.
 Qed.
 
 Lemma pue_formula_vert a b c : (p_x b = p_x c) ->  
-pue_formula a b c == (p_x b - p_x a) * (p_y c - p_y b) .
+pue_formula a b c == (p_x b - p_x a) * (p_y c - p_y b).
 Proof.
 move: a b c => [ax ay] [b_x b_y] [cx cy]/= <-.
 apply : pue_f_vert.
@@ -397,12 +416,23 @@ apply pue_f_two_points.
 Qed.
 
 Lemma pue_formula_on_edge a b c d m :
-pue_formula a b m == 0 -> 
+pue_formula a b m == 0 ->  
 (p_x b - p_x a) * pue_formula c d m == 
 (p_x m - p_x a) * pue_formula c d b + (p_x b - p_x m) * pue_formula c d a.
 Proof.
 move : a b c d m => [ax ay] [b_x b_y] [cx cy] [dx dy] [mx my]/=.
 apply pue_f_on_edge.
+Qed.
+
+
+Lemma pue_formula_triangle_on_edge a b p p' :
+p_x p = p_x p' -> pue_formula a b p' == 0 ->
+(p_x b - p_x a) * pue_formula a p p' == 
+(p_x p - p_x a) * pue_formula a p b.
+Proof.
+move : a b p p' => [ax ay] [b_x b_y] [px py] [p'x p'y] /=.
+move => <-.
+apply pue_f_triangle_on_edge.
 Qed.
 
 Lemma not_under_not_strictly p ed : 
@@ -477,6 +507,33 @@ Definition valid_cell c x := (valid_edge (low c) x) /\ (valid_edge (high c) x).
 Definition point_on_edge (p: pt) (e :edge) : bool :=
   (pue_formula p (left_pt e) (right_pt e) == 0) && (valid_edge e p).
 
+Lemma left_on_edge e :
+point_on_edge (left_pt e) e.
+Proof.
+move : e => [ l r inE].
+rewrite /point_on_edge //=.
+have := pue_formula_two_points l r.
+move => [] ->  _ /=.
+apply  /andP .
+split.
+  by [].
+rewrite /=.
+by apply ltW.
+Qed.
+
+Lemma right_on_edge e :
+point_on_edge (right_pt e) e.
+Proof.
+move : e => [ l r inE].
+rewrite /point_on_edge //=.
+have := pue_formula_two_points r l.
+move => [] _ [] -> _ /=.
+apply  /andP .
+split.
+  rewrite /=.
+  by apply ltW.
+by [].
+Qed.
 
 
 Lemma point_on_edge_above low_e high_e a : 
@@ -701,16 +758,100 @@ have  := intersection_on_edge vip => [][] poep' eqx.
 apply :  not_strictly_above' pableft pabright poep' eqx.
 Qed.
 
-Lemma under_low_imp_under_high low_e high_e p :
+Lemma on_edge_same_point e p p': 
+point_on_edge p e -> point_on_edge p' e ->
+(p_x p == p_x p') = (p_y p == p_y p').
+Proof.
+  move : e => [l r inE].
+rewrite /point_on_edge /= => /andP [] puep0 _ /andP [] puep'0 _.
+
+move : puep'0. 
+Admitted.
+
+Lemma point_valid_under_imp_y_inf e p p' : 
+point_under_edge p e ->
+point_on_edge p' e -> p_x p = p_x p'->
+0 <= (p_y p' - p_y p).
+Proof.
+move : e => [l r inE] /=.
+rewrite /point_on_edge /valid_edge /= => pue  /andP [] p_on_edge_p'   /andP [] linfp pinfr eqx.
+move : pue.
+rewrite -pue_formula_cycle in p_on_edge_p'.
+rewrite -eqx in linfp pinfr.
+rewrite /point_under_edge /=.
+have := (pue_formula_triangle_on_edge eqx (p_on_edge_p')).
+
+have /eqP := (pue_formula_vert l eqx  ) => ->.
+have inle: (p_x r - p_x l) >0.
+  by rewrite subr_cp0.
+move => /eqP a.
+have pminusl : (0 <= p_x p - p_x l).
+  by rewrite subr_cp0.
+  rewrite pue_formula_opposite -pue_formula_cycle oppr_le0 => lprpos.
+have := (mulr_ge0 pminusl lprpos).
+rewrite -a.
+rewrite (pmulr_rge0 _ inle).
+case sup0 : (0 < (p_x p - p_x l)).
+  by rewrite (pmulr_rge0 _ sup0).
+move : sup0.
+rewrite subr_cp0.
+move => /negbT.
+rewrite -leNgt => pinfl.
+have : p_x p <= p_x l <= p_x p.
+by rewrite linfp pinfl.
+move => /le_anti eqxl.
+have /= lone:= left_on_edge (Bedge inE).
+
+move : lprpos.
+rewrite pue_formula_opposite oppr_gte0 .
+have /eqP -> := (pue_formula_vert r eqxl).
+rewrite eqxl => yineq.
+have inle2: (p_x l - p_x r) < 0.
+by rewrite subr_cp0.
+Search (_ * _ <=0).
+move => _.
+rewrite (nmulr_rle0  _  inle2 ) in yineq.
+move => eq _.
+Admitted.
+
+Lemma under_low_imp_under_high low_e high_e p  : 
 point_under_edge (left_pt low_e) high_e ->
 point_under_edge (right_pt low_e) high_e ->
 valid_edge low_e p ->
+valid_edge high_e p ->
 point_under_edge p low_e -> point_under_edge p high_e.
 Proof.
-  move => pueleft pueright valp.
-  have  := exists_point_valid valp.
-  move => [] p' vip .
+move : low_e high_e => [ll lr inL] [hl hr inH]  /=.
+move => pulh purh vallow valhigh.
+have  := exists_point_valid vallow.
+move => [] p' vip .
+have  := intersection_on_edge vip => [][] poep' eqx'.
+have  := exists_point_valid valhigh.
+move => [] p'' vip' .
+have  := intersection_on_edge vip' => [][] poep'' eqx''{vip' vip}.
+move : poep' poep''.
+
+rewrite /point_on_edge /valid_edge =>  /andP [] /= poep' /andP []
+ linfp' p'infr   /andP [] /= poep'' /andP [] linfp'' p''infr.
+
+rewrite -pue_formula_cycle in poep'.
+rewrite -eqx' in linfp' p'infr.
+rewrite -eqx'' in linfp'' p''infr.
+
+have /eqP := (pue_formula_triangle_on_edge eqx' poep') .
+have /= /eqP  -> := pue_formula_vert (left_pt (Bedge inL)) eqx' .
+rewrite /point_under_edge /= => y'eq {eqx'}.
+have pminusl : (0 <= p_x p - p_x ll).
+  by rewrite subr_cp0.
+rewrite pue_formula_opposite -pue_formula_cycle oppr_le0 => punderlow.
+have := mulr_ge0 pminusl punderlow.
+rewrite -y'eq {punderlow y'eq}.
+have inle: (p_x lr - p_x ll) >0.
+  by rewrite subr_cp0.
+rewrite (pmulr_rge0 _ inle).
 Admitted.
+
+
 
 
 Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::].
@@ -972,7 +1113,7 @@ Lemma lexPtevAbsicca a b : (lexPtEv a b) -> (p_x (point a)) <= (p_x (point b)).
 Proof.
 rewrite /lexPtEv.
 move => /orP [] h.
-by rewrite mc_1_10.Num.Theory.ltrW.
+by rewrite ltW.
 by move : h => /andP [] /eqP <-.
 Qed.
 
