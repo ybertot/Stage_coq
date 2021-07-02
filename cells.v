@@ -375,8 +375,27 @@ apply /eqP.
 mc_ring.
 Qed.
 
-
-
+Lemma pue_f_on_edge_same_point a_x a_y b_x b_y p_x p_y p_x' p_y': 
+pue_f a_x a_y b_x b_y p_x p_y == 0 -> 
+pue_f a_x a_y b_x b_y p_x' p_y' == 0 ->
+(p_y == p_y') = (p_x == p_x').
+Proof.
+move => puep0 puep'0.
+  have pyeq := (pue_f_on_edge_y puep0 ).
+  have p'yeq := (pue_f_on_edge_y puep'0 ).
+  apply /eqP.
+  case : ifP => [/eqP xeq| xnoteq].
+    rewrite -xeq in p'yeq.
+    rewrite -p'yeq in pyeq.
+   
+    rewrite -su -opprB oppr_lt0 in inE.
+    have pneq0 : ( p_x r - p_x l != 0).
+      by rewrite neq_lt inE orbT.
+  
+    move : pyeq => /eqP.
+    rewrite mulrC [x in _ == x] mulrC -divq_eq // => a.
+    Search (_ * 1 = _ ).
+  Admitted.
 End ring_sandbox.
 
 Lemma pue_formula_opposite a b d:  pue_formula d a b = - pue_formula b a d.
@@ -424,6 +443,13 @@ move : a b c d m => [ax ay] [b_x b_y] [cx cy] [dx dy] [mx my]/=.
 apply pue_f_on_edge.
 Qed.
 
+Lemma pue_formula_on_edge_y a b m :
+pue_formula a b m == 0 ->
+(p_x b - p_x a) * p_y m = p_x m * (p_y b - p_y a) - (p_x a * p_y b - p_x b * p_y a).
+Proof.
+move : a b m => [ax ay] [b_x b_y]  [mx my]/=.
+apply pue_f_on_edge_y.
+Qed.
 
 Lemma pue_formula_triangle_on_edge a b p p' :
 p_x p = p_x p' -> pue_formula a b p' == 0 ->
@@ -760,12 +786,26 @@ Qed.
 
 Lemma on_edge_same_point e p p': 
 point_on_edge p e -> point_on_edge p' e ->
-(p_x p == p_x p') = (p_y p == p_y p').
+(p_y p == p_y p') = (p_x p == p_x p').
 Proof.
   move : e => [l r inE].
 rewrite /point_on_edge /= => /andP [] puep0 _ /andP [] puep'0 _.
+rewrite -pue_formula_cycle in puep0.
+rewrite -pue_formula_cycle in puep'0.
+have pyeq := (pue_formula_on_edge_y puep0 ).
+have p'yeq := (pue_formula_on_edge_y puep'0 ).
+apply /eqP.
+case : ifP => [/eqP xeq| xnoteq].
+  rewrite -xeq in p'yeq.
+  rewrite -p'yeq in pyeq.
+  have su := (subr_cp0 _   ).
+  rewrite -su -opprB oppr_lt0 in inE.
+  have pneq0 : ( p_x r - p_x l != 0).
+    by rewrite neq_lt inE orbT.
 
-move : puep'0. 
+  move : pyeq => /eqP.
+  rewrite mulrC [x in _ == x] mulrC -divq_eq // => a.
+  Search (_ * 1 = _ ).
 Admitted.
 
 Lemma point_valid_under_imp_y_inf e p p' : 
