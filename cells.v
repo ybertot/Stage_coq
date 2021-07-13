@@ -325,6 +325,7 @@ apply /eqP.
 mc_ring.
 Qed.
 
+
 Lemma ax4 p_x p_y q_x q_y r_x r_y t_x t_y : 
 pue_f t_x t_y q_x q_y r_x r_y + pue_f p_x p_y t_x t_y r_x r_y
 + pue_f p_x p_y q_x q_y t_x t_y == pue_f p_x p_y q_x q_y r_x r_y.
@@ -388,13 +389,9 @@ move => puep0 puep'0.
     rewrite -xeq in p'yeq.
     rewrite -p'yeq in pyeq.
    
-    rewrite -su -opprB oppr_lt0 in inE.
-    have pneq0 : ( p_x r - p_x l != 0).
-      by rewrite neq_lt inE orbT.
   
-    move : pyeq => /eqP.
-    rewrite mulrC [x in _ == x] mulrC -divq_eq // => a.
-    Search (_ * 1 = _ ).
+    have pneq0 : ( b_x - a_x != 0).
+      
   Admitted.
 End ring_sandbox.
 
@@ -687,6 +684,34 @@ rewrite pue_formula_opposite -pue_formula_cycle eqxp'p eqr_oppLR => /eqP ->.
 by rewrite -mulNr mulr_le0 // oppr_le0 subr_cp0.
 Qed.
 
+Lemma pue_right_edge e p : 
+p_x (right_pt e) == p_x p -> 
+(point_under_edge  p e) = ((p_y p - p_y (right_pt e)) <= 0).
+Proof.
+move : e p  => [[ax ay][bx b_y] /= inE] [px py]  /=.
+rewrite /point_under_edge /=.
+move => /eqP <- /=.
+have := (pue_f_vert py ax ay bx b_y).
+rewrite pue_f_c /pue_f.
+move => /eqP ->.
+rewrite -subr_cp0 -opprB oppr_lt0 in inE.
+by rewrite (pmulr_rle0 _  inE  ) .
+Qed.
+
+Lemma pue_left_edge e p : 
+p_x (left_pt e) == p_x p -> 
+(point_under_edge  p e) = (0 <= (p_y (left_pt e) - p_y p )).
+Proof.
+move : e p  => [[ax ay][bx b_y] /= inE] [px py]  /=.
+rewrite /point_under_edge /=.
+move => /eqP <- /=.
+have := (pue_f_vert ay bx b_y ax py).
+rewrite -pue_f_c /pue_f.
+move => /eqP ->.
+rewrite -subr_cp0 in inE.
+by rewrite (nmulr_rle0 _  inE  ) .
+Qed.
+
 
 (* returns the point of the intersection between a vertical edge
  intersecting p and the edge e if it exists, None if it doesn't *)
@@ -805,7 +830,7 @@ case : ifP => [/eqP xeq| xnoteq].
 
   move : pyeq => /eqP.
   rewrite mulrC [x in _ == x] mulrC -divq_eq // => a.
-  Search (_ * 1 = _ ).
+  
 Admitted.
 
 Lemma point_valid_under_imp_y_inf e p p' : 
@@ -814,7 +839,9 @@ point_on_edge p' e -> p_x p = p_x p'->
 0 <= (p_y p' - p_y p).
 Proof.
 move : e => [l r inE] /=.
-rewrite /point_on_edge /valid_edge /= => pue  /andP [] p_on_edge_p'   /andP [] linfp pinfr eqx.
+move => pue poep'.
+have := poep'.
+rewrite /point_on_edge /valid_edge /= =>  /andP [] p_on_edge_p'   /andP [] linfp pinfr eqx.
 move : pue.
 rewrite -pue_formula_cycle in p_on_edge_p'.
 rewrite -eqx in linfp pinfr.
@@ -848,11 +875,12 @@ have /eqP -> := (pue_formula_vert r eqxl).
 rewrite eqxl => yineq.
 have inle2: (p_x l - p_x r) < 0.
 by rewrite subr_cp0.
-Search (_ * _ <=0).
+
 move => _.
 rewrite (nmulr_rle0  _  inle2 ) in yineq.
-move => eq _.
-Admitted.
+have := (on_edge_same_point lone poep').
+by rewrite -eqx eqxl eqxx => /eqP <-.
+Qed.
 
 Lemma under_low_imp_under_high low_e high_e p  : 
 point_under_edge (left_pt low_e) high_e ->
@@ -869,28 +897,48 @@ have  := intersection_on_edge vip => [][] poep' eqx'.
 have  := exists_point_valid valhigh.
 move => [] p'' vip' .
 have  := intersection_on_edge vip' => [][] poep'' eqx''{vip' vip}.
-move : poep' poep''.
+have := poep''.
+have := poep'.
 
-rewrite /point_on_edge /valid_edge =>  /andP [] /= poep' /andP []
- linfp' p'infr   /andP [] /= poep'' /andP [] linfp'' p''infr.
+rewrite /point_on_edge /valid_edge =>  /andP [] /= poepf' /andP []
+ linfp' p'infr   /andP [] /= poepf'' /andP [] linfp'' p''infr.
 
-rewrite -pue_formula_cycle in poep'.
+rewrite -pue_formula_cycle in poepf'.
 rewrite -eqx' in linfp' p'infr.
 rewrite -eqx'' in linfp'' p''infr.
+move => puep.
 
-have /eqP := (pue_formula_triangle_on_edge eqx' poep') .
-have /= /eqP  -> := pue_formula_vert (left_pt (Bedge inL)) eqx' .
-rewrite /point_under_edge /= => y'eq {eqx'}.
-have pminusl : (0 <= p_x p - p_x ll).
-  by rewrite subr_cp0.
-rewrite pue_formula_opposite -pue_formula_cycle oppr_le0 => punderlow.
-have := mulr_ge0 pminusl punderlow.
-rewrite -y'eq {punderlow y'eq}.
-have inle: (p_x lr - p_x ll) >0.
-  by rewrite subr_cp0.
-rewrite (pmulr_rge0 _ inle).
-Admitted.
 
+have ydiff := (point_valid_under_imp_y_inf puep poep' eqx').
+rewrite eqx' in eqx''.
+have puep' := (point_on_edge_under  poep' pulh purh).
+have y'diff := (point_valid_under_imp_y_inf puep' poep'' eqx'').
+rewrite subr_cp0 in ydiff.
+rewrite subr_cp0 in y'diff.
+have y''diff: (p_y p  <= p_y p'').
+  by rewrite (le_trans  ydiff y'diff).
+rewrite -eqx' in eqx''.
+have := ax4_three_triangles p hl hr p''.
+have /eqP pHleq :=  (pue_formula_vert hl eqx'').
+have /eqP pHreq :=  (pue_formula_vert hr eqx'').
+rewrite -pue_formula_cycle in pHreq.
+rewrite pue_formula_opposite -pue_formula_cycle in pHleq.
+
+move : poepf'' pHreq => /eqP ->  -> .
+have :  pue_formula p hl p'' = - ((p_x p - p_x hl) * (p_y p'' - p_y p)).
+  by rewrite -pHleq opprK.
+move => ->.
+rewrite add0r -mulrBl.
+rewrite  [x in (x - _) * _ == _] addrC.
+rewrite addrKA opprK.
+
+rewrite /point_under_edge /= {pulh purh vallow valhigh poep' poep'' poepf' puep puep'}.
+rewrite addrC.
+rewrite -subr_cp0 in inH.
+rewrite -subr_ge0 in y''diff.
+move => /eqP <-.
+by rewrite nmulr_rle0.
+Qed.
 
 
 
@@ -1292,6 +1340,18 @@ move : xin => /orP [ /eqP xeqp | xinq2].
 by exists x.
 Qed. 
 
+Fixpoint adjacent_cells_aux open e : bool :=
+  match open with
+  | [::] => true
+  | a::q => (e == low a) && adjacent_cells_aux q (high a)
+  end.
+
+Definition adjacent_cells open : bool :=
+  match open with 
+  | [::] => true
+  | b::q => adjacent_cells_aux q (high b)
+  end.
+  
 Lemma l_h_c_decomposition open_cells pt :
 forall first_cells contact last_cells low_f high_f,
 open_cells_decomposition open_cells pt  = (first_cells, contact, last_cells, low_f, high_f)   ->
@@ -1472,12 +1532,13 @@ Qed.
 Lemma contact_not_end open_cells e high_e contact_cells :
 s_right_form open_cells ->
 seq_valid open_cells (point e) ->
+
 forall contact last_c high_c, 
 open_cells_decomposition_contact open_cells (point e) contact_cells high_e = (contact, last_c, high_c) ->
 forall c, (c \in last_c) -> ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
 Proof.
-move => oprf opvalid c_c last_cells highc.
-elim op : open_cells oprf opvalid last_cells contact_cells high_e => [/= | c q  IH] op_rf opvalid last_c contact high_e.
+move => oprf opvalid  c_c last_cells highc.
+elim op : open_cells oprf opvalid  last_cells contact_cells high_e => [/= | c q  IH] op_rf opvalid  last_c contact high_e.
   by move =>  [] _ <-  _  .
 move => op_c.
 have c_eq := (contact_preserve_cells op_c).
@@ -1498,9 +1559,42 @@ case : ifP => [contain | notcontain].
   apply : (IH q_rf qval last_c1 (rcons contact {| pts := pts; low := lowc; high := high_c |})  high_c h).
 move =>  [] conteq lc heq {IH}.
 have notclose := contrapositive_close_imp_cont _ _ _ .
-
-
-  
+rewrite -lc.
+move => c1.
+rewrite inE => /orP[ | c1inq].
+  move => /eqP ->.
+  rewrite -ceq.
+  move : op_rf.
+  rewrite /s_right_form /all => /andP [] rfc allrf.
+  move : opvalid.
+  rewrite /seq_valid /all => /andP []/andP  valc   allval.
+  move : notcontain => /negP.
+  rewrite -ceq => notcontain.
+  apply (notclose c e rfc valc notcontain).
+have rfc1 : (right_form c1).
+move : op_rf.
+  rewrite /s_right_form .
+  move =>  /allP /= incq /=.
+  have := (incq c1).
+  rewrite inE c1inq orbT => -> //.
+have valc1 : valid_edge (low c1) (point e) /\ valid_edge (high c1) (point e).
+  move : opvalid.
+  rewrite /seq_valid.
+  move =>  /allP /= valcq /=.
+  have := (valcq c1).
+  rewrite inE c1inq orbT.
+  move =>  a.
+  apply /andP.
+  by apply a. 
+  have := (notclose c1 e rfc1 valc1).
+  have : ( contains_point (point e) c1 =false); first last.
+  move => -> .
+  move => a.
+  by apply a.
+rewrite /right_form /edge_below in rfc1.
+move : rfc1 => /orP [] /andP []puel puer.
+move : valc1 =>  []  vallow valhigh.
+have := under_low_imp_under_high puel puer vallow valhigh.
 
 
 Admitted.
@@ -1633,18 +1727,6 @@ by apply: IH.
 Qed.
 
 
-Fixpoint adjacent_cells_aux open e : bool :=
-  match open with
-  | [::] => true
-  | a::q => (e == low a) && adjacent_cells_aux q (high a)
-  end.
-
-Definition adjacent_cells open : bool :=
-  match open with 
-  | [::] => true
-  | b::q => adjacent_cells_aux q (high b)
-  end.
-  
 
 Definition cells_low_e_top cells low_e : bool :=
   (cells != nil) && (low (head dummy_cell cells) == low_e) && (high (last dummy_cell cells) == top).
