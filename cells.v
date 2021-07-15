@@ -154,17 +154,20 @@ Definition point_under_edge (p : pt) (e : edge) : bool :=
 Definition point_strictly_under_edge (p : pt) (e : edge) : bool :=
   pue_formula p (left_pt e) (right_pt e) < 0.
 
+Notation "p '<<=' e" := (point_under_edge p e)( at level 0, no associativity).
+Notation "p '<<' e" := (point_strictly_under_edge p e)(at level 0, no associativity).
+
 
 (*returns true if e1 is under e2*)
 
 Definition compare_incoming (e1 e2 : edge) : bool :=
   let: Bedge a _ _ := e1 in
-    point_under_edge a e2.
+   a <<= e2.
 
 (*returns true if e1 is under e2*)
 Definition compare_outgoing (e1 e2 : edge) : bool :=
   let: Bedge _ b _ := e1 in
-  point_under_edge b e2.
+   b <<= e2.
 
 
 
@@ -393,6 +396,7 @@ move => puep0 puep'0.
     have pneq0 : ( b_x - a_x != 0).
       
   Admitted.
+  
 End ring_sandbox.
 
 Lemma pue_formula_opposite a b d:  pue_formula d a b = - pue_formula b a d.
@@ -459,8 +463,8 @@ apply pue_f_triangle_on_edge.
 Qed.
 
 Lemma not_under_not_strictly p ed : 
-~ point_under_edge p ed ->
-~ point_strictly_under_edge p ed.
+~  p <<= ed ->
+~ p << ed.
 Proof.
 rewrite /point_strictly_under_edge.
 rewrite /point_under_edge leNgt /= => /negP => pue. 
@@ -530,8 +534,18 @@ Definition valid_cell c x := (valid_edge (low c) x) /\ (valid_edge (high c) x).
 Definition point_on_edge (p: pt) (e :edge) : bool :=
   (pue_formula p (left_pt e) (right_pt e) == 0) && (valid_edge e p).
 
+Notation "p '===' e" := (point_on_edge p e)( at level 70, no associativity).
+
+Definition edge_below (e1 : edge) (e2 : edge) : bool :=
+((left_pt e1) <<= e2 && (right_pt e1) <<= e2 )
+|| (~~  (left_pt e2) << e1 && ~~ (right_pt e2)<< e1 ).
+
+Notation "e1 '<|' e2" := (edge_below e1 e2)( at level 70, no associativity).
+
+Definition right_form (c : cell) : bool :=
+  (low c) <| (high c).
 Lemma left_on_edge e :
-point_on_edge (left_pt e) e.
+(left_pt e) === e.
 Proof.
 move : e => [ l r inE].
 rewrite /point_on_edge //=.
@@ -545,7 +559,7 @@ by apply ltW.
 Qed.
 
 Lemma right_on_edge e :
-point_on_edge (right_pt e) e.
+(right_pt e) === e.
 Proof.
 move : e => [ l r inE].
 rewrite /point_on_edge //=.
@@ -560,10 +574,10 @@ Qed.
 
 
 Lemma point_on_edge_above low_e high_e a : 
-point_on_edge a (high_e) ->
-~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
-~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
-~~ point_strictly_under_edge (a) (low_e).
+a === high_e ->
+~~  (left_pt high_e) << low_e ->
+~~ (right_pt high_e) << low_e ->
+~~ a << low_e.
 Proof.
 move : high_e => [lr hr inH] /=.
 
@@ -589,10 +603,10 @@ Qed.
 
 
 Lemma point_on_edge_under low_e high_e a : 
-point_on_edge a (low_e) ->
- point_under_edge (left_pt (low_e)) (high_e) ->
- point_under_edge (right_pt (low_e)) (high_e) ->
- point_under_edge (a) (high_e).
+a === (low_e) ->
+ (left_pt low_e) <<= high_e ->
+ (right_pt low_e) <<= high_e ->
+  a <<= high_e.
 Proof.
 move : low_e => [lr hr inH] /=.
 
@@ -618,10 +632,10 @@ by rewrite subr_cp0.
 Qed.
 
 Lemma not_strictly_above' low_e high_e p': 
-~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
-~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
-point_on_edge p' high_e ->  p_x (right_pt (low_e)) = p_x p'  ->
-point_under_edge (right_pt (low_e)) (high_e) .
+~~ (left_pt (high_e)) << (low_e) ->
+~~ (right_pt (high_e)) << (low_e) ->
+p' ===  high_e ->  p_x (right_pt (low_e)) = p_x p'  ->
+(right_pt (low_e)) <<= (high_e) .
 Proof.
 move : low_e => [ll lr inL] /=.
 move => pablh pabrh poep' eqxp'p.
@@ -654,10 +668,10 @@ Qed.
 
 
 Lemma not_strictly_under' low_e high_e p' : 
-point_under_edge (left_pt (low_e)) (high_e) ->
-point_under_edge (right_pt (low_e)) (high_e) ->
-point_on_edge p' low_e ->  p_x (right_pt (high_e)) = p_x p'  ->
-~~ point_strictly_under_edge (right_pt (high_e)) (low_e).
+(left_pt (low_e)) <<= (high_e) ->
+(right_pt (low_e))<<= (high_e) ->
+p' === low_e ->  p_x (right_pt (high_e)) = p_x p'  ->
+~~ (right_pt (high_e)) << (low_e).
 Proof.
 move : high_e => [hl hr inH] /=.
 move => pablh pabrh poep' eqxp'p.
@@ -686,7 +700,7 @@ Qed.
 
 Lemma pue_right_edge e p : 
 p_x (right_pt e) == p_x p -> 
-(point_under_edge  p e) = ((p_y p - p_y (right_pt e)) <= 0).
+(p <<= e) = ((p_y p - p_y (right_pt e)) <= 0).
 Proof.
 move : e p  => [[ax ay][bx b_y] /= inE] [px py]  /=.
 rewrite /point_under_edge /=.
@@ -700,7 +714,7 @@ Qed.
 
 Lemma pue_left_edge e p : 
 p_x (left_pt e) == p_x p -> 
-(point_under_edge  p e) = (0 <= (p_y (left_pt e) - p_y p )).
+(p <<= e) = (0 <= (p_y (left_pt e) - p_y p )).
 Proof.
 move : e p  => [[ax ay][bx b_y] /= inE] [px py]  /=.
 rewrite /point_under_edge /=.
@@ -732,7 +746,7 @@ Qed.
 
 
 Lemma vertical_correct p e : 
-    match(vertical_intersection_point p e) with None => ~~ valid_edge e p | Some(i) => point_on_edge i e end.
+    match(vertical_intersection_point p e) with None => ~~ valid_edge e p | Some(i) => i === e end.
 Proof.
 move: p e => [ptx pty] [[ax ay] [bx b_y]  /=ab] .
 rewrite /vertical_intersection_point.
@@ -770,7 +784,7 @@ Qed.
 
 Lemma intersection_on_edge e p p' :
 vertical_intersection_point p e = Some (p') ->
-point_on_edge p' e /\ p_x p = p_x p'.
+p'=== e /\ p_x p = p_x p'.
 Proof.
 have := vertical_correct p e.
 case vert : (vertical_intersection_point p e)=> [vp |//=].
@@ -784,10 +798,10 @@ Qed.
 
 
 Lemma not_strictly_under low_e high_e  : 
-point_under_edge (left_pt low_e) high_e ->
-point_under_edge (right_pt low_e) high_e ->
+(left_pt low_e) <<= high_e ->
+(right_pt low_e) <<= high_e ->
 valid_edge low_e (right_pt high_e)  ->
-~~ point_strictly_under_edge (right_pt high_e) (low_e).
+~~ (right_pt high_e) << (low_e).
 Proof.
 move => pableft pabright valright.
 have  := exists_point_valid valright.
@@ -797,10 +811,10 @@ apply :  not_strictly_under' pableft pabright poep' eqx.
 Qed.
 
 Lemma not_strictly_above low_e high_e : 
-~~ point_strictly_under_edge (left_pt (high_e)) (low_e) ->
-~~ point_strictly_under_edge (right_pt (high_e)) (low_e) ->
+~~ (left_pt high_e) << low_e ->
+~~ (right_pt high_e) << low_e ->
 valid_edge (high_e) (right_pt (low_e)) ->
-point_under_edge (right_pt (low_e)) (high_e) .
+(right_pt (low_e)) <<= (high_e) .
 Proof.
 move => pableft pabright valright.
 have  := exists_point_valid valright.
@@ -810,7 +824,7 @@ apply :  not_strictly_above' pableft pabright poep' eqx.
 Qed.
 
 Lemma on_edge_same_point e p p': 
-point_on_edge p e -> point_on_edge p' e ->
+p === e -> p' === e ->
 (p_y p == p_y p') = (p_x p == p_x p').
 Proof.
   move : e => [l r inE].
@@ -834,8 +848,8 @@ case : ifP => [/eqP xeq| xnoteq].
 Admitted.
 
 Lemma point_valid_under_imp_y_inf e p p' : 
-point_under_edge p e ->
-point_on_edge p' e -> p_x p = p_x p'->
+p <<= e ->
+p'=== e -> p_x p = p_x p'->
 0 <= (p_y p' - p_y p).
 Proof.
 move : e => [l r inE] /=.
@@ -882,12 +896,62 @@ have := (on_edge_same_point lone poep').
 by rewrite -eqx eqxl eqxx => /eqP <-.
 Qed.
 
+
+Lemma point_valid_above_imp_y_inf e p p' : 
+~~ p << e ->
+p' === e -> p_x p = p_x p'->
+0 <= (p_y p - p_y p').
+Proof.
+move : e => [l r inE] /=.
+move => pue poep'.
+have := poep'.
+rewrite /point_on_edge /valid_edge /= =>  /andP [] p_on_edge_p'   /andP [] linfp pinfr eqx.
+move : pue.
+rewrite -pue_formula_cycle in p_on_edge_p'.
+rewrite -eqx in linfp pinfr.
+rewrite /point_strictly_under_edge /=.
+have := (pue_formula_triangle_on_edge eqx (p_on_edge_p')).
+
+have /eqP := (pue_formula_vert l eqx  ) => ->.
+have inle: (p_x r - p_x l) >0.
+  by rewrite subr_cp0.
+move => /eqP a.
+have pminusl : (0 <= p_x p - p_x l).
+  by rewrite subr_cp0.
+  rewrite pue_formula_opposite -pue_formula_cycle oppr_lt0 -leNgt => lprpos.
+have := mulr_ge0_le0 pminusl lprpos.
+rewrite -a pmulr_rle0 //.
+
+case sup0 : (0 < (p_x p - p_x l)).
+  by rewrite (pmulr_rle0 _ sup0) !subr_cp0 .
+move : sup0.
+rewrite subr_cp0.
+move => /negbT.
+rewrite -leNgt => pinfl.
+have : p_x p <= p_x l <= p_x p.
+  by rewrite linfp pinfl.
+move => /le_anti eqxl.
+have /= lone:= left_on_edge (Bedge inE).
+
+move : lprpos.
+rewrite pue_formula_opposite oppr_le0.
+have /eqP -> := (pue_formula_vert r eqxl).
+rewrite eqxl => yineq.
+have inle2: (p_x l - p_x r) < 0.
+  by rewrite subr_cp0.
+
+move => _.
+rewrite (nmulr_rge0  _  inle2 ) subr_cp0 in yineq.
+have := (on_edge_same_point lone poep').
+  by rewrite -eqx eqxl eqxx subr_cp0 => /eqP <- .
+Qed.
+
 Lemma under_low_imp_under_high low_e high_e p  : 
-point_under_edge (left_pt low_e) high_e ->
-point_under_edge (right_pt low_e) high_e ->
+(left_pt low_e) <<= high_e ->
+(right_pt low_e) <<= high_e ->
 valid_edge low_e p ->
 valid_edge high_e p ->
-point_under_edge p low_e -> point_under_edge p high_e.
+p <<= low_e -> p <<= high_e.
 Proof.
 move : low_e high_e => [ll lr inL] [hl hr inH]  /=.
 move => pulh purh vallow valhigh.
@@ -940,7 +1004,84 @@ move => /eqP <-.
 by rewrite nmulr_rle0.
 Qed.
 
+Lemma under_low_imp_under_high_bis low_e high_e p  : 
+~~ (left_pt high_e) << low_e ->
+~~ (right_pt high_e) << low_e ->
+valid_edge low_e p ->
+valid_edge high_e p ->
+p <<= low_e -> p <<= high_e.
+Proof.
+move : low_e high_e => [ll lr inL] [hl hr inH]  .
+move => pabhl pabhr vallow valhigh.
+have  := exists_point_valid vallow.
+move => [] p' vip .
+have  := intersection_on_edge vip => [][] poep' eqx'.
+have  := exists_point_valid valhigh.
+move => [] p'' vip' .
+have  := intersection_on_edge vip' => [][] poep'' eqx''{vip' vip}.
+have := poep''.
+have := poep'.
 
+rewrite /point_on_edge /valid_edge =>  /andP [] /= poepf' /andP []
+ linfp' p'infr   /andP [] /= poepf'' /andP [] linfp'' p''infr.
+
+rewrite -pue_formula_cycle in poepf'.
+rewrite -eqx' in linfp' p'infr.
+rewrite -eqx'' in linfp'' p''infr.
+move => /= puep.
+
+
+have ydiff := (point_valid_under_imp_y_inf puep poep' eqx').
+rewrite eqx' in eqx''.
+symmetry in eqx''.
+have pabp' := (point_on_edge_above  poep'' pabhl pabhr).
+have a:= (point_valid_above_imp_y_inf _ _ _).
+have y'diff := (point_valid_above_imp_y_inf pabp' poep' eqx'').
+rewrite subr_cp0 in ydiff.
+rewrite subr_cp0 in y'diff.
+have y''diff: (p_y p  <= p_y p'').
+  by rewrite (le_trans  ydiff y'diff).
+rewrite -eqx' in eqx''.
+have := ax4_three_triangles p hl hr p''.
+have /eqP pHleq :=  (pue_formula_vert hl eqx'').
+have /eqP pHreq :=  (pue_formula_vert hr eqx'').
+
+rewrite pue_formula_opposite in pHreq.
+rewrite pue_formula_cycle in pHleq.
+
+move : poepf'' pHleq => /eqP  ->  -> .
+have :  pue_formula p p'' hr = - ((p_x p'' - p_x hr) * (p_y p - p_y p'')).
+  by rewrite -pHreq opprK.
+move => ->.
+rewrite add0r addrC -mulrBl.
+rewrite  [x in (x - _) * _ == _] addrC.
+rewrite addrKA opprK.
+
+rewrite /point_under_edge /= {pabhl pabhr vallow valhigh poep' poep'' poepf' puep pabp'}.
+rewrite addrC.
+rewrite -subr_gte0 in inH.
+rewrite -subr_le0 in y''diff.
+move => /eqP <-.
+
+by rewrite pmulr_rle0.
+Qed.
+
+Lemma order_edges_viz_point c p :
+valid_edge (low c) p -> valid_edge (high c) p ->
+(low c) <| (high c) ->
+p <<= (low c) -> p <<= (high c).
+Proof.
+move => vallow valhigh.
+have  := (exists_point_valid  vallow  ) .
+have := (exists_point_valid  valhigh  ) => [][] ph verhigh [] pl verlow.
+have  := intersection_on_edge verlow => [][] poepl eqxl.
+have  := intersection_on_edge verhigh => [][] poeph eqxh.
+rewrite /right_form /edge_below => /orP [] /andP [].
+  move => pueplow puephigh.
+  apply (under_low_imp_under_high pueplow puephigh vallow valhigh).
+move => pabpleft pabpright.
+  apply (under_low_imp_under_high_bis pabpleft pabpright vallow valhigh).
+Qed.  
 
 Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::].
 Definition dummy_edge : edge := (@Bedge  (Bpt 0%:Q 0%:Q) (Bpt 1%:Q 0%:Q) isT).
@@ -948,7 +1089,7 @@ Definition dummy_cell : cell := (@Bcell  ((Bpt 0%:Q 0%:Q)::[::]) dummy_edge dumm
 
 (* if a cell doesn't contain a point, then either both edges are strictly under p or strictly over p *)
 Definition contains_point (p : pt) (c : cell)  : bool :=
-   ~~ point_strictly_under_edge p (low c) && point_under_edge p (high c).
+   ~~  p << (low c) && (p <<= (high c)).
 
 
 Fixpoint contains (A : eqType) (s : seq A) (a : A) : bool :=
@@ -1130,7 +1271,7 @@ Definition lexPtEv (e1 e2 : event) : bool :=
   (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
 
 Definition inside_box p :=
-(~~ point_under_edge p bottom  && point_under_edge p top ) && (valid_edge bottom p && valid_edge top p).
+(~~ p <<= bottom  && p <<= top ) && (valid_edge bottom p && valid_edge top p).
 
 
 Definition event_close_edge ed ev : bool :=
@@ -1381,18 +1522,10 @@ match vertical_intersection_point (Bpt maxleft 0%Q) e1 with
   match vertical_intersection_point (Bpt minright 0%Q) e1 with
     |None => false
     | Some(p2) =>
- point_under_edge p e2 && point_under_edge p2 e2
+  p <<= e2 && p2 <<= e2
   end
 end.
 
-Definition edge_below (e1 : edge) (e2 : edge) : bool :=
-
-(point_under_edge (left_pt e1) e2 && point_under_edge (right_pt e1) e2 )
-|| (~~ point_strictly_under_edge (left_pt e2) e1 && ~~point_strictly_under_edge (right_pt e2) e1 ).
-
-
-Definition right_form (c : cell) : bool :=
-  edge_below (low c) (high c).
 
 Lemma opening_cells_right_form e low_e high_e : 
 sorted edge_below (outgoing e) ->
@@ -1402,10 +1535,10 @@ forall c, c \in new_open_cells /\ right_form c.
 Proof.
 Admitted.
 
-Lemma order_edges_viz_point c p :
+Lemma order_edges_strict_viz_point c p :
 valid_edge (low c) p -> valid_edge (high c) p ->
-right_form c ->
-point_under_edge p (low c) -> point_under_edge p (high c).
+(low c) <| (high c) ->
+p << (low c) ->  p << (high c).
 Proof.
 move => vallow valhigh.
 have  := (exists_point_valid  vallow  ) .
@@ -1413,22 +1546,43 @@ have := (exists_point_valid  valhigh  ) => [][] ph verhigh [] pl verlow.
 have  := intersection_on_edge verlow => [][] poepl eqxl.
 have  := intersection_on_edge verhigh => [][] poeph eqxh.
 rewrite /right_form /edge_below => /orP [] /andP [].
-
-
-rewrite /point_under_edge.
-
-
-
-
+  move => pueplow puephigh.
+  rewrite /point_strictly_under_edge .
+  move =>  inf0.
+  
+  have infeq0 := ltW inf0.
+  have := (under_low_imp_under_high pueplow puephigh vallow valhigh infeq0).
+  rewrite /point_under_edge .
+  case eq_high: (pue_formula p (left_pt (high c)) (right_pt (high c)) == 0).
+  move : eq_high => /eqP /eqP eq_high.
+  have := (pue_formula_on_edge (left_pt (low c)) (right_pt (low c))  eq_high).
+rewrite le_eqVlt.
+  
 
 
 Admitted.
+Lemma order_edges_viz_point c p :
+valid_edge (low c) p -> valid_edge (high c) p ->
+(low c) <| (high c) ->
+p <<= (low c) -> p <<= (high c).
+Proof.
+move => vallow valhigh.
+have  := (exists_point_valid  vallow  ) .
+have := (exists_point_valid  valhigh  ) => [][] ph verhigh [] pl verlow.
+have  := intersection_on_edge verlow => [][] poepl eqxl.
+have  := intersection_on_edge verhigh => [][] poeph eqxh.
+rewrite /right_form /edge_below => /orP [] /andP [].
+  move => pueplow puephigh.
+  apply (under_low_imp_under_high pueplow puephigh vallow valhigh).
+move => pabpleft pabpright.
+  apply (under_low_imp_under_high_bis pabpleft pabpright vallow valhigh).
+Qed.  
 
 Lemma order_cells_viz_point (cells : seq cell) p :
 forall c, c \in cells ->
 valid_edge (low c) p -> valid_edge (high c) p ->
 right_form c ->
-point_under_edge p (low c) -> point_under_edge p (high c).
+p <<= (low c) ->  p <<= (high c).
 Proof.
 Admitted.
 
@@ -1532,13 +1686,13 @@ Qed.
 Lemma contact_not_end open_cells e high_e contact_cells :
 s_right_form open_cells ->
 seq_valid open_cells (point e) ->
-
+adjacent_cells open_cells ->
 forall contact last_c high_c, 
 open_cells_decomposition_contact open_cells (point e) contact_cells high_e = (contact, last_c, high_c) ->
-forall c, (c \in last_c) -> ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
+forall c, (c \in last_c) -> (~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
 Proof.
-move => oprf opvalid  c_c last_cells highc.
-elim op : open_cells oprf opvalid  last_cells contact_cells high_e => [/= | c q  IH] op_rf opvalid  last_c contact high_e.
+move => oprf opvalid  adj_op c_c last_cells highc.
+elim op : open_cells oprf opvalid adj_op last_cells contact_cells high_e => [/= | c q  IH] op_rf opvalid adj_op last_c contact high_e.
   by move =>  [] _ <-  _  .
 move => op_c.
 have c_eq := (contact_preserve_cells op_c).
@@ -1556,7 +1710,9 @@ case : ifP => [contain | notcontain].
   have qval : (seq_valid q (point e)).
     move : opvalid.
     by rewrite /s_right_form /all => /andP [] _.
-  apply : (IH q_rf qval last_c1 (rcons contact {| pts := pts; low := lowc; high := high_c |})  high_c h).
+  have adjq : adjacent_cells q.
+  admit.
+  apply : (IH q_rf qval adjq last_c1 (rcons contact {| pts := pts; low := lowc; high := high_c |})  high_c h).
 move =>  [] conteq lc heq {IH}.
 have notclose := contrapositive_close_imp_cont _ _ _ .
 rewrite -lc.
@@ -1595,8 +1751,29 @@ rewrite /right_form /edge_below in rfc1.
 move : rfc1 => /orP [] /andP []puel puer.
 move : valc1 =>  []  vallow valhigh.
 have := under_low_imp_under_high puel puer vallow valhigh.
+rewrite /contains_point in notcontain.
+Admitted.
 
 
+
+Lemma lowest_above_all_above (s : seq cell) p :
+s != [::] ->
+adjacent_cells s ->
+s_right_form s ->
+ p << (low (head dummy_cell s)) ->
+forall c, (c \in s) ->   p<< (low c) /\  p << (high c) .
+Proof.
+move => snnil adj srf.
+elim : s snnil adj srf => [// |c0 q IH].
+move => c0qnnil /= adjc0q  /andP [] rfc0 rfq.
+rewrite /right_form  in rfc0.
+move => psuelow .
+have :  p << (high c0).
+
+
+
+
+case : q IH c0qnnil adjc0q rfq => [//= a|c1 q'].
 Admitted.
 
 Lemma fix_not_end open_cells e fc :
@@ -1752,7 +1929,7 @@ Qed.
 
 Lemma exists_cell_aux low_e p open :
 cells_low_e_top open low_e -> adjacent_cells_aux open low_e ->
-(~ point_strictly_under_edge p low_e) -> (point_under_edge p top) ->
+~ p << low_e ->  p <<= top ->
 (exists c : cell, c \in open /\ contains_point p c).
 Proof.
 elim : open low_e => [//= | c0 q IH ].
