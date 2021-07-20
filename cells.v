@@ -963,16 +963,16 @@ Proof.
 move : e => [l r inE] /=.
 move => pue poep'.
 have := poep'.
-rewrite /point_on_edge /valid_edge /= =>  /andP [] p_on_edge_p'   /andP [] linfp pinfr eqx.
+rewrite /point_on_edge /valid_edge /= =>  /andP [] p_on_edge_p'   /andP [] linfp pinfeqr eqx.
 move : pue.
 rewrite -pue_formula_cycle in p_on_edge_p'.
-rewrite -eqx in linfp pinfr.
+rewrite -eqx in linfp pinfeqr.
 rewrite /point_strictly_under_edge /=.
   have inle: (p_x r - p_x l) >0.
     by rewrite subr_cp0.
 move: linfp; rewrite le_eqVlt=> /orP [/eqP lp | linfp].
   have : p_x p < p_x r by rewrite -lp.
-  move=> { pinfr } pinfr.
+  move=> { pinfeqr } pinfr.
   have := (pue_formula_triangle_on_edge' eqx (p_on_edge_p')).
 
   have /eqP := (pue_formula_vert r eqx  ); rewrite pue_formula_opposite.
@@ -2035,7 +2035,8 @@ Proof.
 by rewrite /=; case: q => [// | b q]; rewrite /= => /andP[].
 Qed.
 
-Lemma contact_not_end open_cells e high_e contact_cells :
+
+Lemma contact_last_not_contain open_cells e high_e contact_cells :
 bottom_edge_seq_above open_cells (point e) ->
 s_right_form open_cells ->
 seq_valid open_cells (point e) ->
@@ -2043,8 +2044,7 @@ adjacent_cells open_cells ->
 forall contact last_c high_c, 
 open_cells_decomposition_contact open_cells (point e) contact_cells high_e =
    (contact, last_c, high_c) ->
-forall c, (c \in last_c) -> (~ event_close_edge (low c) e) /\
- ( ~ event_close_edge (high c) e).
+forall c, (c \in last_c) -> ~ contains_point (point e) c.
 Proof.
 move => ba oprf opvalid  adj_op c_c last_cells highc.
 elim op : open_cells ba oprf opvalid adj_op last_cells contact_cells high_e => [/= | c q  IH] ba op_rf opvalid adj_op last_c contact high_e.
@@ -2054,7 +2054,6 @@ have c_eq := (contact_preserve_cells op_c).
 move : op_c.
 case ceq : c => [pts lowc high_c].
 rewrite /=.
-
 case : ifP => [contain | /negbT notcontain].
   case h : (open_cells_decomposition_contact _ _ _ _)=> [[contact1 last_c1] high_c1].
   move =>  [] a  <- b.
@@ -2072,20 +2071,10 @@ case : ifP => [contain | /negbT notcontain].
     by case: (q)=> //= a' q' => /andP[/eqP <- _]; rewrite ceq.
   by apply : (IH baq q_rf qval adjq last_c1 (rcons contact {| pts := pts; low := lowc; high := high_c |})  high_c h).
 move =>  [] conteq lc heq {IH}.
-
-have notclose := contrapositive_close_imp_cont _ _ _ .
 rewrite -lc.
 move => c1.
 rewrite inE => /orP[ | c1inq].
-  move => /eqP ->.
-  rewrite -ceq.
-  move : op_rf.
-  rewrite /s_right_form /all => /andP [] rfc allrf.
-  move : opvalid.
-  rewrite /seq_valid /all => /andP []/andP  valc   allval.
-  move : notcontain.
-  rewrite -ceq => notcontain.
-  apply (notclose c e rfc valc (negP notcontain)).
+  by move : notcontain => /negP notcontain /eqP  -> .
 have rfc1 : (right_form c1).
   move : op_rf.
   rewrite /s_right_form .
@@ -2100,11 +2089,8 @@ have valc1 : valid_edge (low c1) (point e) /\ valid_edge (high c1) (point e).
   rewrite inE c1inq orbT.
   move =>  a.
   apply /andP.
-  by apply a. 
-have := (notclose c1 e rfc1 valc1).
-apply.
-have [vallc valhc] :
-   valid_edge (low c) (point e) /\ valid_edge (high c) (point e).
+by apply a. 
+have [vallc valhc] : valid_edge (low c) (point e) /\ valid_edge (high c) (point e).
   by move: opvalid => /allP /= /(_ c); rewrite inE eqxx => /(_ isT)=>/andP.
 have lowhigh : (low c) <| (high c).
   by move: op_rf=> /allP /(_ c); rewrite inE eqxx /right_form => /(_ isT).
@@ -2113,7 +2099,6 @@ have underhigh : (point e) <<= (high_c).
   by apply: order_edges_viz_point.
 have strictunder : (point e) <<< (low c).
   by move: notcontain; rewrite ceq negb_and /= underhigh orbF negbK.
-
 rewrite /right_form /edge_below in rfc1.
 move: notcontain; rewrite /contains_point negb_and negbK /==> notcontain.
 apply/negP; rewrite negb_and negbK.
@@ -2147,29 +2132,21 @@ rewrite inE=> /(_ (eqxx _))=> [][] _.
 compute; by [].
 Qed.
 
-(* This lemma needs to be fixed:
-  - fc should already satisfy the property
-  - all cells should be well-formed
-  - all cells should be valid
-  - the cells should be adjacent
-  - the point should be above the lowest edge in cells. *)
-Lemma fix_not_end open_cells e fc :
-(* added conditions *)
-(forall c, c \in fc -> ~event_close_edge (low c) e /\
-     ~event_close_edge (high c) e) ->
+
+Lemma fix_not_contain fc open_cells e   :
+(forall c, c \in fc  -> ~ contains_point (point e) c) ->
 s_right_form open_cells ->
 seq_valid open_cells (point e) ->
 adjacent_cells open_cells ->
 bottom_edge_seq_below open_cells (point e) ->
-(* end of added conditions. *)
 forall first_cells contact last_cells low_f high_f,
 open_cells_decomposition_fix open_cells (point e) fc =
   (first_cells, contact, last_cells, low_f, high_f) ->
 forall c, (c \in first_cells) || (c \in last_cells) ->
-   ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
+~ contains_point (point e) c.
 Proof.
 elim: open_cells fc => [/= | c1 open_cells IH] fc cfc.
-  move=>_ _ _ _ fc' cc lc l_e h_e=> [][] <- _ <- _ _ c.
+  move=>_ _  _ _ fc' cc lc l_e h_e=> [][] <- _ <- _ _ c.
   by rewrite orbF; apply: cfc.
 rewrite /bottom_edge_seq_below=> rfc1 valc1  adjc1 pabovec1 fc' cc lc l_e h_e.
 rewrite /=.
@@ -2180,10 +2157,8 @@ case open_cells_eq : open_cells => [ | c2 q] //.
   move=> [] <- _ <- _ _ c; rewrite orbF -cats1 mem_cat => /orP[cinf |].
     by apply: cfc.
   rewrite inE => /eqP ->.
-  apply: contrapositive_close_imp_cont; rewrite -c1_eq.
-  - by apply: (allP rfc1); rewrite inE eqxx.
-  - by apply/andP; apply: (allP valc1); rewrite inE eqxx.
-  by rewrite c1_eq; apply/negP.
+  by move : notcontains => /negP.
+
 have rfo : s_right_form (c2 :: q).
   rewrite -open_cells_eq.
   by apply/allP=> c' c'in; apply (allP rfc1); rewrite inE c'in orbT.
@@ -2200,7 +2175,7 @@ case: ifP => [contains | /negbT notcontains].
     by apply: cfc.
   have pundero : bottom_edge_seq_above (c2 :: q) (point e).
     by rewrite /= -c1c2 c1_eq; move: contains => /andP[] /=.
-  by apply: (contact_not_end _ _ _ _ contact_eq).
+  by apply: (contact_last_not_contain _ _ _ _ contact_eq).
 have belowc2 : bottom_edge_seq_below (c2 :: q) (point e).
   move: notcontains; rewrite -c1_eq negb_and negbK (negbTE pabovec1) /=.
   by rewrite /= c1c2 => /negP *; apply/negP/not_under_not_strictly.
@@ -2209,10 +2184,24 @@ have := IH (rcons fc c1); rewrite open_cells_eq c1_eq.
 move=> /(_ _ rfo valo adjo belowc2 _ _ _ _ _ fixeq); apply.
 move=> c; rewrite -cats1 mem_cat inE=> /orP[cinfc | /eqP ->].
   by apply: cfc.
-apply: contrapositive_close_imp_cont.
-- by apply: (allP rfc1); rewrite -c1_eq inE eqxx.
-- by apply/andP; apply: (allP valc1); rewrite -c1_eq inE eqxx.
-by apply/negP.
+by move : notcontains => /negP.
+Qed.
+
+
+Lemma decomposition_not_contain open_cells e : 
+forall first_cells contact last_cells low_f high_f,
+s_right_form open_cells ->
+seq_valid open_cells (point e) ->
+adjacent_cells open_cells ->
+bottom_edge_seq_below open_cells (point e) ->
+open_cells_decomposition open_cells (point e)  = (first_cells, contact, last_cells, low_f, high_f) ->
+forall c, (c \in first_cells) || (c \in last_cells) -> ~ contains_point (point e) c.
+Proof.
+move => fc c_c l_c low_f high_f.
+rewrite /open_cells_decomposition.
+case: open_cells => [ | c q] rfo valo adjo boto.
+  by move=>[] <- _ <- _ _ c.
+by move/fix_not_contain; apply.
 Qed.
 
 Lemma decomposition_not_end open_cells e : 
@@ -2224,11 +2213,17 @@ bottom_edge_seq_below open_cells (point e) ->
 open_cells_decomposition open_cells (point e)  = (first_cells, contact, last_cells, low_f, high_f) ->
 forall c, (c \in first_cells) || (c \in last_cells) -> ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
 Proof.
-move => fc c_c l_c low_f high_f.
-rewrite /open_cells_decomposition.
-case: open_cells => [ | c q] rfo valo adjo boto.
-  by move=>[] <- _ <- _ _ c.
-by move/fix_not_end; apply.
+move => fc c_c l_c low_f high_f srf svalid adj bedbelow dec_eq c1 c1nfclc .
+have := (decomposition_not_contain srf svalid adj bedbelow dec_eq c1nfclc).
+have c1open : c1 \in open_cells.
+    rewrite (decomposition_preserve_cells dec_eq).
+    move : c1nfclc => /orP [].
+      by rewrite mem_cat => -> .
+    rewrite !mem_cat => -> .
+    by rewrite !orbT.
+apply : contrapositive_close_imp_cont.
+  apply: (allP srf _ c1open).
+apply /andP; apply: (allP svalid _ c1open).
 Qed.
 
 Lemma lower_edge_new_cells e low_e high_e:
