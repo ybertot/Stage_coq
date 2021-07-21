@@ -2684,6 +2684,27 @@ move => Hhigh H /andP [] /eqP H2 H3.
 by rewrite H2 eqxx in H .
 Qed. 
 
+Lemma higher_lower_equality e  open :
+out_left_event e ->
+forall first_cells contact_cells last_cells low_e high_e,
+open_cells_decomposition open (point e) =
+(first_cells, contact_cells, last_cells, low_e, high_e) ->
+forall new_cells,
+(opening_cells (point e) (outgoing e) low_e high_e) = new_cells ->
+(exists c : cell, c \in open /\ contains_point (point e) c) -> 
+valid_edge low_e (point e) -> valid_edge high_e (point e) ->
+low (head dummy_cell contact_cells) = low (head dummy_cell new_cells) /\
+high (last dummy_cell contact_cells) = high (last dummy_cell new_cells) /\ contact_cells != nil.
+Proof.
+move => outleft fc c_c lc lowe highe op_c_d new_cells op_new exi lowv highv.
+have := (lower_edge_new_cells op_new lowv highv) => /eqP low_new.
+have := (higher_edge_new_cells outleft op_new lowv highv) => /eqP high_new.
+have := (l_h_c_decomposition op_c_d  exi).
+move => [] /eqP l_old [] /eqP h_old c_nnil.
+by rewrite low_new high_new l_old h_old .
+Qed.
+
+
 
 Lemma step_keeps_adjacent open closed e (future_events : seq event)  :
 inside_box (point e) -> 
@@ -2700,23 +2721,14 @@ case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells cont
 move => [] <- _ adjopen.
 have exi := (exists_cell cbtop adjopen insbox ).
 have openeq := decomposition_preserve_cells op_c_d.
-
 have := (l_h_valid cbtop adjopen  insbox validopen op_c_d).
-
 move => [] lowv highv.
-
 have := (open_not_nil (outgoing e) lowv highv).
 case op_new : (opening_cells (point e) (outgoing e) low_e high_e) => [//= | q l ] qlnnil.
-have := (lower_edge_new_cells op_new lowv highv) => /eqP low_new.
-have := (higher_edge_new_cells outleft op_new lowv highv) => /eqP high_new.
-
-have := (l_h_c_decomposition op_c_d  exi).
-move => [] /eqP l_old [] /eqP h_old c_nnil.
-rewrite -high_new in h_old.
-rewrite -low_new in l_old.
+have := higher_lower_equality outleft op_c_d op_new exi lowv highv => [][] l_eq [] h_eq c_nnil.
 have := (adjacent_opening outleft op_new lowv highv) => adjnew.
 rewrite openeq in adjopen.
-apply : (replacing_seq_adjacent c_nnil qlnnil l_old h_old adjopen adjnew).
+apply : (replacing_seq_adjacent c_nnil qlnnil l_eq h_eq adjopen adjnew).
 Qed.
 
 
@@ -2745,12 +2757,11 @@ inside_box (point e) ->
 seq_valid open (point e) ->
 adjacent_cells open ->
 cells_bottom_top open -> 
-out_left_event e ->
 forall open2 closed2, 
 step e open closed = (open2, closed2) ->
 (open2 != nil) && (low (head dummy_cell open2) == bottom).
 Proof.
-move => insbox openvalid adjopen cbtop outleft open2 closed2 .
+move => insbox openvalid adjopen cbtop  open2 closed2 .
 rewrite /step /=.
 case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
 have op_dec := (decomposition_preserve_cells op_c_d).
@@ -2762,7 +2773,6 @@ move : cbtop.
 rewrite /cells_bottom_top /cells_low_e_top => /andP [] /andP [] opnnil /eqP openbottom /eqP _.
 have newnnil := open_not_nil (outgoing e) lowv highv.
 have newopnnil := (middle_seq_not_nil first_cells last_cells newnnil).
-
 rewrite newopnnil /=.
 case op_new : (opening_cells (point e) (outgoing e) low_e high_e) => [// | c q].
   by rewrite op_new in newnnil.
@@ -2788,7 +2798,7 @@ cells_bottom_top open2.
 Proof.
 move => insbox openvalid adjopen cbtop outleft open2 closed2 step .
 rewrite /cells_bottom_top /cells_low_e_top.
-rewrite (step_keeps_bottom insbox openvalid adjopen cbtop outleft step) /=.
+rewrite (step_keeps_bottom insbox openvalid adjopen cbtop step) /=.
 move : step.
 rewrite /step /=.
 case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
@@ -2803,17 +2813,12 @@ have newnnil := open_not_nil (outgoing e) lowv highv.
 have newopnnil := (middle_seq_not_nil first_cells last_cells newnnil).
 case op_new : (opening_cells (point e) (outgoing e) low_e high_e) => [// | c q].
   by rewrite op_new in newnnil.
-have := (higher_edge_new_cells outleft op_new lowv highv) => /eqP /= high_new.
-have := (l_h_c_decomposition op_c_d  exi).
-move => [] /eqP _ [] /eqP h_old c_nnil.
-rewrite -high_new in h_old.
-case : last_cells op_c_d op_dec newopnnil => [/= op_c_d |c1 q1 _ op_dec]  .
-  rewrite !cats0 -opentop last_cat -h_old => -> newn_nil.
-  rewrite last_cat.
-  by case  : contact_cells c_nnil h_old op_c_d.
-rewrite -opentop  op_dec /=.
-rewrite !last_cat /=.
-by rewrite last_cat /=.
+have := higher_lower_equality outleft op_c_d op_new exi lowv highv => [][] _ [] /= h_eq c_nnil.
+case : last_cells op_c_d op_dec newopnnil => [/= op_c_d |c1 q1 _ op_dec /=]  .
+  rewrite !cats0 -opentop last_cat  => -> newn_nil /=.
+  rewrite last_cat -h_eq.
+  by case  : contact_cells c_nnil h_eq op_c_d.
+by rewrite -opentop op_dec !last_cat /= last_cat.
 Qed.
 
 Lemma opening_cells_eq  p out low_e high_e:
