@@ -530,18 +530,21 @@ rewrite !(addrAC _ _ (-(ax * py))) addrN add0r.
 by rewrite (addrAC _ _ (px * ay)) addNr add0r addrC subr_gt0.
 Qed.
 
-Lemma not_under_not_strictly p ed : 
-~  p <<= ed ->
-~ (p <<< ed).
+Lemma underW p e :
+  (p <<< e) ->
+  (p <<= e).
 Proof.
-rewrite /point_strictly_under_edge.
-rewrite /point_under_edge leNgt /= => /negP => pue. 
-have pue2 := (negbNE pue).
-apply : negP.
-rewrite -leNgt.
-apply : (ltW pue2).
+rewrite /point_under_edge /point_strictly_under_edge.
+apply : ltW .
 Qed.
 
+Lemma underWC p e : 
+~  p <<= e ->
+~ (p <<< e).
+Proof.
+apply : (contra_not  (p <<= e) (p <<< e)).
+apply : underW.
+Qed.
 
 Lemma compare_outgoing_total p : {in [pred e | left_pt e == p] &, total compare_outgoing} .
 Proof.
@@ -1330,6 +1333,8 @@ Definition dummy_cell : cell := (@Bcell  ((Bpt 0%:Q 0%:Q)::[::]) dummy_edge dumm
 Definition contains_point (p : pt) (c : cell)  : bool :=
    ~~  (p <<< low c) && (p <<= (high c)).
 
+Definition inside_cell p c :=
+  contains_point p c && (valid_edge (low c) p && valid_edge (high c) p).
 
 Fixpoint contains (A : eqType) (s : seq A) (a : A) : bool :=
    match s with
@@ -1505,12 +1510,15 @@ Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : 
 Section proof_environment.
 Variable bottom top : edge.
 
-Definition lexPtEv (e1 e2 : event) : bool :=
-  let p1 := point e1 in let p2 := point e2 in
+
+Definition lexPt (p1 p2 : pt) : bool :=
   (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
 
+Definition lexPtEv (e1 e2 : event) : bool :=
+  lexPt (point e1) (point e2).
+
 Definition inside_box p :=
-(~~ (p <<= bottom)  && (p <<= top) ) &&
+(~~ (p <<= bottom)  && (p <<< top) ) &&
   (valid_edge bottom p && valid_edge top p).
 
 
@@ -1558,7 +1566,7 @@ rewrite /=.
 move => /andP [] evLea /andP [] aLeb pathbf.
 rewrite pathbf andbT.
 move : evLea aLeb.
-rewrite /lexPtEv.
+rewrite /lexPtEv /lexPt.
 (*case h : (p_x (point ev) < p_x (point a)) => /=.*)
 have [h | h'] := boolP (p_x (point ev) < p_x (point a)) => /=.
 move => _.
@@ -2178,7 +2186,7 @@ case: ifP => [contains | /negbT notcontains].
   by apply: (contact_last_not_contain _ _ _ _ contact_eq).
 have belowc2 : bottom_edge_seq_below (c2 :: q) (point e).
   move: notcontains; rewrite -c1_eq negb_and negbK (negbTE pabovec1) /=.
-  by rewrite /= c1c2 => /negP *; apply/negP/not_under_not_strictly.
+  by rewrite /= c1c2 => /negP *; apply/negP/underWC.
 move=> fixeq.  
 have := IH (rcons fc c1); rewrite open_cells_eq c1_eq.
 move=> /(_ _ rfo valo adjo belowc2 _ _ _ _ _ fixeq); apply.
@@ -2361,9 +2369,10 @@ Qed.
 
 
 
+
 Lemma exists_cell_aux low_e p open :
 cells_low_e_top open low_e -> adjacent_cells_aux open low_e ->
-~ p <<< low_e ->  p <<= top ->
+~ p <<< low_e ->  p <<< top ->
 (exists c : cell, c \in open /\ contains_point p c).
 Proof.
 elim : open low_e => [//= | c0 q IH ].
@@ -2383,7 +2392,8 @@ move => lowunder topabove.
     move : hightop lowunder topabove  cont {IH'} adjaux.
     case : q => //.
     rewrite  /contains_point /=.
-    by move => /eqP -> /negP -> ->.
+    move => /eqP ->  /negP -> pinftop.
+    by rewrite  (underW pinftop). 
   rewrite qnnil /=.
   move : hightop qnnil adjaux IH'.
   case : q => [ // | a q /=].
@@ -2393,7 +2403,7 @@ move => lowtop /=.
 
 rewrite /contains_point in cont.
 move : lowunder cont  => /negP /= -> /= /negP phc0.
-have phc := (not_under_not_strictly phc0  ).
+have phc := (underWC phc0  ).
 have := (IH' lowtop adjaux phc topabove) .
 move => [] x [] xinq cpx.
 exists x .
@@ -2413,7 +2423,7 @@ have := (exists_cell_aux cbt _ _ _ ).
 move : cbt.
 rewrite /cells_low_e_top =>  /andP [] /andP [] _ /= /eqP -> _ .
 rewrite eqxx adjqhc0 /= => exis /andP [] /andP [] /negP puepb puept _.
-have puespb :=  (not_under_not_strictly puepb).
+have puespb :=  (underWC puepb).
 by apply : (exis p _ puespb puept).
 Qed.
 
@@ -2821,40 +2831,25 @@ case : last_cells op_c_d op_dec newopnnil => [/= op_c_d |c1 q1 _ op_dec /=]  .
 by rewrite -opentop op_dec !last_cat /= last_cat.
 Qed.
 
-Lemma opening_cells_eq  p out low_e high_e:
-  opening_cells   p out low_e high_e =
-      match out with
-    | [::] => let op0 := vertical_intersection_point p low_e in 
-              let op1 := vertical_intersection_point p high_e in
-                      match (op0,op1) with 
-                          |(None,_) |(_,None)=> [::]
-                          |(Some(p0),Some(p1)) =>
-                              (Bcell  (no_dup_seq ([:: p1; p; p0])) low_e high_e) ::[::]
-                      end
-    (*
-    | only_out::[::] =>  let op0 := vertical_intersection_point p low_e in 
-                      let op1 := vertical_intersection_point p high_e in
-                      match (op0,op1) with 
-                          |(None,_) |(_,None)=> [::]
-                          |(Some(p0),Some(p1)) =>
-                                (Bcell  (no_dup_seq ([:: p; p0])) low_e only_out)::(Bcell  (no_dup_seq ([:: p1; p])) only_out high_e)::[::]
-                            end
-*)
-    | c::q => let op0 := vertical_intersection_point p low_e in 
-                    match op0 with 
-                       | None => [::]
-                       | Some(p0) =>
-                        (Bcell  (no_dup_seq([:: p; p0])) low_e c) :: opening_cells p q c high_e
-                    end
-end.
-Proof. by case: out. Qed.
+
+Lemma every_point_inside_cell e1 (future_events : seq event) p open : 
+inside_box p -> 
+inside_box (point e1) ->
+seq_valid open (p) ->
+ adjacent_cells open ->
+ cells_bottom_top open ->
+ (lexPt (point e1) p) -> forall e2, e2 \in future_events -> lexPt p (point e2) ->
+
+exists c, c \in open /\ inside_cell p c.
+Proof.
+Admitted.
+
 
 Lemma size_open_ok (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) :   
 let open :=  opening_cells p out low_e high_e in  
 (size open = size out + 1)%N. 
  Proof.
-rewrite /opening_cells_eq.
-rewrite opening_cells_eq.
+
 elim :out =>[ /=|op0 op1 Ih /=].
 case : (vertical_intersection_point p low_e) .
 case : (vertical_intersection_point p high_e).
