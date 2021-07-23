@@ -58,22 +58,24 @@ Qed.
 
 Canonical edge_eqType := EqType edge (EqMixin edge_eqP).
 
-Record cell := Bcell  {pts : list pt; low : edge; high : edge}.
+Record cell := Bcell  {left_pts : list pt; right_pts : list pt; low : edge; high : edge}.
 
 Definition cell_eqb (ca cb : cell) : bool :=
-  let: Bcell ptsa lowa higha := ca in
-  let: Bcell ptsb lowb highb:= cb in
-  (ptsa == ptsb) && (lowa == lowb) && (higha == highb).
+  let: Bcell lptsa rptsa lowa higha := ca in
+  let: Bcell lptsb rptsb lowb highb:= cb in
+  (lptsa == lptsb) && (rptsa == rptsb) && (lowa == lowb) && (higha == highb).
 
 
 Lemma cell_eqP : Equality.axiom cell_eqb.
 Proof.
 rewrite /Equality.axiom.
-move => [ptsa lowa higha] [ptsb lowb highb] /=.
-have [/eqP <-|/eqP anb] := boolP(ptsa == ptsb).
-  have [/eqP <-|/eqP anb] := boolP(lowa == lowb).
-    have [/eqP <-|/eqP anb] := boolP(higha == highb).
-      by apply:ReflectT.
+move => [lptsa rptsa lowa higha] [lptsb rptsb lowb highb] /=.
+have [/eqP <-|/eqP anb] := boolP(lptsa == lptsb).
+  have [/eqP <-|/eqP anb] := boolP(rptsa == rptsb).
+    have [/eqP <-|/eqP anb] := boolP(lowa == lowb).
+      have [/eqP <-|/eqP anb] := boolP(higha == highb).
+        by apply:ReflectT.
+      by apply : ReflectF => [][].
     by apply : ReflectF => [][].
   by apply: ReflectF=> [][].
 by apply: ReflectF=> [][].
@@ -1325,16 +1327,20 @@ move=> inf0.
 by have := (under_low_imp_strict_under_high_bis pueplow puephigh vallow valhigh inf0).
 Qed.
 
-Definition dummy_event := Bevent (Bpt 0%:Q 0%:Q) [::].
-Definition dummy_edge : edge := (@Bedge  (Bpt 0%:Q 0%:Q) (Bpt 1%:Q 0%:Q) isT).
-Definition dummy_cell : cell := (@Bcell  ((Bpt 0%:Q 0%:Q)::[::]) dummy_edge dummy_edge).
+Definition dummy_pt := Bpt 0%:Q 0%:Q.
+Definition dummy_event := Bevent dummy_pt [::].
+Definition dummy_edge : edge := (@Bedge  dummy_pt (Bpt 1%:Q 0%:Q) isT).
+Definition dummy_cell : cell := (@Bcell  (dummy_pt::[::]) (dummy_pt::[::]) dummy_edge dummy_edge).
 
 (* if a cell doesn't contain a point, then either both edges are strictly under p or strictly over p *)
 Definition contains_point (p : pt) (c : cell)  : bool :=
    ~~  (p <<< low c) && (p <<= (high c)).
 
-Definition inside_cell p c :=
-  contains_point p c && (valid_edge (low c) p && valid_edge (high c) p).
+Definition inside_open_cell p c :=
+  contains_point p c && (p_x (head dummy_pt (left_pts c)) <= p_x p).
+
+Definition inside_closed_cell p c :=
+  contains_point p c && (p_x (head dummy_pt (left_pts c)) <= p_x p) && (p_x (head dummy_pt (right_pts c)) <= p_x p).
 
 Fixpoint contains (A : eqType) (s : seq A) (a : A) : bool :=
    match s with
@@ -1360,9 +1366,9 @@ Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
                     match op1 with 
                        | None => [::]
                        | Some(p1) =>
-                        Bcell  ((no_dup_seq [:: p; p1])++(pts c)) (low c) (high c)::[::]
+                        Bcell  (left_pts c) (no_dup_seq [:: p; p1]) (low c) (high c)::[::]
                     end
-       | c::q =>  Bcell  (p::(pts c)) (low c) (high c)::closing_rest p q
+       | c::q =>  Bcell  (left_pts c) [::p] (low c) (high c)::closing_rest p q
     end.
 
 
@@ -1375,13 +1381,13 @@ Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              Bcell  ((no_dup_seq [:: p0; p; p1])++(pts only_cell)) (low only_cell) (high only_cell)::[::]
+                              Bcell  (left_pts only_cell) (no_dup_seq [:: p0; p; p1])(low only_cell) (high only_cell)::[::]
                       end
       | c::q => let op0 := vertical_intersection_point p (low c) in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        Bcell  ((no_dup_seq ([:: p0; p])) ++ (pts c)) (low c) (high c) :: (closing_rest p q)
+                        Bcell  (left_pts c) (no_dup_seq [:: p0; p]) (low c) (high c) :: (closing_rest p q)
                     end
     end.
 
@@ -1395,22 +1401,13 @@ Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) 
                       match (op0,op1) with 
                           |(None,_) |(_,None)=> [::]
                           |(Some(p0),Some(p1)) =>
-                              (Bcell  (no_dup_seq ([:: p1; p; p0])) low_e high_e) ::[::]
+                              (Bcell  (no_dup_seq ([:: p1; p; p0])) [::] low_e high_e) ::[::]
                       end
-    (*
-    | [:: only_out] =>  let op0 := vertical_intersection_point p low_e in 
-                      let op1 := vertical_intersection_point p high_e in
-                      match (op0,op1) with 
-                          |(None,_) |(_,None)=> [::]
-                          |(Some(p0),Some(p1)) =>
-                                (Bcell  (no_dup_seq ([:: p; p0])) low_e only_out)::(Bcell  (no_dup_seq ([:: p1; p])) only_out high_e)::[::]
-                            end
-*)
     | c::q => let op0 := vertical_intersection_point p low_e in 
                     match op0 with 
                        | None => [::]
                        | Some(p0) =>
-                        (Bcell  (no_dup_seq([:: p; p0])) low_e c) :: opening_cells p q c high_e
+                        (Bcell  (no_dup_seq([:: p; p0])) [::] low_e c) :: opening_cells p q c high_e
                     end
 end.
 (*
@@ -1432,9 +1429,9 @@ end.
 Fixpoint open_cells_decomposition_contact open_cells pt contact high_e : seq cell * seq cell * edge :=
 match open_cells with
         | [::] => (contact, [::], high_e)
-        | Bcell lpt low high :: q  => 
-                if (contains_point pt (Bcell lpt low high)) then 
-                    open_cells_decomposition_contact q pt (rcons contact (Bcell lpt low high)) high
+        | Bcell lpt rpt low high :: q  => 
+                if (contains_point pt (Bcell lpt rpt low high)) then 
+                    open_cells_decomposition_contact q pt (rcons contact (Bcell lpt rpt low high)) high
                 else (contact, open_cells, high_e)
         end.
 
@@ -1442,11 +1439,11 @@ Fixpoint open_cells_decomposition_fix open_cells pt first_cells : seq cell * seq
 
 match open_cells with
         | [::] => (first_cells, [::], [::], dummy_edge, dummy_edge)
-        | Bcell lpt low high :: q  => 
-            if (contains_point pt (Bcell lpt low high)) then 
+        | Bcell lpt rpt low high :: q  => 
+            if (contains_point pt (Bcell lpt rpt low high)) then 
                    let '(contact, last_cells, high_e) := open_cells_decomposition_contact q pt [::] high in
-                   (first_cells, (Bcell lpt low high)::contact,last_cells, low, high_e)
-            else open_cells_decomposition_fix q pt (rcons first_cells ( Bcell lpt low high))
+                   (first_cells, (Bcell lpt rpt low high)::contact,last_cells, low, high_e)
+            else open_cells_decomposition_fix q pt (rcons first_cells ( Bcell lpt rpt low high))
 end.
             
 (* only works if cells are sorted *)
@@ -1596,11 +1593,9 @@ Qed.
 
 
 Lemma vertical_some_alive ed ev future :
-
 p_x (left_pt ed) < p_x (point ev) -> sorted lexPtEv (ev::future) ->
 end_edge ed (ev::future) -> inside_box (point ev) -> valid_edge ed (point ev).
 Proof.
-
 elim : future => [ lftedLev _ | b future Ih lftedLev].
   rewrite /end_edge.
   move => /orP [].
@@ -1641,13 +1636,15 @@ rewrite /end_edge /=.
 by rewrite endfut !orbT.
 Qed.
 
+
+
 Lemma open_cells_decomposition_contact_eq open pt contact high_e:
 open_cells_decomposition_contact open pt contact high_e =
 match open with
         | [::] => (contact, [::], high_e)
-        | Bcell lpt low high :: q  => 
-                if (contains_point pt (Bcell lpt low high)) then 
-                    open_cells_decomposition_contact q pt (rcons contact (Bcell lpt low high)) high
+        | Bcell lpt rpt low high :: q  => 
+                if (contains_point pt (Bcell lpt rpt low high)) then 
+                    open_cells_decomposition_contact q pt (rcons contact (Bcell lpt rpt low high)) high
                 else (contact, open, high_e)
         end.
 Proof.
@@ -1669,7 +1666,7 @@ elim : open_cells contact_cells high_e => [//= | c open Ih] contact_cells high_e
   inversion H.
   by rewrite ! eqxx orbT.
 rewrite /=.
-case : c => [pts lowc highc].
+case : c => [lpts rpts lowc highc].
 case : ifP => [contain| notcontain].
   case h : (open_cells_decomposition_contact _ _ _ _) => [[contact lc]high_final].
   move : (Ih _ _ _ _ _ h).
@@ -1701,7 +1698,7 @@ elim : open_cells fc => [/= | c q IH] fc.
    by rewrite andFb.
 
 rewrite /=.
-case : c => [pts lowfi highfi].
+case : c => [lpts rpts lowfi highfi].
 case : ifP => [contain |notcontain].  
 
   case h : (open_cells_decomposition_contact _ _ _ _) => [[contact last_c] high_c].
@@ -1779,6 +1776,7 @@ Definition bottom_edge_seq_above (s : seq cell) (p : pt) :=
 
 Definition bottom_edge_seq_below (s : seq cell) (p : pt) :=
   if s is c :: _ then ~~ (p <<< low c) else true.
+
 
 Lemma under_onVstrict e p :
   valid_edge e p ->
@@ -1957,12 +1955,12 @@ Proof.
 elim : open_cells contact_cells high_e => [/=| c q  IH] contact_cells high_e contact last_c high_c.
   move =>  [] -> <- _.
   by rewrite eqxx.
-case : c => [pts lowc highc].
+case : c => [lpts rpts lowc highc].
 rewrite /=.
 case : ifP => [contain| notcontain].
   case h : (open_cells_decomposition_contact _ _ _ _)=> [[contact1 last_c1] high_c1].
   move =>  [] <- <- _.
-  have h2: ((rcons contact_cells {| pts := pts; low := lowc; high := highc |}) ++ q == contact1 ++ last_c1) .
+  have h2: ((rcons contact_cells {| left_pts := lpts; right_pts := rpts;low := lowc; high := highc |}) ++ q == contact1 ++ last_c1) .
     apply (IH _ highc _ _ high_c1).
     by rewrite h.
   move : h2 => /eqP  h2.
@@ -1980,7 +1978,7 @@ Proof.
 elim : open_cells fc => [/=| c q IH] fc first_cells contact last_cells low_f high_f.
   move =>  [] <- <- <- _ _ .
   by [].
-case : c => [pts lowc highc].
+case : c => [lpts rpts lowc highc].
 rewrite /=.
 case : ifP => [contain| notcontain].
   case h : (open_cells_decomposition_contact _ _ _ _) => [[contact0 last_c0] high_c0].
@@ -2060,7 +2058,7 @@ elim op : open_cells ba oprf opvalid adj_op last_cells contact_cells high_e => [
 move => op_c.
 have c_eq := (contact_preserve_cells op_c).
 move : op_c.
-case ceq : c => [pts lowc high_c].
+case ceq : c => [lpts rpts lowc high_c].
 rewrite /=.
 case : ifP => [contain | /negbT notcontain].
   case h : (open_cells_decomposition_contact _ _ _ _)=> [[contact1 last_c1] high_c1].
@@ -2077,7 +2075,7 @@ case : ifP => [contain | /negbT notcontain].
     move: contain; rewrite /contains_point /= => /andP[] _.
     rewrite /bottom_edge_seq_above; move: adj_op.
     by case: (q)=> //= a' q' => /andP[/eqP <- _]; rewrite ceq.
-  by apply : (IH baq q_rf qval adjq last_c1 (rcons contact {| pts := pts; low := lowc; high := high_c |})  high_c h).
+  by apply : (IH baq q_rf qval adjq last_c1 (rcons contact {| left_pts := lpts; right_pts := rpts;low := lowc; high := high_c |})  high_c h).
 move =>  [] conteq lc heq {IH}.
 rewrite -lc.
 move => c1.
@@ -2134,7 +2132,7 @@ move=> abs.
 set e1 := @Bedge {|p_x := 0; p_y := 1|} {|p_x := 1; p_y := 1|} ltr01.
 set e2 := @Bedge {|p_x := 0; p_y := 2%:R|} {|p_x := 1; p_y := 1|} ltr01.
 set p := {|p_x := 3%:R; p_y := 0|}.
-set c := Bcell [::] e1 e2.
+set c := Bcell [::] [::] e1 e2.
 have := abs [::c] p isT isT isT isT c.
 rewrite inE=> /(_ (eqxx _))=> [][] _.
 compute; by [].
@@ -2158,7 +2156,7 @@ elim: open_cells fc => [/= | c1 open_cells IH] fc cfc.
   by rewrite orbF; apply: cfc.
 rewrite /bottom_edge_seq_below=> rfc1 valc1  adjc1 pabovec1 fc' cc lc l_e h_e.
 rewrite /=.
-case c1_eq : c1 => [pts lc1 hc1].
+case c1_eq : c1 => [lpts rpts lc1 hc1].
 case open_cells_eq : open_cells => [ | c2 q] //.
   case: ifP => [contains | /negbT notcontains] /=.
     by move=> [] <- _ <- _ _ c; rewrite orbF; apply: cfc.
@@ -2353,6 +2351,16 @@ Definition cells_low_e_top cells low_e : bool :=
 Definition cells_bottom_top cells : bool :=
   cells_low_e_top cells bottom.
 
+Lemma bottom_imp_seq_below s p :
+cells_bottom_top s -> inside_box p -> bottom_edge_seq_below s p.
+Proof.
+case s=> [// | c q].
+rewrite /cells_bottom_top /cells_low_e_top => /andP []/andP [] _ /eqP /= loweq _.
+rewrite /bottom_edge_seq_below  /inside_box loweq => /andP [] /andP []  /negP nsab _ _ /=.
+by apply /negP /underWC.
+Qed.
+  
+  
 Lemma last_in_not_nil (A : eqType) (e : A) (s : seq A) :
 s != [::] -> last e s \in s.
 Proof.
@@ -2417,7 +2425,6 @@ inside_box p ->
 Proof.
 case : open => [//= | c0 q].
 rewrite /cells_bottom_top => cbt.
-
 rewrite /adjacent_cells /= => adjqhc0.
 have := (exists_cell_aux cbt _ _ _ ).
 move : cbt.
@@ -2447,27 +2454,6 @@ by rewrite !mem_cat headincc lastincc !orbT .
 Qed.
 
 
-(* Lemma step_keeps_valid (open : seq cell) (e :event) (future_events : seq event) :
-*)
-
-
-Lemma l_h_valid (open : seq cell) p :
-cells_bottom_top open -> adjacent_cells open  ->
-inside_box p ->
-seq_valid open p ->
-forall first_cells contact last_cells low_f high_f,
-open_cells_decomposition open p  = (first_cells, contact, last_cells, low_f, high_f) ->
-valid_edge low_f p /\ valid_edge high_f p.
-Proof.
-rewrite /seq_valid.
-move => cbtop adjopen insbox /allP openvalid.
-have := (l_h_in_open cbtop adjopen insbox) => [] [lc [hc] ] /=.
-move => [] /openvalid /andP [] validlowc _.
-move => [] /openvalid /andP [] _ validhighc .
-case op_c_d : (open_cells_decomposition open p) => [[[[fc cc]last_c ]low_e]high_e] /= => [][] <- <- .
-by move => f_c contact last lowe highe [] _ _ _ <- <-.
-Qed.
-
 Lemma opening_cells_close event low_e high_e future :
 end_edge low_e future -> end_edge high_e future -> close_out_from_event event future ->
 close_alive_edges (opening_cells (point event) (outgoing event) low_e high_e) future.
@@ -2489,6 +2475,117 @@ case : (vertical_intersection_point (point event) low_e) => [low_pt|]; last by [
 rewrite /=.
 rewrite end_low end0 /=.
 apply : Ho => //.
+Qed.
+
+Definition adj_rel := [rel x y : cell | high x == low y].
+
+Lemma adj_aux_path (x : cell) s :
+    adjacent_cells_aux s (high x) = path adj_rel x s.
+Proof.
+by elim: s x => [// | y s Ih] x /=; rewrite Ih.
+Qed.
+
+Definition adjacent_cells' open : bool :=
+    sorted adj_rel open.
+
+Lemma adjacent_cell'_eq open : adjacent_cells' open = adjacent_cells open.
+Proof.
+by case: open => [// | c l]; rewrite /adjacent_cells' /= -adj_aux_path.
+Qed.
+
+Lemma high_fc_low_cc open p :
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition open p  = (first_cells, contact, last_cells, low_f, high_f) ->
+first_cells != nil -> contact != nil -> high (last dummy_cell first_cells) = low (head dummy_cell contact).
+Proof.
+move => fc cc lc lowf highf.
+case : fc => [// | c q op_dec _].
+case : cc op_dec => [//  | c' q' op_dec _ /=].
+Admitted.
+
+Lemma adjacent_cut l2 a lc :
+l2 != nil -> 
+((high (last dummy_cell l2) == low a) && 
+adjacent_cells l2 &&
+adjacent_cells (a::lc) ) =
+adjacent_cells (l2 ++ a::lc).
+Proof.
+case : l2 => [//= | c2 q2 _].
+elim : q2 c2 => [ | c3 q3 IH]  c2 //=.
+by rewrite andbT. 
+have /= IH' := IH c3.
+rewrite andbCA.
+rewrite -IH'.
+by rewrite !andbA.
+Qed.
+
+Lemma step_keeps_valid (open : seq cell) (e : event) (p : pt) (future_events : seq event) :
+inside_box p -> 
+inside_box (point e) -> 
+s_right_form open ->
+cells_bottom_top open ->
+adjacent_cells open ->
+seq_valid open (point e) ->
+sorted lexPtEv (e::future_events) ->
+close_alive_edges open (e::future_events) ->
+forall e', e' \in future_events -> lexPt p (point e') ->
+forall open2 closed closed2,
+step e open closed = (open2, closed2) ->
+seq_valid open2 p.
+Proof.
+move => insboxp insboxe srf cbtop adjop val_op_e evsorted close_ed e' e'fut pinfe' open2 closed closed2.
+rewrite /step.
+
+case op_dec : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] low_e] high_e] /=.
+move => [] <- _.
+have beseqb := bottom_imp_seq_below cbtop insboxe.
+have dec_not_end := decomposition_not_end srf val_op_e adjop beseqb op_dec.
+have open_eq := decomposition_preserve_cells op_dec.
+
+rewrite open_eq in val_op_e.
+have exi := exists_cell cbtop adjop insboxe.
+move : cbtop.
+rewrite /cells_bottom_top /cells_low_e_top open_eq => /andP [] /andP [] _ /eqP openbottom /eqP opentop.
+
+have lhc := l_h_c_decomposition op_dec exi .
+case : cc op_dec open_eq val_op_e openbottom opentop lhc => [//|c q  /=] op_dec open_eq val_op_e openbottom opentop lhc.
+  by move : lhc => [] _ [] _.
+have : end_edge low_e future_events.
+  case : fc op_dec open_eq val_op_e openbottom opentop dec_not_end lhc => [/=|c' q' ] op_dec open_eq val_op_e openbottom opentop dec_not_end []/eqP low_eq [] /eqP high_eq _.
+    by rewrite -low_eq /end_edge !inE openbottom eqxx orbT.
+  move : adjop.
+  rewrite open_eq -adjacent_cut //.
+  rewrite -low_eq.
+  move => /andP [] /andP [] /eqP <- _ _.
+  
+  move : close_ed.
+  rewrite open_eq /close_alive_edges /= => /andP [] /andP [] _ endhigh .
+  rewrite all_cat => /andP [] endq' _.
+  have := (dec_not_end c').
+  rewrite inE eqxx /=.
+  move => [] // _ notende.
+  move :endhigh.
+  rewrite /end_edge.
+  move => /orP [].
+  rewrite inE => /orP [].
+
+Admitted.
+
+Lemma l_h_valid (open : seq cell) p :
+cells_bottom_top open -> adjacent_cells open  ->
+inside_box p ->
+seq_valid open p ->
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition open p  = (first_cells, contact, last_cells, low_f, high_f) ->
+valid_edge low_f p /\ valid_edge high_f p.
+Proof.
+rewrite /seq_valid.
+move => cbtop adjopen insbox /allP openvalid.
+have := (l_h_in_open cbtop adjopen insbox) => [] [lc [hc] ] /=.
+move => [] /openvalid /andP [] validlowc _.
+move => [] /openvalid /andP [] _ validhighc .
+case op_c_d : (open_cells_decomposition open p) => [[[[fc cc]last_c ]low_e]high_e] /= => [][] <- <- .
+by move => f_c contact last lowe highe [] _ _ _ <- <-.
 Qed.
 
 Lemma step_keeps_closeness open closed current_event (future_events : seq event) : 
@@ -2564,22 +2661,6 @@ by move => /= /andP [_] .
 Qed.
 
 
-Definition adj_rel := [rel x y : cell | high x == low y].
-
-Lemma adj_aux_path (x : cell) s :
-    adjacent_cells_aux s (high x) = path adj_rel x s.
-Proof.
-by elim: s x => [// | y s Ih] x /=; rewrite Ih.
-Qed.
-
-Definition adjacent_cells' open : bool :=
-    sorted adj_rel open.
-
-Lemma adjacent_cell'_eq open : adjacent_cells' open = adjacent_cells open.
-Proof.
-by case: open => [// | c l]; rewrite /adjacent_cells' /= -adj_aux_path.
-Qed.
-
 Lemma adjacent_cut' l2 a lc :
 l2 != nil -> 
 ((high (last dummy_cell l2) == low a) && 
@@ -2600,21 +2681,6 @@ rewrite andbC.
 by [].
 Qed.
 
-Lemma adjacent_cut l2 a lc :
-l2 != nil -> 
-((high (last dummy_cell l2) == low a) && 
-adjacent_cells l2 &&
-adjacent_cells (a::lc) ) =
-adjacent_cells (l2 ++ a::lc).
-Proof.
-case : l2 => [//= | c2 q2 _].
-elim : q2 c2 => [ | c3 q3 IH]  c2 //=.
-by rewrite andbT. 
-have /= IH' := IH c3.
-rewrite andbCA.
-rewrite -IH'.
-by rewrite !andbA.
-Qed.
 
 Lemma adjacent_cut_rcons' l2 a fc :
 l2 != nil -> 
@@ -2716,17 +2782,17 @@ Qed.
 
 
 
-Lemma step_keeps_adjacent open closed e (future_events : seq event)  :
+Lemma step_keeps_adjacent open  e (future_events : seq event)  :
 inside_box (point e) -> 
 out_left_event e ->
 seq_valid open (point e) ->
 cells_bottom_top open ->
-forall open2 closed2, 
+forall closed open2 closed2, 
  step e open closed = (open2, closed2) ->
 adjacent_cells open -> adjacent_cells open2.
 Proof.
 rewrite /step .
-move => insbox  outleft  validopen cbtop  open2 closed2.
+move => insbox  outleft  validopen cbtop closed open2 closed2.
 case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
 move => [] <- _ adjopen.
 have exi := (exists_cell cbtop adjopen insbox ).
@@ -2762,16 +2828,16 @@ move => /andP [] _ /andP [] sizebeq0.
 by rewrite sizebeq0 in sizebneq0.
 Qed.
 
-Lemma step_keeps_bottom open closed e  : 
+Lemma step_keeps_bottom open e  : 
 inside_box (point e) ->
 seq_valid open (point e) ->
 adjacent_cells open ->
 cells_bottom_top open -> 
-forall open2 closed2, 
+forall closed open2 closed2, 
 step e open closed = (open2, closed2) ->
 (open2 != nil) && (low (head dummy_cell open2) == bottom).
 Proof.
-move => insbox openvalid adjopen cbtop  open2 closed2 .
+move => insbox openvalid adjopen cbtop closed open2 closed2 .
 rewrite /step /=.
 case op_c_d : (open_cells_decomposition open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
 have op_dec := (decomposition_preserve_cells op_c_d).
@@ -2796,17 +2862,17 @@ case : first_cells op_c_d op_dec newopnnil => [/= |c1 q1 /=] op_c_d op_dec newop
 by rewrite -openbottom op_dec /=.
 Qed.  
 
-Lemma step_keeps_bottom_top open closed e  : 
+Lemma step_keeps_bottom_top open e  : 
 inside_box (point e) ->
 seq_valid open (point e) ->
 adjacent_cells open ->
 cells_bottom_top open -> 
 out_left_event e ->
-forall open2 closed2, 
+forall closed open2 closed2, 
  step e open closed = (open2, closed2) ->
 cells_bottom_top open2.
 Proof.
-move => insbox openvalid adjopen cbtop outleft open2 closed2 step .
+move => insbox openvalid adjopen cbtop outleft closed open2 closed2 step .
 rewrite /cells_bottom_top /cells_low_e_top.
 rewrite (step_keeps_bottom insbox openvalid adjopen cbtop step) /=.
 move : step.
@@ -2832,16 +2898,22 @@ by rewrite -opentop op_dec !last_cat /= last_cat.
 Qed.
 
 
-Lemma every_point_inside_cell e1 (future_events : seq event) p open : 
+Lemma every_point_inside_cell e1 (future_events : seq event) p old_open : 
 inside_box p -> 
 inside_box (point e1) ->
-seq_valid open (p) ->
- adjacent_cells open ->
- cells_bottom_top open ->
- (lexPt (point e1) p) -> forall e2, e2 \in future_events -> lexPt p (point e2) ->
-
-exists c, c \in open /\ inside_cell p c.
+seq_valid old_open (p) ->
+adjacent_cells old_open ->
+cells_bottom_top old_open ->
+forall new_open new_closed closed, 
+step e1 old_open closed  = (new_open, new_closed) ->
+(lexPt (point e1) p) -> forall e2, e2 \in future_events -> lexPt p (point e2) ->
+exists c, c \in new_open /\ inside_open_cell p c.
 Proof.
+move => insp inse1 valopen adjopen cbtom. (*
+have := step_keeps_bottom inse1 valopen.
+have := step_keeps_adjacent. cbtom adjopen insp.
+have := exists_cell cbtom adjopen insp.
+*)
 Admitted.
 
 
@@ -2912,18 +2984,18 @@ have [/eqP pp1 | /eqP pnp1] := boolP(p == point ev1).
   by case: evs path_evs => [ | ev2 evs'].
 move/path_sorted/Ih: (path_evs) {Ih} => Ih.
 have [ pltp1 | pnltp1] /= := boolP(p_x p < p_x (point ev1)).
-  by case: inc {Ih}=> /=; (apply/andP; split=> //); rewrite /lexPtEv /= pltp1.
+  by case: inc {Ih}=> /=; (apply/andP; split=> //); rewrite /lexPtEv /lexPt /= pltp1.
 have [/eqP pp1 | pnp1'] /= := boolP (p_x p == p_x (point ev1)).
   have pyneq : p_y p != p_y (point ev1).
     apply/eqP=> pp1'; case pnp1.
     move: p (point ev1) {pnp1 Ih pnltp1} pp1 pp1'.
     by move=> [a b][c d] /= -> ->.
   have [ pltp1 | pnltp1'] /= := boolP(p_y p < p_y (point ev1)).
-    by case: (inc); rewrite /= path_evs andbT /lexPtEv /= pp1 eqxx pltp1 orbT.
+    by case: (inc); rewrite /= path_evs andbT /lexPtEv /lexPt /= pp1 eqxx pltp1 orbT.
   have p1ltp : p_y (point ev1) < p_y p.
     by rewrite ltNge le_eqVlt negb_or pyneq pnltp1'.
   case evseq : evs => [ | [p2 o2] evs2].
-    by case: (inc)=> /=; rewrite /lexPtEv /= pp1 eqxx p1ltp orbT.
+    by case: (inc)=> /=; rewrite /lexPtEv /lexPt /= pp1 eqxx p1ltp orbT.
   rewrite -evseq.
   case aeq : (add_event p e inc evs) => [ | e' evs3].
     have := add_event_preserve_first p e inc
@@ -2933,14 +3005,14 @@ have [/eqP pp1 | pnp1'] /= := boolP (p_x p == p_x (point ev1)).
          {| point := p2; outgoing := o2 |} evs2)=> _.
   rewrite -evseq aeq /= => [] [eqp | eqp2].
     apply/andP; split; last by move: Ih; rewrite aeq.
-    by rewrite /lexPtEv eqp pp1 eqxx p1ltp orbT.
+    by rewrite /lexPtEv /lexPt eqp pp1 eqxx p1ltp orbT.
   apply/andP; split; last by move: Ih; rewrite aeq.
   move: path_evs; rewrite evseq /= andbC => /andP[] _.
   by rewrite /lexPtEv /= eqp2.
 have p1ltp : p_x (point ev1) < p_x p.
   by rewrite ltNge le_eqVlt negb_or pnp1' pnltp1.
 case evseq : evs => [ | [p2 o2] evs2].
-  by case: (inc)=> /=; rewrite /lexPtEv /= p1ltp.
+  by case: (inc)=> /=; rewrite /lexPtEv /lexPt /= p1ltp.
 case aeq : (add_event p e inc evs) => [ | e' evs3].
   case: (add_event_preserve_first p e inc
        {| point := p2; outgoing := o2 |} evs2).
@@ -2949,7 +3021,7 @@ case: (add_event_preserve_first p e inc
      {| point := p2; outgoing := o2 |} evs2) => _.
 have path_e'evs3 : path lexPtEv e' evs3 by move: Ih; rewrite aeq.
 rewrite -evseq aeq /= => [][e'p | e'p2]; rewrite path_e'evs3 andbT.
-  by rewrite /lexPtEv e'p p1ltp.
+  by rewrite /lexPtEv /lexPt e'p p1ltp.
 by move: path_evs; rewrite evseq /= andbC /lexPtEv e'p2=> /andP[].
 Qed.
 
