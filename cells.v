@@ -2519,6 +2519,43 @@ rewrite -IH'.
 by rewrite !andbA.
 Qed.
 
+Lemma head_not_end q e future_events :
+
+close_alive_edges q (e :: future_events) ->
+(forall c, (c \in q) ->
+~ event_close_edge (low c) e /\ ~ event_close_edge (high c) e) ->
+close_alive_edges q (future_events).
+Proof.
+elim q => [//| c' q' IH cae].
+have cae': close_alive_edges q' (e :: future_events).
+  move : cae.
+  by rewrite /close_alive_edges /all => /andP [] /andP [] _ _.
+
+move => c. (*
+have IH':= IH cae' c.
+rewrite inE => /orP [/eqP -> |].
+  move => [] nclow nchigh.
+  have clow: event_close_edge (high c') e = false.
+    by apply /negP.
+  have chigh: event_close_edge (low c') e = false.
+    by apply /negP.
+  rewrite /close_alive_edges /end_edge /has /all /= clow chigh /= in  cae.
+  move : cae => /andP [] /andP []endlow endhigh endq'.
+
+
+rewrite /close_alive_edges /all /= /end_edge /has endhigh endlow /=.
+rewrite inE => /orP [/eqP <-|].
+apply IH
+
+rewrite /close_alive_edges /end_edge.
+move => /allP.
+rewrite /= =>
+have := (a c).
+/end_edge /=.*)
+
+Admitted.
+
+
 Lemma step_keeps_valid (open : seq cell) (e : event) (p : pt) (future_events : seq event) :
 inside_box p -> 
 inside_box (point e) -> 
@@ -2563,11 +2600,26 @@ have : end_edge low_e future_events.
   rewrite all_cat => /andP [] endq' _.
   have := (dec_not_end c').
   rewrite inE eqxx /=.
-  move => [] // _ notende.
+  move => [] // _  notende.
+  rewrite /end_edge in endhigh.
   move :endhigh.
+  rewrite /has.
+  have : event_close_edge (high c') e = false.
+    by apply /negP.
+  move => -> /=.
   rewrite /end_edge.
-  move => /orP [].
-  rewrite inE => /orP [].
+  rewrite /= in openbottom => /orP [].
+
+    rewrite !inE => /orP [/eqP <-| /eqP <-].
+      have : has (event_close_edge (high (last c' q'))) future_events.
+        move : endq'.
+        rewrite /all /=.
+        move => /andP.
+      move : endq' => /andP [].
+      case q'eq : q' op_dec open_eq val_op_e opentop dec_not_end endq' => [/=  | c'' q'' /=] op_dec open_eq val_op_e opentop dec_not_end endq'.
+        by rewrite eqxx.
+      
+      
 
 Admitted.
 
