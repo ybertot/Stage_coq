@@ -2530,31 +2530,32 @@ elim q => [//| c' q' IH cae].
 have cae': close_alive_edges q' (e :: future_events).
   move : cae.
   by rewrite /close_alive_edges /all => /andP [] /andP [] _ _.
-
-move => c. (*
-have IH':= IH cae' c.
-rewrite inE => /orP [/eqP -> |].
-  move => [] nclow nchigh.
-  have clow: event_close_edge (high c') e = false.
-    by apply /negP.
-  have chigh: event_close_edge (low c') e = false.
-    by apply /negP.
-  rewrite /close_alive_edges /end_edge /has /all /= clow chigh /= in  cae.
-  move : cae => /andP [] /andP []endlow endhigh endq'.
-
-
-rewrite /close_alive_edges /all /= /end_edge /has endhigh endlow /=.
-rewrite inE => /orP [/eqP <-|].
-apply IH
-
-rewrite /close_alive_edges /end_edge.
-move => /allP.
-rewrite /= =>
-have := (a c).
-/end_edge /=.*)
-
-Admitted.
-
+move=> condition.
+rewrite /=.
+apply/andP; split; last first.
+  apply: IH=> //.
+  by move=> c cin; apply condition; rewrite inE cin orbT.
+move: cae; rewrite /= /end_edge /= => /andP[] /andP[] /orP[].
+  move=> -> C; rewrite orTb; move: C=> /orP[].
+    by move=> ->.
+  move=> /orP [abs | ].
+  case: (condition c').
+    by rewrite inE eqxx.
+  by rewrite abs.
+  by move=> ->; rewrite orbT.
+  move=> /orP [abs | ].
+  case: (condition c').
+    by rewrite inE eqxx.
+  by rewrite abs.
+move=> ->; rewrite orbT.
+move=> /orP[] .
+    by move=> ->.
+  move=> /orP [abs | ].
+  case: (condition c').
+    by rewrite inE eqxx.
+  by rewrite abs.
+by move=> ->; rewrite orbT.
+Qed.
 
 Lemma step_keeps_valid (open : seq cell) (e : event) (p : pt) (future_events : seq event) :
 inside_box p -> 
@@ -2594,8 +2595,16 @@ have : end_edge low_e future_events.
   rewrite open_eq -adjacent_cut //.
   rewrite -low_eq.
   move => /andP [] /andP [] /eqP <- _ _.
-  
-  move : close_ed.
+  have close_c'q': close_alive_edges (c' :: q') future_events.
+    suff/head_not_end : close_alive_edges (c' :: q') (e :: future_events).
+      by apply=> c0 cin; apply: dec_not_end; rewrite cin.
+    apply/allP=> c0 cin; apply (allP close_ed); rewrite open_eq.
+    by rewrite mem_cat cin.
+  rewrite /=.
+  by move: (allP close_c'q' (last c' q'))=> /(_  (mem_last _ _))/andP[].
+  move/allP.
+  move/head_not_end: (close_ed).
+  move : (close_ed).
   rewrite open_eq /close_alive_edges /= => /andP [] /andP [] _ endhigh .
   rewrite all_cat => /andP [] endq' _.
   have := (dec_not_end c').
@@ -2603,10 +2612,10 @@ have : end_edge low_e future_events.
   move => [] // _  notende.
   rewrite /end_edge in endhigh.
   move :endhigh.
-  rewrite /has.
   have : event_close_edge (high c') e = false.
     by apply /negP.
-  move => -> /=.
+  move => /= ->; rewrite orFb.
+  have hne := head_not_end.
   rewrite /end_edge.
   rewrite /= in openbottom => /orP [].
 
