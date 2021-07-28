@@ -2803,8 +2803,6 @@ move => insboxp insboxe einfp outlefte srf cbtop adjop val_op_e close_ed close_e
 have close_all := step_keeps_closeness insboxe outlefte srf cbtop adjop val_op_e close_ev close_ed step.
 move : step.
 rewrite /step.
-
-
 case op_dec : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] low_e] high_e] /=.
 have exi := exists_cell cbtop adjop insboxe.
 have lhc := l_h_c_decomposition op_dec exi .
@@ -3126,22 +3124,30 @@ by rewrite -opentop op_dec !last_cat /= last_cat.
 Qed.
 
 
-Lemma every_point_inside_cell e1 (future_events : seq event) p old_open : 
+Lemma every_point_inside_cell e (future_events : seq event) p old_open : 
 inside_box p -> 
-inside_box (point e1) ->
-seq_valid old_open (p) ->
+inside_box (point e) ->
+out_left_event e ->
+s_right_form old_open ->
+seq_valid old_open (point e) ->
 adjacent_cells old_open ->
 cells_bottom_top old_open ->
+close_alive_edges old_open (e :: future_events) ->
+close_edges_from_events (e :: future_events) ->
 forall new_open new_closed closed, 
-step e1 old_open closed  = (new_open, new_closed) ->
-(lexPt (point e1) p) -> forall e2, e2 \in future_events -> lexPt p (point e2) ->
+step e old_open closed  = (new_open, new_closed) ->
+(lexPt (point e) p) -> (forall e2, e2 \in future_events -> lexPt p (point e2)) ->
 exists c, c \in new_open /\ inside_open_cell p c.
 Proof.
-move => insp inse1 valopen adjopen cbtom. (*
-have := step_keeps_bottom inse1 valopen.
-have := step_keeps_adjacent. cbtom adjopen insp.
-have := exists_cell cbtom adjopen insp.
-*)
+move => insboxp insboxe outlefte srf openval adjopen cbtom close_ed close_ev new_open new_closed closed step einfp pinfe'. 
+have cbtop_new := step_keeps_bottom_top insboxe openval adjopen cbtom outlefte step.
+have adj_new := step_keeps_adjacent future_events insboxe outlefte openval cbtom step adjopen.
+have val_new := step_keeps_valid insboxp insboxe einfp outlefte srf cbtom adjopen openval close_ed close_ev pinfe' step.
+have := exists_cell cbtop_new adj_new insboxp => [][]c [] cin cont.
+exists c.
+
+rewrite /inside_open_cell cin cont /=; split .
+  by [].
 Admitted.
 
 
