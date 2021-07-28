@@ -1511,6 +1511,9 @@ Variable bottom top : edge.
 Definition lexPt (p1 p2 : pt) : bool :=
   (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 < p_y p2)).
 
+Definition lexePt (p1 p2 : pt) : bool :=
+    (p_x p1 < p_x p2) || ((p_x p1 == p_x p2) && (p_y p1 <= p_y p2)).
+
 Definition lexPtEv (e1 e2 : event) : bool :=
   lexPt (point e1) (point e2).
 
@@ -3124,7 +3127,25 @@ by rewrite -opentop op_dec !last_cat /= last_cat.
 Qed.
 
 
-Lemma every_point_inside_cell e (future_events : seq event) p old_open : 
+Lemma opening_cells_left e low_e high_e c: 
+
+c \in (opening_cells (point e) (outgoing e) low_e high_e)  -> lexePt (last dummy_pt (left_pts c)) (point e).
+Proof.
+  
+elim : (outgoing e) => [//= | c' q ].
+  case : (vertical_intersection_point (point e) low_e) => [low_p /= |//].
+  case : (vertical_intersection_point (point e) high_e) => [high_p /= |//].
+  rewrite inE => /eqP -> /=.
+  case : ifP => [/eqP <-/=|/=].
+    case : ifP=> [/eqP <-/=|/=].
+      by rewrite /lexePt eqxx le_refl orbT .
+Admitted.
+    
+
+
+
+
+Lemma step_keeps_left_pts_inf e (future_events : seq event) p old_open : 
 inside_box p -> 
 inside_box (point e) ->
 out_left_event e ->
@@ -3140,16 +3161,15 @@ step e old_open closed  = (new_open, new_closed) ->
 (lexPt (point e) p) -> (forall e2, e2 \in future_events -> lexPt p (point e2)) ->
 forall c, c \in new_open -> lexPt (last dummy_pt (left_pts c)) p.
 Proof.
-move => insboxp insboxe outlefte srf openval adjopen cbtom close_ed close_ev new_open new_closed closed step einfp pinfe'. 
+move => insboxp insboxe outlefte srf openval adjopen cbtom close_ed close_ev old_keep_left new_open new_closed closed step einfp pinfe'.
+move => c cin .
+rewrite /lexPt.
+
 have cbtop_new := step_keeps_bottom_top insboxe openval adjopen cbtom outlefte step.
 have adj_new := step_keeps_adjacent future_events insboxe outlefte openval cbtom step adjopen.
 have val_new := step_keeps_valid insboxp insboxe einfp outlefte srf cbtom adjopen openval close_ed close_ev pinfe' step.
-have := exists_cell cbtop_new adj_new insboxp => [][]c [] cin cont.
-exists c.
-
-rewrite /inside_open_cell cin cont /=; split .
-  by [].
 Admitted.
+
 
 
 Lemma size_open_ok (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) :   
