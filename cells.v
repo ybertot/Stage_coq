@@ -2751,7 +2751,7 @@ have close_lc: close_alive_edges lc future_events.
     by apply=> c0 cin; apply: dec_not_end; rewrite cin orbT.
   apply/allP=> c0 cin; apply (allP close_ed); rewrite open_eq.
   by rewrite mem_cat -cat_cons mem_cat cin !orbT.
-have endlowe: end_edge low_e future_events. 
+have endlowe: end_edge low_e future_events.
   case : fc op_dec open_eq val_op_e openbottom opentop close_fc dec_not_end lhc  => [/=|c' q' ] op_dec open_eq val_op_e openbottom opentop close_fc dec_not_end .
     rewrite /end_edge !inE openbottom => [][] /eqP <- _.
     by rewrite eqxx orbT.
@@ -3134,10 +3134,11 @@ adjacent_cells old_open ->
 cells_bottom_top old_open ->
 close_alive_edges old_open (e :: future_events) ->
 close_edges_from_events (e :: future_events) ->
+(forall c, c \in old_open -> lexPt (last dummy_pt (left_pts c)) (point e)) ->
 forall new_open new_closed closed, 
 step e old_open closed  = (new_open, new_closed) ->
 (lexPt (point e) p) -> (forall e2, e2 \in future_events -> lexPt p (point e2)) ->
-exists c, c \in new_open /\ inside_open_cell p c.
+forall c, c \in new_open -> lexPt (last dummy_pt (left_pts c)) p.
 Proof.
 move => insboxp insboxe outlefte srf openval adjopen cbtom close_ed close_ev new_open new_closed closed step einfp pinfe'. 
 have cbtop_new := step_keeps_bottom_top insboxe openval adjopen cbtom outlefte step.
