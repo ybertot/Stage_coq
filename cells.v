@@ -2506,16 +2506,6 @@ Proof.
 by case: open => [// | c l]; rewrite /adjacent_cells' /= -adj_aux_path.
 Qed.
 
-Lemma high_fc_low_cc open p :
-forall first_cells contact last_cells low_f high_f,
-open_cells_decomposition open p  = (first_cells, contact, last_cells, low_f, high_f) ->
-first_cells != nil -> contact != nil -> high (last dummy_cell first_cells) = low (head dummy_cell contact).
-Proof.
-move => fc cc lc lowf highf.
-case : fc => [// | c q op_dec _].
-case : cc op_dec => [//  | c' q' op_dec _ /=].
-Admitted.
-
 Lemma adjacent_cut l2 a lc :
 l2 != nil -> 
 ((high (last dummy_cell l2) == low a) && 
@@ -2702,8 +2692,8 @@ Proof.
 move => einfp pinffut vale.
 rewrite /inside_box => /andP [] _ /andP [] botv topv.
 rewrite /end_edge => /orP [].
-  rewrite !inE => /orP [/eqP -> // | /eqP -> //].
-move => /hasP  [] e' e'in e'c.
+  by rewrite !inE => /orP [/eqP -> | /eqP -> ].
+move => /hasP [] e' e'in e'c.
 have pinfe' := pinffut e' e'in. 
 rewrite /valid_edge; apply /andP; split.
   move : vale.
@@ -2718,33 +2708,29 @@ rewrite /lexPt => /orP [ | /andP [] /eqP -> //].
 apply ltW .
 Qed.
 
-Lemma step_keeps_valid (open : seq cell) (e : event) (p : pt) (future_events : seq event) :
-inside_box p -> 
+
+Lemma step_keeps_closeness open  e (future_events : seq event) : 
 inside_box (point e) ->
-lexPt (point e) p ->
 out_left_event e ->
 s_right_form open ->
 cells_bottom_top open ->
 adjacent_cells open ->
 seq_valid open (point e) ->
-close_alive_edges open (e::future_events) ->
 close_edges_from_events (e::future_events) ->
-(forall e', e' \in future_events -> lexPt p (point e')) ->
+close_alive_edges open (e::future_events) -> 
+
 forall open2 closed closed2,
 step e open closed = (open2, closed2) ->
-seq_valid open2 p.
+close_alive_edges open2 future_events.
 Proof.
-move => insboxp insboxe einfp outlefte srf cbtop adjop val_op_e close_ed close_ev pinfe' open2 closed closed2.
-rewrite /step.
-
+move => insboxe outlefte srf cbtop adjop val_op_e close_ev close_ed  open2 closed closed2.
+rewrite /step.  
 case op_dec : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] low_e] high_e] /=.
 move => [] <- _.
 have beseqb := bottom_imp_seq_below cbtop insboxe.
 have dec_not_end := decomposition_not_end srf val_op_e adjop beseqb op_dec.
 have open_eq := decomposition_preserve_cells op_dec.
 have := (l_h_valid cbtop adjop  insboxe val_op_e op_dec) => [][] lowv highv.
-
-
 rewrite open_eq in val_op_e.
 have exi := exists_cell cbtop adjop insboxe.
 move : cbtop.
@@ -2753,7 +2739,6 @@ have := (open_not_nil (outgoing e) lowv highv).
 case op_new : (opening_cells (point e) (outgoing e) low_e high_e) => [//= | cnew q'' /=] _.
 have := higher_lower_equality outlefte op_dec op_new exi lowv highv .
 rewrite /= => [][] low_eq [] high_eq ccnnil.
-
 have lhc := l_h_c_decomposition op_dec exi .
 case : cc op_dec open_eq val_op_e openbottom opentop low_eq high_eq ccnnil lhc => [//|c q  /=] op_dec open_eq val_op_e openbottom opentop low_eq high_eq ccnnil lhc.
 have close_fc: close_alive_edges fc future_events.
@@ -2777,7 +2762,6 @@ have endlowe: end_edge low_e future_events.
   move => /andP [] /andP [] /eqP <- _ _.
   rewrite /=.
   by move: (allP close_fc (last c' q'))  => /(_  (mem_last _ _))/andP[].
-
 have endhighe: end_edge high_e future_events.
   case : lc op_dec open_eq val_op_e openbottom opentop close_lc dec_not_end lhc => [/=|c' q' ] op_dec open_eq val_op_e openbottom opentop close_lc dec_not_end []/eqP low_eq2 [] /eqP high_eq2 _.
     rewrite last_cat /= last_cat /= in opentop.
@@ -2789,26 +2773,69 @@ have endhighe: end_edge high_e future_events.
     have /eqP  := PeanoNat.Nat.neq_succ_0 (size q) => sizennil.
     by rewrite negb_and sizennil orbT.
   rewrite  last_cat /= => /andP []/andP [] /eqP -> _ _.
-  
-  have cin : c' \in c'::q'.
+    have cin : c' \in c'::q'.
     by rewrite inE eqxx.
   by move: (allP close_lc (c') cin) => /andP [].
-
 move : close_ev.
 rewrite /= => /andP [] cle _.
 have close_new:= opening_cells_close endlowe endhighe cle.
 rewrite op_new in close_new.
-have close_all := insert_opening_closeness close_fc close_new close_lc.
+apply (insert_opening_closeness close_fc close_new close_lc).
+Qed.
+
+Lemma step_keeps_valid (open : seq cell) (e : event) (p : pt) (future_events : seq event) :
+inside_box p -> 
+inside_box (point e) ->
+lexPt (point e) p ->
+out_left_event e ->
+s_right_form open ->
+cells_bottom_top open ->
+adjacent_cells open ->
+seq_valid open (point e) ->
+close_alive_edges open (e::future_events) ->
+close_edges_from_events (e::future_events) ->
+(forall e', e' \in future_events -> lexPt p (point e')) ->
+forall open2 closed closed2,
+step e open closed = (open2, closed2) ->
+seq_valid open2 p.
+Proof.
+move => insboxp insboxe einfp outlefte srf cbtop adjop val_op_e close_ed close_ev pinfe' open2 closed closed2 step.
+have close_all := step_keeps_closeness insboxe outlefte srf cbtop adjop val_op_e close_ev close_ed step.
+move : step.
+rewrite /step.
+
+
+case op_dec : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] low_e] high_e] /=.
+have exi := exists_cell cbtop adjop insboxe.
+have lhc := l_h_c_decomposition op_dec exi .
+
+move => [] open2eq _.
+rewrite -open2eq in close_all.
+rewrite -open2eq{open2eq}.
+have beseqb := bottom_imp_seq_below cbtop insboxe.
+have dec_not_end := decomposition_not_end srf val_op_e adjop beseqb op_dec.
+have open_eq := decomposition_preserve_cells op_dec.
+
+have := (l_h_valid cbtop adjop  insboxe val_op_e op_dec) => [][] lowv highv.
+rewrite open_eq in val_op_e.
+move : cbtop.
+rewrite /cells_bottom_top /cells_low_e_top open_eq => /andP [] /andP [] _ /eqP openbottom /eqP opentop.
+have := (open_not_nil (outgoing e) lowv highv).
+case op_new : (opening_cells (point e) (outgoing e) low_e high_e) => [//= | cnew q'' /=] _.
+have := higher_lower_equality outlefte op_dec op_new exi lowv highv .
+rewrite /= => [][] low_eq [] high_eq ccnnil.
+
+case : cc op_dec open_eq val_op_e openbottom opentop low_eq high_eq ccnnil lhc => [//|c q  /=] op_dec open_eq val_op_e openbottom opentop low_eq high_eq ccnnil lhc.
 have := opening_valid outlefte lowv highv.
+rewrite op_new => valnew.
 rewrite /seq_valid  all_cat -cat_cons all_cat in val_op_e.
 move : val_op_e => /andP [] valfc  /andP [] _ vallc.
-rewrite op_new => valnew.
 have valall := insert_opening_all valfc valnew vallc.
 rewrite /seq_valid.
 apply /allP .
 move => c' cin.
 move : close_all.
-rewrite /close_alive_edges => /allP.
+rewrite /close_alive_edges op_new => /allP.
 move => end_all.
 have := end_all c' cin => /andP [] endlowc' endhighc'.
 have : valid_edge (low c') (point e) && valid_edge (high c') (point e).
@@ -2817,16 +2844,6 @@ have : valid_edge (low c') (point e) && valid_edge (high c') (point e).
 move => /andP [] vlowc'e vhighc'e.
 by rewrite(valid_between_events einfp pinfe' vlowc'e insboxp endlowc')( valid_between_events einfp pinfe' vhighc'e insboxp endhighc') .
 Qed.
-
-Lemma step_keeps_closeness open closed current_event (future_events : seq event) : 
-close_alive_edges open (current_event::future_events) -> close_out_from_event current_event future_events ->
-close_alive_edges  (step current_event open closed).1  future_events.
-
-Proof.
-move => close_open close_out.
-rewrite /step.
-
-Admitted.
 
 
 
