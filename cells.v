@@ -2907,7 +2907,7 @@ elim : (sort edge_below (outgoing e)) low_e  =>
     case h2 : (vertical_intersection_point (point e) high_e) => [ph |  /= ].
       move => <-  _ /=  _.
       by rewrite eqxx.
-      rewrite /=.
+    rewrite /=.
     move => <- _ validh.
     move : h2.
     by rewrite /vertical_intersection_point validh.
@@ -3189,27 +3189,36 @@ have px_eq : p_x pl = p_x ph.
   by rewrite -lx_eq -hx_eq /=.
 have := point_valid_under_imp_y_inf pluh poeh px_eq.
 by rewrite subr_cp0.
+
 Qed.
+
+Definition no_crossing  : Prop:=
+ forall e e',
+ valid_edge e (left_pt e') ->
+(left_pt e' <<< e  -> e' <| e)  /\
+(~ (left_pt e' <<= e)  -> e <| e').
+
+
 
 Lemma opening_cells_left e low_e high_e c : 
 out_left_event e ->
 ~~(point e <<< low_e) -> point e <<< high_e ->
 valid_edge low_e (point e)-> valid_edge high_e (point e) ->
-sorted edge_below (rcons (low_e::(sort edge_below (outgoing e))) high_e) ->
+{in  (rcons (low_e::(sort edge_below (outgoing e))) high_e) &, no_crossing} ->
+low_e <| high_e ->
  c \in (opening_cells (point e) (sort edge_below (outgoing e)) low_e high_e)  -> 
  lexePt (last dummy_pt (left_pts c)) (point e).
 Proof.
 move => /outleft_event_sort outlefte eabl eunh lowv highv .
 
-elim : (sort edge_below (outgoing e)) low_e eabl lowv outlefte => [/= | c' q IH] low_e eabl lowv outlefte sorted_out.
+elim : (sort edge_below (outgoing e)) low_e eabl lowv outlefte => [/= | c' q IH] low_e eabl lowv outlefte nc linfh.
   case lp: (vertical_intersection_point (point e) low_e) => [low_p /= |//].
   have := intersection_on_edge lp=> [][] poel lx_eq.
   case hp: (vertical_intersection_point (point e) high_e) => [high_p /= |//].
   have := intersection_on_edge hp=> [][] poeh hx_eq.
   rewrite lx_eq in hx_eq.
-  rewrite andbT in sorted_out.
 
-  have y_ineq := order_below_viz_vertical lowv highv lp hp sorted_out.
+  have y_ineq := order_below_viz_vertical lowv highv lp hp linfh.
   rewrite  inE => /eqP -> /=.
   case : ifP => [/eqP <-/=|/= _].
     case : ifP=> [/eqP <-/=|/= _].
@@ -3236,21 +3245,29 @@ have outq: (forall e0 : edge_eqType, e0 \in q -> left_pt e0 == point e).
   move => e0 ein.
   apply outlefte.
   by rewrite inE ein orbT.
-have sortedq : sorted edge_below (rcons (c' :: q) high_e).
-  move : sorted_out.
-  by rewrite /= => /andP[].
-case lp: (vertical_intersection_point (point e) low_e) => [low_p /= |//].
+have c'infh : c' <| high_e.
+  have := (nc high_e c' ).
+  rewrite /= !inE  !mem_rcons !inE  !eqxx !orbT /= .
+  have := outlefte c' cin => /eqP ->.
+  rewrite highv eunh => [] a.
+  apply a; by []; by []; by []; by [].
+have nc' : {in  (rcons (c'::q) high_e) &, no_crossing}.
+  move => e1 e2 e1in e2in .
+  apply nc.
+    by rewrite inE e1in orbT.
+  by rewrite inE e2in orbT.
+  case lp: (vertical_intersection_point (point e) low_e) => [low_p /= |//].
 have := intersection_on_edge lp=> [][] poel lx_eq.
 
 case : ifP=> [/eqP <-/=|/= _].
   rewrite inE => /orP  [/eqP -> /=|].
     by rewrite lexePt_refl.
-  apply : (IH c' einfc' c'v outq sortedq).
+  apply (IH c' einfc' c'v outq nc' c'infh).
 rewrite inE => /orP  [/eqP -> /=|].
   have := point_valid_above_imp_y_inf eabl poel lx_eq.
   rewrite /lexePt subr_cp0 lx_eq eqxx=> ->.
   by rewrite orbT.
-apply : (IH c' einfc' c'v outq sortedq).
+apply : (IH c' einfc' c'v outq nc' c'infh).
 Qed.
 
 Lemma step_keeps_left_pts_inf e (future_events : seq event) p old_open : 
@@ -3263,13 +3280,15 @@ adjacent_cells old_open ->
 cells_bottom_top old_open ->
 close_alive_edges old_open (e :: future_events) ->
 close_edges_from_events (e :: future_events) ->
+{in  ((map low old_open) ++ (map high old_open) ++ flatten (map outgoing future_events)) &, no_crossing} ->
+
 (forall c, c \in old_open -> lexPt (last dummy_pt (left_pts c)) (point e)) ->
 forall new_open new_closed closed, 
 step e old_open closed  = (new_open, new_closed) ->
 (lexPt (point e) p) -> (forall e2, e2 \in future_events -> lexPt p (point e2)) ->
 forall c, c \in new_open -> lexPt (last dummy_pt (left_pts c)) p.
 Proof.
-move => insboxp insboxe outlefte srf openval adjopen cbtom close_ed close_ev old_keep_left new_open new_closed closed step einfp pinfe'.
+move => insboxp insboxe outlefte srf openval adjopen cbtom close_ed close_ev  n_c old_keep_left new_open new_closed closed step einfp pinfe'.
 move => c cin .
 
 
@@ -3283,7 +3302,7 @@ case op_c_d : (open_cells_decomposition old_open (point e)) =>  [[[[first_cells 
 have op_dec := (decomposition_preserve_cells op_c_d).
 move => [] new_eq _.
 have := opening_cells_left outlefte.
-
+IPO
 Admitted.
 
 
