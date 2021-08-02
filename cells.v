@@ -2615,6 +2615,108 @@ case op_c_d : (open_cells_decomposition open p) => [[[[fc cc]last_c ]low_e]high_
 by move => f_c contact last lowe highe [] _ _ _ <- <-.
 Qed.
 
+Lemma l_h_neq_contact open p high_e contact :
+((open != nil) && (p <<< high (last dummy_cell open))) || ((p <<< high_e) && (open == nil)) ->
+forall c_c last_c high_c, 
+open_cells_decomposition_contact open p contact high_e = (c_c,last_c, high_c) ->
+p <<< high_c.
+Proof.
+elim : open contact high_e  => [//= | c q Ih] contact high_e /=.
+  by rewrite eqxx andbT => pinfe _ _ _ [] _ _ <-.
+move => /orP[ pinfhigh | /andP [] //=].
+move => c_c lc highc.
+case : c pinfhigh => [lpts rpts lowc high_c].
+
+case : ifP => [contain| notcontain] pinfh op_dec.
+  apply / (Ih _ _ _  _  _  _ op_dec) /orP{Ih op_dec}.
+  case : q pinfh => [//= ->| /= c' q' ->].
+     by rewrite eqxx andbT; right.
+  by left.
+
+case : q pinfh op_dec {Ih} .
+  rewrite /= => ineq [] _ _ .
+Admitted.
+
+Lemma l_h_above_under_contact open p high_e contact :
+p <<= high_e ->
+forall c_c last_c high_c, 
+open_cells_decomposition_contact open p contact high_e = (c_c,last_c, high_c) ->
+p <<= high_c.
+Proof.
+elim : open contact high_e  => [//= | c open Ih] contact high_e pinf.
+  by move => _ _ _ [] _ _ <-.
+case : c=> [lpts rpts lowc highc].
+rewrite /=.
+case : ifP => [contain| notcontain]. 
+  case h : (open_cells_decomposition_contact _ _ _ _) => [[cc lc]high_final].
+  move => _ _ _ [] _ _ <-.
+  have := Ih _ _ _ _ _ _ h => d.
+  apply d.
+  move : contain.
+  by rewrite /contains_point /= => /andP [] _ pinfhc.
+by move => _ _ _ [] _ _ <-.
+Qed.
+
+Lemma l_h_above_under_fix open_cells  p fc :
+(exists c, (c \in open_cells) && contains_point p c)  ->
+forall first_cells contact last_cells low_f high_f ,
+open_cells_decomposition_fix open_cells p fc = (first_cells, contact, last_cells, low_f, high_f)   ->
+~~( p <<< low_f) && (p <<= high_f).
+Proof.
+move => exi f_c c_c l_c lowf highf .
+elim : open_cells fc exi => [//= fc []c' |c' q' IH /= fc].
+  by [].
+case : c' => [lpts rpts lowc highc] .
+case : ifP => [contain |notcontain].
+  case op_c: (open_cells_decomposition_contact _ _ _ _) => [/= []cc lc high_c] _ [] _ _ _ <- <-.
+  move : contain.
+  rewrite /contains_point /= => /andP [] -> pinfhc.
+  by rewrite (l_h_above_under_contact pinfhc op_c) andbT.
+move => [] c' /andP.
+
+rewrite inE => [][] /orP [/eqP -> a|cin cont op_c].
+  by rewrite a in notcontain.
+apply : (IH _ _ op_c).
+exists c'.
+by rewrite cin cont.
+Qed.
+
+Lemma l_h_above_under open p :
+cells_bottom_top open -> adjacent_cells open  ->
+inside_box p ->
+seq_valid open p ->
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition open p  = (first_cells, contact, last_cells, low_f, high_f) ->
+~ (p <<< low_f) /\ (p <<= high_f).
+Proof.
+case : open  => [//=| c q ] cbtop adjopen insbox opval fc cc lc lowf highf.
+have := exists_cell cbtop adjopen insbox => [][]c' []cin cont.
+have exi : (exists c0 : cell, (c0 \in c :: q) && contains_point p c0).
+  exists c'.
+  by rewrite cin cont.
+rewrite /open_cells_decomposition => op_f. 
+have := (l_h_above_under_fix exi op_f) => /andP [] /negP.
+by [].
+Qed. 
+
+Lemma l_h_above_under_neq open p :
+cells_bottom_top open -> adjacent_cells open  ->
+inside_box p ->
+seq_valid open p ->
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition open p  = (first_cells, contact, last_cells, low_f, high_f) ->
+~ (p === low_f) /\ ~ (p === high_f).
+Proof.
+
+case : open  => [//=| c q ] cbtop adjopen insbox opval fc cc lc lowf highf.
+have := exists_cell cbtop adjopen insbox => [][]c'.
+
+rewrite /open_cells_decomposition /= => exi op_f. 
+have := (l_h_above_under_fix exi op_f) => /andP [] /negP a b.
+
+by [].
+Qed. 
+
 Lemma higher_lower_equality e open :
 out_left_event e ->
 forall first_cells contact_cells last_cells low_e high_e,
@@ -3302,7 +3404,7 @@ case op_c_d : (open_cells_decomposition old_open (point e)) =>  [[[[first_cells 
 have op_dec := (decomposition_preserve_cells op_c_d).
 move => [] new_eq _.
 have := opening_cells_left outlefte.
-IPO
+
 Admitted.
 
 
