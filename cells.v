@@ -2616,26 +2616,57 @@ by move => f_c contact last lowe highe [] _ _ _ <- <-.
 Qed.
 
 Lemma l_h_neq_contact open p high_e contact :
-((open != nil) && (p <<< high (last dummy_cell open))) || ((p <<< high_e) && (open == nil)) ->
+p <<= high_e ->
+adjacent_cells open ->
+seq_valid open p ->
+s_right_form open ->
+((p <<< high (last dummy_cell open)) && (high_e == low (head dummy_cell open)) && (open !=nil)) || ((open == nil) &&  (p <<< high_e)) ->
 forall c_c last_c high_c, 
 open_cells_decomposition_contact open p contact high_e = (c_c,last_c, high_c) ->
 p <<< high_c.
 Proof.
-elim : open contact high_e  => [//= | c q Ih] contact high_e /=.
-  by rewrite eqxx andbT => pinfe _ _ _ [] _ _ <-.
-move => /orP[ pinfhigh | /andP [] //=].
-move => c_c lc highc.
-case : c pinfhigh => [lpts rpts lowc high_c].
+elim : open contact high_e  => [//= | c q Ih/=] contact high_e   /=.
+ by rewrite andbF /= => _ _ _ _ pinfe a b c [] _ _ <-  .
+rewrite orbF andbT.
+move => pinfe  adjopen valopen rf_open pinfhighc c_c lc highc //.
+case c_eq : c pinfhighc adjopen valopen rf_open => [lpts rpts lowc high_c].
 
-case : ifP => [contain| notcontain] pinfh op_dec.
-  apply / (Ih _ _ _  _  _  _ op_dec) /orP{Ih op_dec}.
-  case : q pinfh => [//= ->| /= c' q' ->].
-     by rewrite eqxx andbT; right.
-  by left.
+case : ifP => [contain| notcontain {Ih}] /= pinfh adjopen valopen rf_open op_dec .
+  
+move : contain.
+  rewrite /contains_point => /andP [] _ /= pinf_c.
+  have := (Ih _ _  pinf_c _ _ _  _ _ _  _ op_dec )  =>  Ih' {Ih}.
+  
 
-case : q pinfh op_dec {Ih} .
-  rewrite /= => ineq [] _ _ .
-Admitted.
+  case : q adjopen  op_dec valopen rf_open pinfh Ih' => [//= |  c' q'  /= /andP [] -> -> op_dec] .
+    rewrite andbF orFb /= => _ _ _ _ /andP [] -> _ a.
+    by apply a.
+  rewrite !andbT orbF =>  /andP [] _ /andP [] /andP [] -> -> -> /andP [] _ /andP [] -> -> /andP [] -> _ a.
+  by apply a.
+
+move : op_dec => [] _ _ <-. 
+move : notcontain.
+rewrite /contains_point /= .
+move => /idPn.
+rewrite negb_and => /orP [/negPn |].
+  by move : pinfh => /andP  [] _ /eqP ->.
+move : pinfh => /andP  [] _ /eqP heql .
+rewrite heql in pinfe.
+move : valopen => /andP [] /andP []  vallow valhigh _.
+have vall': valid_edge (low c) p.
+  by rewrite c_eq.
+have valh': valid_edge (high c) p.
+  by rewrite c_eq.
+move : rf_open.
+rewrite /right_form /= => /andP [] linfh _.
+have inf' : low c <| high c.
+  by rewrite c_eq.
+have pinf : p <<= low c .
+  by rewrite c_eq.
+move => /negPf.
+have := order_edges_viz_point vall' valh' inf' pinf.
+by rewrite c_eq /= => -> .
+Qed.
 
 Lemma l_h_above_under_contact open p high_e contact :
 p <<= high_e ->
@@ -2711,11 +2742,8 @@ Proof.
 case : open  => [//=| c q ] cbtop adjopen insbox opval fc cc lc lowf highf.
 have := exists_cell cbtop adjopen insbox => [][]c'.
 
-rewrite /open_cells_decomposition /= => exi op_f. 
-have := (l_h_above_under_fix exi op_f) => /andP [] /negP a b.
-
-by [].
-Qed. 
+rewrite /open_cells_decomposition /= => exi op_f.
+Admitted.
 
 Lemma higher_lower_equality e open :
 out_left_event e ->
