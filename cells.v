@@ -2745,6 +2745,21 @@ have := exists_cell cbtop adjopen insbox => [][]c'.
 rewrite /open_cells_decomposition /= => exi op_f.
 Admitted.
 
+Lemma l_h_under_neq open p :
+cells_bottom_top open -> adjacent_cells open  ->
+inside_box p ->
+seq_valid open p ->
+forall first_cells contact last_cells low_f high_f,
+open_cells_decomposition open p  = (first_cells, contact, last_cells, low_f, high_f) ->
+~ (p <<< low_f) /\  (p <<< high_f).
+Proof.
+
+case : open  => [//=| c q ] cbtop adjopen insbox opval fc cc lc lowf highf.
+have := exists_cell cbtop adjopen insbox => [][]c'.
+
+rewrite /open_cells_decomposition /= => exi op_f.
+Admitted.
+
 Lemma higher_lower_equality e open :
 out_left_event e ->
 forall first_cells contact_cells last_cells low_e high_e,
