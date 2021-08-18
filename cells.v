@@ -3759,17 +3759,21 @@ have cinfe := (opening_cells_left outlefte lowinfe' einfhigh vallow valhigh n_c'
 apply (lexePt_lexPt_trans cinfe einfp) .
 Qed.
 
-
-
 Lemma size_open_ok (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) :
+valid_edge low_e p ->
+valid_edge high_e p ->
+(forall e, e \in out -> left_pt e == p) ->
 let open :=  opening_cells p out low_e high_e in
 (size open = size out + 1)%N.
- Proof.
-
-elim :out =>[ /=|op0 op1 Ih /=].
-case : (vertical_intersection_point p low_e) .
-case : (vertical_intersection_point p high_e).
-Admitted.
+Proof.
+elim :out low_e =>[ /=|op0 op1 Ih /=] low_e vl vh cond_out.
+  have [lp ->] := (exists_point_valid vl).
+  by have [hp -> /=] := (exists_point_valid vh).
+have [lp -> /=] := (exists_point_valid vl).
+rewrite addSn; congr (_.+1); apply: Ih=> //; last first.
+  by move=> e ein; apply: cond_out; rewrite inE ein orbT.
+by apply: valid_edge_extremities; rewrite cond_out // inE eqxx.
+Qed.
 
 
 End proof_environment.
