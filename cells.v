@@ -128,6 +128,28 @@ Fixpoint add_event (p : pt) (e : edge) (inc : bool) (evs : seq event) :
     ev1 :: add_event p e inc evs'
   end.
 
+Lemma add_event_step (p : pt) (e : edge) (inc : bool) (evs : seq event) :
+  add_event p e inc evs =
+  match evs with
+  | nil => if inc then [:: Bevent p [::]]
+           else [:: Bevent p [:: e]]
+  | ev1 :: evs' =>
+    let p1 := point ev1 in
+    if p == p1 then
+      if inc then Bevent p1 (outgoing ev1) :: evs'
+      else Bevent p1 (e :: outgoing ev1) :: evs' else
+    if p_x p < p_x p1 then
+      if inc then
+        Bevent p [::] :: evs else
+        Bevent p [:: e] :: evs
+    else if (p_x p == p_x p1) && (p_y p < p_y p1) then
+       if inc then
+         Bevent p [::] :: evs else
+         Bevent p [:: e] :: evs else
+    ev1 :: add_event p e inc evs'
+  end.
+Proof. by case: evs. Qed.
+
 (* We should be able to prove that the sequence of events produced by
   edges to events is sorted lexicographically on the coordinates of
   the points. *)
@@ -1617,6 +1639,13 @@ Fixpoint close_edges_from_events events : bool :=
   | [::] => true
   | ev :: future_events => close_out_from_event ev future_events && close_edges_from_events future_events
   end.
+
+Lemma close_edges_from_events_step events :
+  close_edges_from_events events = match events with
+  | [::] => true
+  | ev :: future_events => close_out_from_event ev future_events && close_edges_from_events future_events
+  end.
+Proof. by case: events. Qed.
 
 Lemma lexePt_refl :
 reflexive lexePt.
@@ -3778,8 +3807,6 @@ Qed.
 
 End proof_environment.
 
-
-
 Lemma add_event_preserve_first p e inc ev evs :
   (0 < size (add_event p e inc (ev :: evs)))%N /\
   (point (head ev (add_event p e inc (ev :: evs))) = p \/
@@ -3853,3 +3880,100 @@ rewrite -evseq aeq /= => [][e'p | e'p2]; rewrite path_e'evs3 andbT.
 by move: path_evs; rewrite evseq /= andbC /lexPtEv e'p2=> /andP[].
 Qed.
 
+Lemma add_event_preserve_ends bottom top p e inc evs ed :
+  end_edge bottom top ed evs ->
+  end_edge bottom top ed (add_event p e inc evs).
+Proof.
+have [excp | norm ] := boolP(ed \in [:: top; bottom]).
+  by rewrite /end_edge excp.
+rewrite /end_edge (negbTE norm) /=.
+elim: evs => [// | ev evs Ih] /= /orP[|];
+  repeat (case: ifP => _);
+   rewrite /=/event_close_edge /=; try (move=> -> //); rewrite ?orbT //.
+by move=> ?; rewrite Ih ?orbT.
+Qed.
+
+Lemma add_event_inc bottom top evs ed :
+  end_edge bottom top ed (add_event (right_pt ed) ed true evs).
+Proof.
+elim: evs => [ | ev evs Ih] /=.
+  by rewrite /end_edge /= /event_close_edge /= eqxx orbT.
+case: ifP=> [/eqP <- | ].
+  by rewrite /end_edge /= /event_close_edge /= eqxx orbT.
+repeat (case: ifP=> _); rewrite /end_edge/=/event_close_edge ?eqxx ?orbT //.
+move=> _; move: Ih; rewrite /end_edge/=/event_close_edge => /orP [] -> //.
+by rewrite !orbT.
+Qed.
+
+Lemma close_edges_from_events_inc bottom top evs p ed :
+ close_edges_from_events bottom top evs ->
+ close_edges_from_events bottom top (add_event p ed true evs).
+Proof.
+elim: evs => /= [ // | ev evs Ih /andP [clev clevs]].
+move: Ih=> /(_ clevs) Ih.
+case: ifP=> _ /=; first by rewrite clevs andbT; exact clev.
+case: ifP=> _ /=; first by rewrite clevs andbT; exact clev.
+case: ifP=> _ /=; first by rewrite clevs andbT; exact clev.
+rewrite Ih andbT.
+apply/allP=> ed' edin'.
+move: (allP clev ed' edin')=> /orP[]; first by rewrite /end_edge => ->.
+by move=> it; rewrite add_event_preserve_ends // /end_edge it ?orbT.
+Qed.
+
+Lemma add_edge_close_edges_from_events bottom top evs ed :
+  close_edges_from_events bottom top evs ->
+  close_edges_from_events bottom top
+    (add_event (left_pt ed) ed false (add_event (right_pt ed) ed true evs)).
+Proof.
+have no_eq : left_pt ed == right_pt ed = false.
+    by apply/negP=> /eqP abs_eq; have := edge_cond ed; rewrite abs_eq ltxx.
+elim: evs => [/= _ | ev evs Ih].
+  rewrite no_eq edge_cond /=.
+  by rewrite /close_out_from_event /= /end_edge/=/event_close_edge eqxx orbT.
+move=> tmp; rewrite /= in tmp; case/andP: tmp=> [clev clevs].
+move: Ih=> /(_ clevs) Ih.
+have : end_edge bottom top ed (add_event (right_pt ed) ed true (ev :: evs)).
+  by apply: add_event_inc.
+rewrite [add_event (right_pt _) _ _ _]add_event_step.
+lazy zeta.
+case: ifP=> [/eqP <- /= | cnd1].
+  rewrite no_eq edge_cond /=.
+  rewrite /close_out_from_event /= /end_edge/=/event_close_edge.
+  rewrite eqxx orbT /= clevs andbT=> _; exact: clev.
+case: ifP=> cnd2 /=.
+  rewrite no_eq edge_cond /=.
+  rewrite /close_out_from_event /= => -> /=; rewrite clevs andbT; exact: clev.
+case: ifP=> cnd3 ended /=.
+  rewrite no_eq edge_cond.
+  rewrite close_edges_from_events_step.
+  apply/andP; split; last by rewrite /= clev clevs.
+  by rewrite /close_out_from_event/= ended.
+case: ifP=> cnd4.
+  rewrite close_edges_from_events_step /close_out_from_event/=.
+  rewrite close_edges_from_events_inc ?andbT ?clevs //.
+  apply/andP; split; last first.
+    apply/allP=> x xin.
+    move/allP: clev=> /(_ x xin) closed.
+    by rewrite add_event_preserve_ends ?orbT.
+  by rewrite add_event_inc.
+case: ifP=> cnd5.
+  rewrite close_edges_from_events_step; apply/andP; split.
+    by rewrite /close_out_from_event /= ended.
+  rewrite close_edges_from_events_step; apply/andP; split.
+    apply/allP=> x xin; apply: add_event_preserve_ends.
+    by move/allP: clev=> /(_ x xin).
+  by apply: close_edges_from_events_inc.
+case: ifP=> cnd6.
+  rewrite close_edges_from_events_step; apply/andP; split.
+    by rewrite /close_out_from_event /= ended.
+  rewrite close_edges_from_events_step; apply/andP; split.
+    apply/allP=> x xin; apply: add_event_preserve_ends.
+    by move/allP: clev=> /(_ x xin).
+  by apply: close_edges_from_events_inc.
+rewrite close_edges_from_events_step; apply/andP; split.
+  rewrite /close_out_from_event.
+  apply/allP=> x xin.
+  do 2 apply:add_event_preserve_ends.
+  by move/allP: clev; apply.
+by apply: Ih.
+Qed.
