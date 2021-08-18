@@ -2893,6 +2893,7 @@ case : last_cells op_c => [/= | c q] op_c op_eq.
 
 have high_eq2:( high (last c' q') = low c).
   move : adjopen.
+  
   case : first_cells op_c op_eq => [/= | c'' q'' ] op_c op_eq.
     by rewrite op_eq /adjacent_cells // adj_aux_path cat_path => /andP [] _ /= => /andP [] /eqP -> _.
   rewrite op_eq /adjacent_cells cat_cons  /= adj_aux_path cat_path => /andP [] _ /= /andP [] _.
@@ -2906,12 +2907,12 @@ have := decomposition_not_contain r_f valopen adjopen besb op_c cin.
 rewrite /contains_point => /negP .
 rewrite negb_and => /orP [/negPn //| /negP //].
 move : (valopen).
-rewrite /seq_valid op_eq -cat_cons all_cat => /andP [] _ /allP a.
-have := a (c).
+rewrite /seq_valid op_eq -cat_cons all_cat => /andP [] _ /allP .
+move => /(_ c).
 rewrite mem_cat !inE eqxx /= orbT  => /( _ isT) /andP [] vallow valhigh.
 move : r_f.
-rewrite /s_right_form op_eq -cat_cons all_cat => /andP [] _ /allP b.
-have := b (c).
+rewrite /s_right_form op_eq -cat_cons all_cat => /andP [] _ /allP.
+move => /(_ c).
 rewrite mem_cat !inE eqxx /= orbT /right_form => /( _ isT) linfh.
 have := l_h_above_under cbtop adjopen insboxp valopen op_c => [][] _.
 rewrite -high_eq high_eq2 => pinflow. 
@@ -3127,9 +3128,8 @@ have endhighe: end_edge high_e future_events.
   rewrite -high_eq2.
   move : adjop.
   rewrite open_eq (catA fc (c :: q) (c' :: q')) -(adjacent_cut c'); first last.
-    rewrite -size_eq0 size_cat /= !addn_eq0 .
-    have /eqP  := PeanoNat.Nat.neq_succ_0 (size q) => sizennil.
-    by rewrite negb_and sizennil orbT.
+  by case : (fc).  
+ 
   rewrite  last_cat /= => /andP []/andP [] /eqP -> _ _.
     have cin : c' \in c'::q'.
     by rewrite inE eqxx.
@@ -3392,14 +3392,6 @@ rewrite openeq in adjopen.
 apply : (replacing_seq_adjacent c_nnil qlnnil l_eq h_eq adjopen adjnew).
 Qed.
 
-
-Lemma l_h_valid2 (open : seq cell) (p : pt) :
- inside_box p  ->
-open != nil ->
-let '(fc,c_c,last_c,lower,higher) := (open_cells_decomposition open p) in
-valid_edge lower p /\ valid_edge higher p.
-Proof.
-Admitted.
 
 Lemma middle_seq_not_nil  (A : eqType) (a b c : seq A) :
 b != [::] ->
@@ -3779,26 +3771,6 @@ case : (vertical_intersection_point p low_e) .
 case : (vertical_intersection_point p high_e).
 Admitted.
 
-Lemma step_size_close (e : event) (open : seq cell) (closed : seq cell) :
-let (open2, close2) := step e open closed in
-(size close2 = size closed + size (outgoing e) + 1)%N.
- Proof.
-rewrite /step.
-
-Admitted.
-
-
-(* Lemma step_size_open (e : event) (open : seq cell) (closed : seq cell) :   *)
-(*    let (open2, close2) := step e open closed in (size open2 = size open - size (incoming e) + size (outgoing e))%N. *)
-(* Admitted. *)
-
-
-
-
-(*
-Definition events_inside_bottom_top events bottom top : Prop :=
-  (p_x (left_pt bottom) = p_x (left_pt top)) && (p_x (left_pt bottom) = p_x (left_pt top))
-*)
 
 End proof_environment.
 
