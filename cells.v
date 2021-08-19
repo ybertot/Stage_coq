@@ -3804,6 +3804,47 @@ rewrite addSn; congr (_.+1); apply: Ih=> //; last first.
 by apply: valid_edge_extremities; rewrite cond_out // inE eqxx.
 Qed.
 
+Lemma opening_cells_subset c p s le he:
+  c \in opening_cells p s le he ->
+  (low c \in le :: s) && (high c \in he :: s).
+Proof.
+elim: s le => [ | ed s Ih] le /=.
+by do 2 case: (vertical_intersection_point p _) => [? | //];
+  rewrite !inE => /eqP -> /=; rewrite !eqxx.
+case: (vertical_intersection_point p le) => [p' | //].
+rewrite !inE=> /orP[/eqP -> /=| ]; rewrite ?eqxx ?orbT //.
+move=> /Ih /andP[]; rewrite !inE=> ->; rewrite ?orbT /= orbCA => ->.
+by rewrite orbT.
+Qed.
+
+(* This will be necessary to prove that the no_crossing property is preserved. *)
+Lemma step_edges_open_subset e open closed open' closed' :
+  cells_bottom_top open ->
+  adjacent_cells open ->
+  inside_box (point e) ->
+  step e open closed = (open', closed') ->
+  {subset map low open' ++ map high open' <=
+    outgoing e ++ map low open ++ map high open}.
+Proof.
+move=> cbtom adj insbox_e; rewrite /step /=.
+case oe: (open_cells_decomposition open (point e)) => [[[[fc cc] lc] le] he] [].
+have dcp := decomposition_preserve_cells oe.
+have new c p : c \in opening_cells p (sort edge_below (outgoing e)) le he ->
+  let w := outgoing e ++ [seq low i | i <- open] ++ [seq high i | i <- open] in
+  (low c \in w) && (high c \in w).
+  move/opening_cells_subset; rewrite !inE=> /andP[lcond hcond] /=.
+  have [c1 [c2]] := l_h_in_open cbtom adj insbox_e.
+  rewrite oe /= => [][c1in [c2in [le_eq he_eq]]].
+  apply/andP; split; rewrite !mem_cat.
+    case/orP: lcond=> [/eqP -> |];[ | rewrite mem_sort=> -> //].
+    by rewrite -le_eq map_f ?orbT.
+  case/orP: hcond=> [/eqP -> |];[ | rewrite mem_sort=> -> //].
+  by rewrite -he_eq map_f ?orbT.
+move=> <- _ x; rewrite mem_cat=> /orP[/mapP[c + ->] | /mapP[c + ->]];
+  (rewrite 2!mem_cat orbCA orbC => /orP[cold | /new /andP[] // ];
+   rewrite 2!mem_cat dcp orbC  map_f ?orbT // 2!mem_cat orbCA cold orbT//).
+Qed.
+
 
 End proof_environment.
 
@@ -3984,3 +4025,37 @@ Proof.
 elim : s => [ // | e s Ih /=].
 by apply: add_edge_close_edges_from_events.
 Qed.
+
+(* Todo : most previous uses of flatten should be replaced by uses
+  of events_to_edges *)
+Definition events_to_edges := flatten \o (map outgoing).
+
+Lemma edges_to_events_no_loss (s : seq edge) :
+  perm_eq s (events_to_edges (edges_to_events s)).
+Proof.
+have add_inc evs p ed:
+  perm_eq (events_to_edges evs)
+    (events_to_edges (add_event p ed true evs)).
+  elim: evs => [/= | ev evs Ih]; first by apply: perm_refl.
+  rewrite /events_to_edges /=.
+  by repeat (case: ifP=> _ //=); rewrite perm_cat2l Ih.
+have add_out evs p ed:
+  perm_eq (ed :: events_to_edges evs)
+     (events_to_edges (add_event p ed false evs)).
+  elim: evs => [/= | ev evs]; first by apply: perm_refl.
+  rewrite /events_to_edges /= => Ih.
+  repeat (case: ifP => //=); move => ? ? ?.
+  rewrite -[ed :: outgoing ev ++ _]/([:: ed] ++ outgoing ev ++ _).
+  by rewrite perm_catCA perm_cat2l Ih.
+elim: s => /= [// | ed s Ih]; rewrite -(perm_cons ed) in Ih.
+apply/(perm_trans Ih)/(perm_trans _ (add_out _ (left_pt ed) _)).
+by rewrite perm_cons; apply: add_inc.
+Qed.
+
+Lemma edges_to_events_no_crossing s :
+  {in s &, no_crossing} ->
+  {in events_to_edges (edges_to_events s) &, no_crossing}.
+Proof.
+by apply: sub_in2=> x; rewrite (perm_mem (edges_to_events_no_loss s)).
+Qed.
+
