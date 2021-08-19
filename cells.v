@@ -3977,3 +3977,10 @@ rewrite close_edges_from_events_step; apply/andP; split.
   by move/allP: clev; apply.
 by apply: Ih.
 Qed.
+
+Lemma edges_to_event_wf (bottom top : edge)(s : seq edge) :
+  close_edges_from_events bottom top (edges_to_events s).
+Proof.
+elim : s => [ // | e s Ih /=].
+by apply: add_edge_close_edges_from_events.
+Qed.
