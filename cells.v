@@ -2004,20 +2004,33 @@ rewrite -(pmulr_lge0 _ bright) -pue_f_ax5.
 by apply: addr_ge0; rewrite pmulr_lge0.
 Qed.
 
+Definition s_right_form (s : seq cell)  : bool :=
+  all (fun c => right_form c ) s.
+
 Lemma opening_cells_right_form e low_e high_e :
-sorted edge_below (outgoing e) ->
 ~~(point e <<< low_e) -> point e <<< high_e ->
 low_e <| high_e ->
-(forall g, g \in outgoing e -> left_pt g = (point e)) ->
-(forall g, g \in outgoing e -> low_e <| g) ->
-(forall g, g \in outgoing e -> g <| high_e) ->
+{in outgoing e, forall g, left_pt g = point e} ->
+{in outgoing e, forall g, low_e <| g} ->
+{in outgoing e, forall g, g <| high_e} ->
+{in outgoing e &, no_crossing} ->
 forall new_open_cells,
-opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
-forall c, c \in new_open_cells ->
-  right_form c.
+opening_cells (point e) 
+  (sort edge_below (outgoing e)) low_e high_e = new_open_cells ->
+s_right_form new_open_cells.
 (*  && (head low_e [seq low c | c <- new_open_cells] == low_e). *)
 Proof.
-elim: (outgoing e) low_e => [ | g1 edges IH] low_e
+move=> pabove punder lowhigh outs alla allb noc new oe; apply/allP.
+have sorted_e : sorted edge_below (sort edge_below (outgoing e)).
+  have /sort_sorted_in : {in outgoing e &, total edge_below}.
+    by move=> e1 e2 e1in e2in; apply/orP/noc.
+  by apply;apply/allP=>x.
+have /sub_in1 trsf : {subset sort edge_below (outgoing e) <= outgoing e}.
+  move=> x.
+  by rewrite (perm_mem (permEl (perm_sort edge_below (outgoing e)))).
+move: new oe; move/trsf: allb; move/trsf: alla; move/trsf:outs.
+move: sorted_e pabove punder lowhigh {trsf}.
+elim: (sort edge_below (outgoing e)) low_e => [ | g1 edges IH] low_e
   sorted_e pabove punder lowhigh outs alla allb /=.
   case v_i_l_eq :
    (vertical_intersection_point (point e) low_e)=> [a1 | ];
@@ -2025,8 +2038,9 @@ elim: (outgoing e) low_e => [ | g1 edges IH] low_e
   case v_i_h_eq :
    (vertical_intersection_point (point e) high_e) => [a2 | ];
    last by move=> s <- c.
-  case: ifP => [a2e | a2ne];
-    by case: ifP => [a1e | a1ne] s <- c; rewrite inE ?eqxx => /eqP ->;
+  by case: ifP => [a2e | a2ne];
+    case: ifP => [a1e | a1ne] s <- c;
+     rewrite inE ?eqxx => /eqP ->;
     rewrite /right_form /= (* andbT *).
 case v_i_l_eq :
    (vertical_intersection_point (point e) low_e)=> [a1 | ];
@@ -2058,7 +2072,7 @@ have g1le : forall g, g \in edges -> g1 <| g.
   by apply: IH=> // g' g'in; apply: lefts; rewrite inE g'in orbT.
 by case: ifP => [_ | _ ] s <- c; rewrite inE=> /orP[/eqP -> /= | ];
   (try solve[rewrite /right_form /=; apply: alla; rewrite inE eqxx; by []]);
-  (apply: IH=> //); (try exact g1belowhigh); (try exact paboveg1).
+  (apply: IH=> //); (try exact g1belowhigh); (try exact paboveg1); move=> //.
 Qed.
 
 (*
@@ -2070,9 +2084,6 @@ p <<= (low c) ->  p <<= (high c).
 Proof.
 
 *)
-
-Definition s_right_form (s : seq cell)  : bool :=
-  all (fun c => right_form c ) s.
 
 
 Definition seq_valid (s : seq cell) (p : pt) : bool :=
@@ -3230,8 +3241,6 @@ move => /andP [] vlowc'e vhighc'e.
 by rewrite(valid_between_events einfp pinfe' vlowc'e insboxp endlowc')( valid_between_events einfp pinfe' vhighc'e insboxp endhighc') .
 Qed.
 
-
-
 (* toutes les arêtes présentes dans la liste des événements qui sont déjà vivantes sont dans la liste des cellules
    car dans un second temps la liste des cellules qu'on obtient à la fin doit contenir toutes les arêtes
    après un certain événement
@@ -3718,7 +3727,7 @@ apply underW.
 Qed.
 
 Lemma step_keeps_left_pts_inf e (future_events : seq event) p old_open : 
-inside_box p -> inside_box (point e) -> out_left_event e ->
+inside_box (point e) -> out_left_event e ->
 s_right_form old_open -> seq_valid old_open (point e) ->
 adjacent_cells old_open -> cells_bottom_top old_open ->
 close_alive_edges old_open (e :: future_events) ->
@@ -3731,22 +3740,16 @@ step e old_open closed  = (new_open, new_closed) ->
 (forall e2, e2 \in future_events -> lexPt p (point e2)) ->
 forall c, c \in new_open -> lexPt (last dummy_pt (left_pts c)) p.
 Proof.
-move => insboxp insboxe outlefte srf openval adjopen cbtom close_ed close_ev  n_c old_keep_left new_open new_closed closed step einfp pinfe'.
+move => insboxe outlefte srf openval adjopen cbtom close_ed close_ev  n_c old_keep_left new_open new_closed closed step einfp pinfe'.
 move => c cin .
-
-
 have cbtop_new := step_keeps_bottom_top insboxe openval adjopen cbtom outlefte step.
 have adj_new := step_keeps_adjacent future_events insboxe outlefte openval cbtom step adjopen.
-
-have val_new := step_keeps_valid insboxp insboxe einfp outlefte srf cbtom adjopen openval close_ed close_ev pinfe' step.
 move : step.
 rewrite /step.
-
 case op_c_d : (open_cells_decomposition old_open (point e)) =>  [[[[first_cells contact_cells] last_cells ]low_e] high_e].
 have op_dec := (decomposition_preserve_cells op_c_d).
 move => [] new_eq _.
 move : cin.
-
 rewrite op_dec in old_keep_left.
 rewrite -new_eq !mem_cat orbCA => /orP [| /orP [cin | cin]]; first last.
   enough  ( lexPt (last dummy_pt (left_pts c))(point e)).
@@ -3787,6 +3790,30 @@ have lowinfe' : ~~ (point e <<< low_e).
 have cinfe := (opening_cells_left outlefte lowinfe' einfhigh vallow valhigh n_c' linfh cin).
 apply (lexePt_lexPt_trans cinfe einfp) .
 Qed.
+
+  
+Lemma step_keeps_right_form e open closed op2 cl2 :
+  inside_box (point e) -> out_left_event e ->
+  step e open closed = (op2, cl2) ->
+  s_right_form open -> s_right_form closed ->
+  s_right_form op2 && s_right_form cl2.
+Proof.
+move=> inbox_e oute; rewrite /step /=.
+case oe : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] le] he].
+move=> [] <- <- /allP rfo /allP rfc; apply/andP.
+have ocd := decomposition_preserve_cells oe.
+have := opening_cells_right_form.
+have /opening_cells_right_form : {in outgoing e, forall g, left_pt g = point e}.
+  by move=> x xin; apply/eqP/oute.
+split; apply/allP=> ed; rewrite !mem_cat.
+  rewrite orbCA orbC=> /orP[inopen|].
+    by apply: rfo; rewrite ocd !mem_cat orbCA inopen orbT.
+
+
+
+Lemma step_keeps_valid2 e future_events p old_open :
+  inside_box (point e) -> out_left_event e ->
+  s_right_form old_open -> 
 
 Lemma size_open_ok (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) :
 valid_edge low_e p ->
