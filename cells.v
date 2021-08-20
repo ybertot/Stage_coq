@@ -1561,10 +1561,41 @@ Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : 
      opening_cells p (sort edge_below (outgoing e)) lower_edge higher_edge in
    (first_cells++new_open_cells++last_cells, closed_cells).
 
-   Fixpoint scan (events : seq event) (open_cells : seq cell) (closed_cells : seq cell) : seq cell :=
-    match events with
-       | [::] => closed_cells
-       | e::q => let (open, closed) := (step e open_cells closed_cells) in  scan q open closed
+Definition leftmost_points (bottom top : edge) :=
+  if p_x (left_pt bottom) < p_x (left_pt top) then
+    if vertical_intersection_point (left_pt top) bottom is Some pt then
+       [:: left_pt top; pt]
+    else
+        [::]
+  else
+     if vertical_intersection_point (left_pt bottom) top is Some pt then
+        [:: pt; left_pt bottom]
+     else
+        [::].
+
+Definition rightmost_points (bottom top : edge) :=
+  if p_x (right_pt bottom) < p_x (right_pt top) then
+    if vertical_intersection_point (right_pt bottom) top is Some pt then
+       [:: right_pt bottom; pt]
+    else
+        [::]
+  else
+     if vertical_intersection_point (left_pt top) bottom is Some pt then
+        [:: pt; right_pt top]
+     else
+        [::].
+
+Definition complete_last_open (bottom top : edge) (c : cell) :=
+  match c with
+  | Bcell lpts rpts le he =>
+      Bcell lpts (rightmost_points bottom top) le he
+  end.
+
+Fixpoint scan (events : seq event) (open_cells : seq cell)
+  (closed_cells : seq cell) : seq cell * seq cell :=
+  match events with
+     | [::] => (closed_cells, open_cells)
+     | e::q => let (open, closed) := (step e open_cells closed_cells) in  scan q open closed
   end.
 
 
@@ -1589,13 +1620,9 @@ Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : 
 
  *)
 
- Definition start (events : seq event) (bottom : edge) (top : edge) : seq cell :=
-     match events with
-       | [::] => [::]
-       | e :: q =>
-           let p := point e in let out := outgoing e in
-            scan q (opening_cells p out bottom top) [::]
-       end.
+Definition start (events : seq event) (bottom : edge) (top : edge) :
+  seq cell * seq cell :=
+  scan events [:: Bcell (leftmost_points bottom top) [::] bottom top] [::].
 
 Section proof_environment.
 Variable bottom top : edge.
@@ -1649,7 +1676,6 @@ Qed.
 Definition inside_box p :=
 (~~ (p <<= bottom)  && (p <<< top) ) &&
   (valid_edge bottom p && valid_edge top p).
-
 
 Definition event_close_edge ed ev : bool :=
 right_pt ed == point ev.
@@ -1732,6 +1758,11 @@ rewrite /lexePt /lexPt => /orP  [x_ineq|/andP  [] /eqP -> y_ineq /orP [-> // |/a
     by rewrite /lexPt x_ineq.
   move/[swap]; apply lexPt_trans.
 by rewrite( lt_le_trans y_s y_ineq) eqxx /= orbT.
+Qed.
+
+Lemma lexePt_trans : transitive lexePt.
+move => p2 p1 p3; rewrite lexePt_eqVlt => /orP[/eqP-> // | p1p2] p2p3.
+by apply/lexPtW/(lexPt_lexePt_trans p1p2).
 Qed.
 
 Lemma lexPtEvtrans ev a future : sorted  lexPtEv (ev::a::future) ->
@@ -3113,7 +3144,7 @@ Qed.
 
 Lemma valid_between_events g e p future :
 lexPt e p ->
-(forall e', e' \in future -> lexPt p (point e')) ->
+(forall e', e' \in future -> lexePt p (point e')) ->
 valid_edge g e -> inside_box p -> end_edge g future ->
 valid_edge g p.
 Proof.
@@ -3221,7 +3252,7 @@ adjacent_cells open ->
 seq_valid open (point e) ->
 close_alive_edges open (e::future_events) ->
 close_edges_from_events (e::future_events) ->
-(forall e', e' \in future_events -> lexPt p (point e')) ->
+(forall e', e' \in future_events -> lexePt p (point e')) ->
 forall open2 closed closed2,
 step e open closed = (open2, closed2) ->
 seq_valid open2 p.
@@ -3766,10 +3797,9 @@ close_edges_from_events (e :: future_events) ->
 forall new_open new_closed closed,
 step e old_open closed  = (new_open, new_closed) ->
 (lexPt (point e) p) ->
-(forall e2, e2 \in future_events -> lexPt p (point e2)) ->
 forall c, c \in new_open -> lexPt (last dummy_pt (left_pts c)) p.
 Proof.
-move => insboxe outlefte srf openval adjopen cbtom close_ed close_ev  n_c old_keep_left new_open new_closed closed step einfp pinfe'.
+move => insboxe outlefte srf openval adjopen cbtom close_ed close_ev  n_c old_keep_left new_open new_closed closed step einfp.
 move => c cin .
 have cbtop_new := step_keeps_bottom_top insboxe openval adjopen cbtom outlefte step.
 have adj_new := step_keeps_adjacent insboxe outlefte openval cbtom step adjopen.
@@ -3818,18 +3848,18 @@ have lowinfe' : ~~ (point e <<< low_e).
 have cinfe := (opening_cells_left outlefte lowinfe' einfhigh vallow valhigh n_c' linfh cin).
 apply (lexePt_lexPt_trans cinfe einfp) .
 Qed.
-  
+
 Lemma step_keeps_right_form e open closed op2 cl2 :
   cells_bottom_top open -> adjacent_cells open -> 
   inside_box (point e) -> seq_valid open (point e) ->
   {in [seq low c | c <- open] ++ [seq high c | c <- open] ++
       outgoing e &, no_crossing} ->
   out_left_event e ->
-  s_right_form open -> s_right_form closed ->
+  s_right_form open ->
   step e open closed = (op2, cl2) ->
   s_right_form op2.
 Proof.
-move=> cbtom adj inbox_e sval noc oute rfo rfc; rewrite /step /=.
+move=> cbtom adj inbox_e sval noc oute rfo; rewrite /step /=.
 case oe : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] le] he].
 move=> [] <- _.
 have ocd := decomposition_preserve_cells oe.
@@ -3919,7 +3949,7 @@ move=> <- _ x; rewrite mem_cat=> /orP[/mapP[c + ->] | /mapP[c + ->]];
 Qed.
 
 Definition cover_left_of p s1 s2 :=
-  forall q, inside_box q -> lexPt q p ->
+  forall q, inside_box q -> lexePt q p ->
   has (inside_open_cell q) s1 || has (inside_closed_cell q) s2.
 
 Definition bottom_left_cells_lex (open : seq cell) p :=
@@ -4043,7 +4073,7 @@ Lemma step_keeps_cover e open closed open' closed' p evs :
   bottom_left_cells_lex open (point e) ->
   step e open closed = (open', closed') ->
   cover_left_of (point e) open closed ->
-  all (lexPt p) [seq point e | e <- evs] ->
+  all (lexePt p) [seq point e | e <- evs] ->
   cover_left_of p open' closed'.
 Proof.
 move=> sortevs cbtom adj inbox_e sval oute rfo clae clev noc btm_left stepeq.
@@ -4054,8 +4084,7 @@ have := step_keeps_left_pts_inf inbox_e oute rfo sval adj cbtom clae
 have := step_keeps_closeness inbox_e oute rfo cbtom adj sval clev clae
    stepeq.
 have := 
-   step_keeps_valid _ inbox_e _ oute rfo cbtom adj sval clae clev
-    _ stepeq.
+   step_keeps_valid _ inbox_e _ oute rfo cbtom adj sval clae clev _ stepeq.
 move: stepeq; rewrite /step /=.
 case oe : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] le] he].
 have subcc : {subset cc <= open}.
@@ -4065,14 +4094,11 @@ move=> [] open'eq closed'eq sval0' clae' btm_left' adj' cbtom' cov limr
 have [qright | qleft] := boolP(lexPt (point e) q).
   apply/orP; left.
   have [c [cin ctn]]:= exists_cell cbtom' adj' inbox_q.
-  have subpq1 : subpred (lexPt p) (lexePt q).
-    by move=> x px; apply/lexPtW/(lexPt_trans limrq).
-  have subpq2 : subpred (lexPt p) (lexPt q).
-    by move=> x px; apply/(lexPt_trans limrq).
+  have subpq1 : subpred (lexePt p) (lexePt q).
+    by move=> x px; apply/(lexePt_trans limrq).
   have limrq1 := sub_all subpq1 limr.
-  have limrq' : forall e, e \in evs -> lexPt q (point e).
-    by move/(sub_all subpq2): (limr); rewrite all_map=>/allP.
-  move: sval0'=> sval0'.
+  have limrq' : forall e, e \in evs -> lexePt q (point e).
+    by move/(sub_all subpq1): (limr); rewrite all_map=>/allP.
   have sval' := sval0' _ inbox_q qright limrq'.
   apply/hasP; exists c=> //.
   have btm_left_q : lexePt (last dummy_pt (left_pts c)) q.
@@ -4171,7 +4197,7 @@ move=> /orP[/eqP qe' | qlte ].
   rewrite -qe'=> einopc.
   have [it it1 it2]:= inclosing _ opcin einopc svalcc.
   by exists it=> //; rewrite -closed'eq mem_cat it1 orbT.
-have := cov q inbox_q qlte=> /orP[ | already_closed]; last first.
+have := cov q inbox_q (lexPtW qlte)=> /orP[ | already_closed]; last first.
   by rewrite -closed'eq has_cat already_closed orbT.
 rewrite -open'eq (decomposition_preserve_cells oe).
 rewrite 2!has_cat orbCA=> /orP[/hasP [opc opcin qinopc] | keptopen].
@@ -4256,6 +4282,13 @@ have path_e'evs3 : path lexPtEv e' evs3 by move: Ih; rewrite aeq.
 rewrite -evseq aeq /= => [][e'p | e'p2]; rewrite path_e'evs3 andbT.
   by rewrite /lexPtEv /lexPt e'p p1ltp.
 by move: path_evs; rewrite evseq /= andbC /lexPtEv e'p2=> /andP[].
+Qed.
+
+Lemma sorted_edges_to_events s :
+   sorted lexPt [seq point x | x <- edges_to_events s].
+Proof.
+have /mono_sorted -> : {mono point : x y / lexPtEv x y >-> lexPt x y} by [].
+by elim: s => [ | g s Ih] //=; do 2 apply: add_event_sort.
 Qed.
 
 Lemma add_event_preserve_ends bottom top p e inc evs ed :
@@ -4395,4 +4428,186 @@ Lemma edges_to_events_no_crossing s :
 Proof.
 by apply: sub_in2=> x; rewrite (perm_mem (edges_to_events_no_loss s)).
 Qed.
+
+Lemma step_sub_open_edges open closed open' closed' ev:
+  step ev open closed = (open', closed') ->
+  {subset [seq low i | i <- open'] ++ [seq high i | i <- open']
+      <= [seq low i | i <- open] ++ [seq high i | i <- open] ++
+         outgoing ev}.
+Admitted.
+
+Lemma out_left_add_event p g b evs:
+    p = (if b then right_pt g else left_pt g) ->
+    {in evs, forall ev, out_left_event ev} ->
+    {in add_event p g b evs, forall ev, out_left_event ev}.
+Proof.
+move=> ->.
+elim: evs => [ | ev evs Ih] acc.
+  move=> /= ev; case:b; rewrite inE => /eqP -> e //=.
+  by rewrite inE => /eqP ->; rewrite eqxx.
+rewrite /=; case: ifP=> [/eqP pev | ] ev'.
+  case bval: (b); rewrite /= inE => /orP[/eqP ev'ev | ev'inevs].
+  - have -> : ev' = ev by rewrite ev'ev; case: (ev).
+    by apply: acc; rewrite inE eqxx.
+  - by apply: acc; rewrite inE ev'inevs orbT.
+  - move=> g2; rewrite ev'ev /= inE=> /orP[/eqP -> | ].
+    * by rewrite -pev bval eqxx.
+    by apply: acc; rewrite inE eqxx.
+  by apply: acc; rewrite inE ev'inevs orbT.
+case: ifP => [athead | later].
+  case bval: (b) => ev2; rewrite inE => /orP[].
+  - by move/eqP=> -> g2.
+  - by apply: acc.
+  - by move/eqP=> -> g2 /=; rewrite inE=> /eqP ->; rewrite eqxx.
+  by apply: acc.
+case: ifP => [athead' | later'].
+  case bval: (b) => ev2; rewrite inE => /orP[].
+  - by move/eqP=> -> g2.
+  - by apply: acc.
+  - by move/eqP=> -> g2 /=; rewrite inE=> /eqP ->; rewrite eqxx.
+  by apply: acc.
+move=> ev2; rewrite inE=> /orP[/eqP -> | ev2intl].
+  by apply: acc; rewrite inE eqxx.
+apply: Ih=> //.
+by move=> ev3 ev3in; apply: acc; rewrite inE ev3in orbT.
+Qed.
+
+Lemma out_left_edges_to_events s:
+  {in edges_to_events s, forall ev, out_left_event ev}.
+Proof.
+elim: s => [// | g s Ih] /=.
+have Ih' := @out_left_add_event (right_pt g) g true _ erefl Ih.
+by have Ih'' := @out_left_add_event (left_pt g) g false _ erefl Ih'.
+Qed.
+
+Lemma start_cover (bottom top : edge) (s : seq edge) closed open :
+  bottom <| top ->
+  {in bottom :: top :: s &, no_crossing} ->
+  all (inside_box bottom top) [seq left_pt x | x <- s] ->
+  all (inside_box bottom top) [seq right_pt x | x <- s] ->
+  start (edges_to_events s) bottom top = (closed, open) ->
+  forall p, inside_box bottom top p ->
+  has (inside_closed_cell p) closed || has (inside_open_cell p) open.
+Proof.
+move=> boxwf nocs leftin rightin; rewrite /start.
+set evs := edges_to_events s.
+have/perm_mem := edges_to_events_no_loss s.
+  rewrite -/evs/events_to_edges/= => stoevs.
+set op0 := [:: Bcell (leftmost_points bottom top) [::] bottom top].
+set cl0 := (X in scan _ _ X).
+have : sorted lexPt [seq point x | x <- evs].
+  by apply: sorted_edges_to_events.
+have : cells_bottom_top bottom top op0.
+  by rewrite /op0/cells_bottom_top/cells_low_e_top/= !eqxx.
+have : adjacent_cells op0 by [].
+have : s_right_form op0 by rewrite /=/right_form/= boxwf.
+have : close_alive_edges bottom top op0 evs.
+  by rewrite /=/end_edge !inE !eqxx !orbT.
+have : {in [seq low i | i <- op0] ++
+       [seq high i | i <- op0] ++ 
+       flatten [seq outgoing i | i <- evs] &,
+     no_crossing}.
+  rewrite /=; move: nocs; apply sub_in2.
+  move=> x; rewrite !inE => /orP[-> //| [/orP[-> // | ]]]; rewrite ?orbT//.
+  by rewrite -stoevs orbA orbC => ->.
+have : {in evs, forall ev, out_left_event ev}.
+  by apply: out_left_edges_to_events.
+have : close_edges_from_events bottom top evs.
+  by apply: edges_to_event_wf.
+have : all (inside_box bottom top)
+    [seq point ev | ev <- evs].
+  admit.
+have : {in [seq point e | e <- evs], 
+         forall e,  bottom_left_cells_lex op0 e}.
+  admit.
+have : evs != nil -> seq_valid op0 (head dummy_pt [seq point ev | ev <- evs]).
+  admit.
+have : forall p, all (lexePt p) [seq point ev | ev <- evs] ->
+         cover_left_of bottom top p op0 cl0.
+  admit.
+move=> {stoevs}.
+elim: evs op0 cl0 => [ | ev evs' Ih]
+   op cl main sval btm_left evsin clev oute noc clae rfo adj cbtom sortev.
+  rewrite /= => [][] <- <- p inbox_p.
+  have lexpp : lexePt p p by rewrite lexePt_eqVlt eqxx.
+  by rewrite orbC; apply: (main p isT p inbox_p lexpp).
+rewrite /=.
+case stepeq : (step ev op cl) => [op' cl'].
+move=> scaneq.
+have inbox_e : inside_box bottom top (point ev).
+  by apply: (allP evsin); rewrite map_f // inE eqxx.
+have := sval isT; rewrite /= => sval'.
+have oute' : out_left_event ev by apply: oute; rewrite inE eqxx.
+have btm_left' : bottom_left_cells_lex op (point ev).
+  by apply: btm_left; rewrite inE eqxx.
+have cov : cover_left_of bottom top (point ev) op cl.
+  apply: main=> /=; rewrite lexePt_eqVlt eqxx /=.
+  move: sortev; rewrite /sorted /= (path_sortedE lexPt_trans) // => /andP[+ _].
+  by apply: sub_all; exact: lexPtW.
+have cov' : forall p : pt,
+    all (lexePt p) [seq point ev0 | ev0 <- evs'] ->
+    cover_left_of bottom top p op' cl'.
+  have := step_keeps_cover sortev cbtom adj inbox_e sval' oute' rfo clae clev
+           noc btm_left' stepeq cov.
+  by [].
+have evle : forall ev', ev' \in evs' -> lexPt (point ev) (point ev').
+  move=> ev' ev'in.
+  move: sortev=> /=; rewrite (path_sortedE lexPt_trans)=> /andP[]/allP.
+  by move=> /(_ (point ev')) + _; apply; apply map_f.
+have svalr : evs' != [::] ->
+       seq_valid op' (head dummy_pt [seq point ev0 | ev0 <- evs']).
+  case evs'eq : evs' => [// | a q] /= _.
+  have inbox_a : inside_box bottom top (point a).
+    by apply: (allP evsin); rewrite evs'eq !inE eqxx orbT.
+  have eva : lexPt (point ev) (point a).
+    by apply: evle; rewrite evs'eq inE eqxx.
+  have limra : forall e', e' \in evs' -> lexePt (point a) (point e').
+    rewrite evs'eq => e'; rewrite inE => /orP[/eqP -> | e'q ].
+      by rewrite lexePt_eqVlt eqxx.
+    move: sortev=> /=; rewrite evs'eq=> /path_sorted/=; rewrite path_sortedE.
+      by move=>/andP[]/allP/(_ (point e') (map_f point e'q))/lexPtW.
+    exact: lexPt_trans.
+  have := step_keeps_valid inbox_a inbox_e eva oute' rfo cbtom adj sval' clae
+            clev limra stepeq.
+  by [].
+have btm_leftr:
+   {in [seq point e | e <- evs'], forall e, bottom_left_cells_lex op' e}.
+  have btm_left2 :=
+    step_keeps_left_pts_inf inbox_e oute' rfo sval' adj cbtom clae clev
+           noc btm_left' stepeq.
+  by move=> evp /mapP [ev' ev'in ->]; apply/btm_left2/evle.
+have evsinr : all (inside_box bottom top) [seq point ev' | ev' <- evs'].
+  by move: evsin; rewrite /= => /andP[].
+have clevr : close_edges_from_events bottom top evs'.
+  by move: clev; rewrite /= => /andP[].
+have outer :{in evs', forall ev0 : event, out_left_event ev0}.
+  by move: oute; apply: sub_in1=> x xin; rewrite inE xin orbT.
+have nocr : {in [seq low i | i <- op'] ++
+       [seq high i | i <- op'] ++ flatten [seq outgoing i | i <- evs'] &,
+     no_crossing}.
+  move: noc; apply: sub_in2=> x.
+  rewrite catA mem_cat=> /orP[].
+    move/(step_sub_open_edges stepeq)=> it.
+    by rewrite /= 2!catA -(catA _ _ (outgoing ev)) mem_cat it.
+  by move=> xinf; rewrite /= !mem_cat xinf !orbT.
+have claer : close_alive_edges bottom top op' evs'.
+  by have := step_keeps_closeness inbox_e oute' rfo cbtom adj sval' clev
+      clae stepeq.
+have rfor : s_right_form op'.
+  have noc1: {in [seq low c | c <- op] ++ [seq high c | c <- op] ++
+         outgoing ev &, no_crossing}.
+    move: noc; apply sub_in2=> x.
+    rewrite catA mem_cat=> /orP[it| xino].
+      by rewrite /= 2!catA 2!mem_cat it.
+    by rewrite /= !mem_cat xino !orbT.
+  by apply: (step_keeps_right_form cbtom adj inbox_e sval' noc1 _ _ stepeq).
+have adjr : adjacent_cells op'.
+  by have := step_keeps_adjacent inbox_e oute' sval' cbtom stepeq adj.
+have cbtomr : cells_bottom_top bottom top op'.
+  by apply: (step_keeps_bottom_top inbox_e sval' adj cbtom oute' stepeq).
+have sortev' : sorted lexPt [seq point x | x <- evs'].
+  by move: sortev; rewrite /= => /path_sorted.
+by have := Ih _ _ cov' svalr btm_leftr evsinr clevr outer nocr claer rfor adjr
+        cbtomr sortev' scaneq.
+Admitted.
 
