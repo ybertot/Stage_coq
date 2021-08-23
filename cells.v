@@ -352,7 +352,6 @@ apply /eqP.
 mc_ring.
 Qed.
 
-
 Lemma ax4 p_x p_y q_x q_y r_x r_y t_x t_y :
 pue_f t_x t_y q_x q_y r_x r_y + pue_f p_x p_y t_x t_y r_x r_y
 + pue_f p_x p_y q_x q_y t_x t_y == pue_f p_x p_y q_x q_y r_x r_y.
@@ -414,7 +413,6 @@ apply /eqP.
 mc_ring.
 Qed.
 
-
 Lemma pue_f_on_edge_same_point_counter_example :
   ~ (forall a_x a_y b_x b_y p_x p_y p_x' p_y',
     a_x != b_x ->  (* The two points are not on the same vertical *)
@@ -473,6 +471,87 @@ move=> online.
 rewrite -(eqP (ax4 _ _ _ _ _ _ d_x d_y)).
 rewrite addrC; congr (_ + _).
 by rewrite addrC pue_f_o pue_f_c online oppr0 add0r -pue_f_c.
+Qed.
+
+Definition mkmx2 (a b c d : R) :=
+  \matrix_(i < 2, j < 2)
+    if (i == ord0) && (j == ord0) then a
+    else if i == ord0 then b
+           else if j == ord0 then c else d.
+
+Definition mkcv2 (a b : R) := \col_(i < 2) if i == ord0 then a else b.
+
+Lemma det_mkmx2 a_x a_y b_x b_y :
+  \det(mkmx2 a_x a_y b_x b_y) = a_x * b_y - a_y * b_x.
+Proof.
+rewrite /mkmx2 (expand_det_row _ ord0) big_ord_recr /= big_ord1 /=.
+by rewrite /cofactor /= expr0 expr1 mulNr !mul1r !det_mx11 !mxE /= mulrN.
+Qed.
+
+Lemma line_intersection a_x a_y b_x b_y c_x c_y d_x d_y :
+  c_x < d_x ->
+  0 < pue_f a_x a_y b_x b_y c_x c_y ->
+  pue_f a_x a_y b_x b_y d_x d_y < 0 ->
+  exists p_x p_y,
+    pue_f a_x a_y b_x b_y p_x p_y = 0 /\
+    pue_f c_x c_y d_x d_y p_x p_y = 0 /\
+    (forall q_x q_y, pue_f a_x a_y b_x b_y q_x q_y = 0 ->
+       pue_f c_x c_y d_x d_y q_x q_y = 0 -> p_x = q_x /\ p_y = q_y).
+Proof.
+move=> cltd cabove cunder.
+set A := a_y - b_y; set B := b_x - a_x; set C := \det(mkmx2 a_x a_y b_x b_y).
+have puef1_id x y : pue_f a_x a_y b_x b_y x y = A * x + B * y + C.
+  by rewrite /A /B /C det_mkmx2 /pue_f; mc_ring.
+set D := c_y - d_y; set E := d_x - c_x; set F := \det(mkmx2 c_x c_y d_x d_y).
+have puef2_id x y : pue_f c_x c_y d_x d_y x y = D * x + E * y + F.
+  by rewrite /D /E /F det_mkmx2 /pue_f; mc_ring.
+set M := mkmx2 A B D E.
+set V1 := mkcv2 (b_x - a_x) (b_y - a_y).
+set V2 := mkcv2 (d_x - c_x) (d_y - c_y).
+have sys_to_mx_eqn :
+  forall x y, (A * x + B * y + C = 0 /\ D * x + E * y + F = 0) <->
+   (M *m mkcv2 x y + mkcv2 C F = 0).
+  move=> x y; split.
+    move=> [eq1 eq2]; apply/matrixP=> i j.
+    rewrite !mxE big_ord_recr /= big_ord1 /= !mxE.
+    by case : j => [ [ | j ] ] //= _; case : i => [ [ | [ | i]]].
+  move/matrixP=> mxq.
+  split.
+    have := mxq (Ordinal (isT : (0 < 2)%N)) (Ordinal (isT : (0 < 1)%N)).
+    by rewrite !mxE big_ord_recr /= big_ord1 /= !mxE.
+  have := mxq (Ordinal (isT : (1 < 2)%N)) (Ordinal (isT : (0 < 1)%N)).
+  by rewrite !mxE big_ord_recr /= big_ord1 /= !mxE.
+set sol := - (M ^-1 *m mkcv2 C F).
+have soleq : sol = mkcv2 (sol ord0 ord0) (sol ord_max ord0).
+  apply/matrixP=> [][[ | [ | i]]] // ip [ [ | j]] // jp; rewrite /= !mxE /=;
+    (rewrite (_ : Ordinal jp = ord0); last apply: val_inj=> //).
+    by rewrite (_ : Ordinal ip = ord0); last apply: val_inj.
+  by rewrite (_ : Ordinal ip = ord_max); last apply: val_inj.
+have detm : \det M != 0.
+  have dets : \det M = A * E - D * B.
+    rewrite (expand_det_col _ ord0) big_ord_recr /= big_ord1 !mxE /= /cofactor.
+    by rewrite !det_mx11 /= expr1 expr0 !mulNr !mulrN !mul1r !mxE.
+  have -> : \det M = pue_f a_x a_y b_x b_y d_x d_y -
+                  pue_f a_x a_y b_x b_y c_x c_y.
+    by rewrite dets /pue_f /A /B /D /E; mc_ring.
+  rewrite subr_eq0; apply/eqP=> abs; move: cabove cunder; rewrite abs=> ca cu.
+  by have := lt_trans ca cu; rewrite ltxx.
+have Munit : M \in unitmx by rewrite unitmxE unitfE.
+have solm : M *m sol + mkcv2 C F = 0.
+  rewrite /sol mulmxN mulmxA mulmxV; last by rewrite unitmxE unitfE.
+  by rewrite mul1mx addNr.
+move: (solm); rewrite soleq -sys_to_mx_eqn => [][sol1 sol2].
+exists (sol ord0 ord0), (sol ord_max ord0).
+split; first by rewrite puef1_id.
+split; first by rewrite puef2_id.
+move=> qx qy; rewrite puef1_id puef2_id=> tmp1 tmp2; have := conj tmp1 tmp2.
+rewrite sys_to_mx_eqn addrC => /addr0_eq solmq {tmp1 tmp2}.
+suff : mkcv2 qx qy = sol.
+  move/matrixP=> mxq; split.
+    by rewrite -(mxq ord0 ord0) mxE.
+  by rewrite -(mxq ord_max ord0) mxE.
+rewrite -(mul1mx (mkcv2 qx qy)) -[in LHS](mulVmx Munit) -!mulmxA.
+by rewrite -solmq mulmxN.
 Qed.
 
 End ring_sandbox.
@@ -685,6 +764,23 @@ Definition below_alt (e1 : edge) (e2 : edge) :=
 
 Lemma below_altC e1 e2 : below_alt e1 e2 <-> below_alt e2 e1.
 Proof. by rewrite /below_alt or_comm. Qed.
+
+Definition inter_at_ext (e1 e2 : edge) :=
+  e1 = e2 \/
+  forall p, p === e1 -> p === e2 -> p \in [:: left_pt e1; right_pt e1].
+
+Definition inter_at_ext' (e1 e2 : edge) :=
+  e1 = e2 \/
+  forall p, p === e2 -> p === e1 -> p \in [:: left_pt e2; right_pt e2].
+
+Lemma inter_at_ext_sym (s : seq edge) :
+  {in s &, forall e1 e2, inter_at_ext e1 e2} ->
+  {in s &, forall e1 e2, inter_at_ext' e1 e2}.
+Proof.
+move=> cnd e1 e2 e1in e2in; case: (cnd e2 e1 e2in e1in).
+  by move=> ->; left.
+by move=> subcnd; right=> p pe2 pe1; apply: subcnd.
+Qed.
 
 Definition no_crossing := forall e1 e2, below_alt e1 e2.
 
@@ -1433,6 +1529,43 @@ Definition inside_open_cell p c :=
 
 Definition inside_closed_cell p c :=
   contains_point p c && (p_x (last dummy_pt (left_pts c)) <= p_x p) && ( p_x p <= p_x (last dummy_pt (right_pts c))).
+
+Lemma intersection_middle_au e1 e2 :
+  ~~ (left_pt e2 <<= e1) -> right_pt e2 <<< e1 ->
+  exists p, pue_formula p (left_pt e1) (right_pt e1) = 0 /\ p === e2.
+Proof.
+rewrite /point_under_edge -pue_formula_cycle pue_formulaE -ltNge => ca.
+rewrite /point_strictly_under_edge -pue_formula_cycle pue_formulaE => cu.
+have [px [py []]] := line_intersection (edge_cond e2) ca cu.
+rewrite -/(p_y (Bpt px py)); set py' := (p_y (Bpt px py)).
+rewrite -/(p_x (Bpt px py)) /py'.
+rewrite -pue_formulaE pue_formula_cycle=> on_line1.
+case; rewrite -pue_formulaE pue_formula_cycle=> on_line2.
+have := @line_intersection _ (p_x (left_pt e1)) (p_y (left_pt e1))
+  (p_x (right_pt e1)) (p_y (right_pt e1))
+ (p_x (left_pt e2)) (p_y (left_pt e2))
+  (p_x (right_pt e2)) (p_y (right_pt e2))
+  (edge_cond e2) ca.
+move=> _; move: ca cu; rewrite -!pue_formulaE => ca cu.
+exists (Bpt px py); split; first by rewrite on_line1.
+rewrite /point_on_edge on_line2 eqxx /valid_edge /=.
+have/eqP ol2 := on_line2.
+have := pue_formula_on_edge (left_pt e1) (right_pt e1) ol2 => /=.
+rewrite (pue_formula_cycle _ (Bpt _ _)) on_line1 mulr0 addr0 => /eqP signcond.
+case : (ltrgtP px (p_x (right_pt e2))).
+- rewrite andbT -subr_gt0 -subr_le0 => pe2.
+  move: ca; rewrite -(pmulr_rgt0 _ pe2) -signcond.
+  by rewrite nmulr_lgt0 // => /ltW.
+- rewrite andbF -subr_lt0=> pe2.
+  move: ca; rewrite -(nmulr_rlt0 _ pe2) -signcond.
+  rewrite nmulr_llt0 // subr_gt0.
+  move: pe2; rewrite subr_lt0=> rp pl; have := (lt_trans rp pl).
+  by case: ltrgtP (edge_cond e2).
+move=> pr; move: signcond; rewrite pr subrr mul0r=> /eqP; rewrite mulf_eq0.
+move=> /orP[].
+  by rewrite subr_eq0 => /eqP abs; have:= edge_cond e2; rewrite abs ltxx.
+by move=>/eqP abs; move: cu; rewrite abs ltxx.
+Qed.
 
 Fixpoint contains (A : eqType) (s : seq A) (a : A) : bool :=
    match s with
@@ -3688,6 +3821,37 @@ have case2 : ~~(left_pt e1 <<= e2) -> e2 <| e1.
 by [].
 Qed.
 
+Lemma inter_at_ext_no_crossing (s : seq edge) :
+  {in s &, forall e1 e2, inter_at_ext e1 e2} ->
+  {in s &, no_crossing}.
+Proof.
+move=> nc e1 e2 e1in e2in.
+have nc' := inter_at_ext_sym nc.
+have ceq : e1 = e2 -> below_alt e1 e2.
+  move=> <-; left; apply/orP; left; rewrite /point_under_edge.
+  rewrite (fun a b => eqP (proj1 (pue_formula_two_points a b))).
+  rewrite (fun a b => eqP (proj1 (proj2 (pue_formula_two_points a b)))).
+  by rewrite lexx.
+have [/eqP/ceq // | e1ne2] := boolP(e1 == e2).
+have [/eqP | {nc}nc ] := nc _ _ e1in e2in; first by rewrite (negbTE e1ne2).
+have [/eqP | {nc'}nc' ] := nc' _ _ e1in e2in; first by rewrite (negbTE e1ne2).
+have [ | ] := boolP(e1 <| e2); first by left.
+rewrite /edge_below; rewrite negb_or !negb_and !negbK.
+have [le1u /= | le1a /=] := boolP (left_pt e1 <<= e2).
+  have [re1u //= | re1a /=] := boolP (right_pt e1 <<= e2).
+  move=>/orP[le2u | re2u].
+    have [re2u | re2a] := boolP(right_pt e2 <<= e1).
+      by right; rewrite /edge_below re2u underW.
+    move: le1u; rewrite /point_under_edge le_eqVlt => /orP[le1on | ].
+      have [u | a] := boolP(right_pt e1 <<< e2).
+        left; rewrite /edge_below; apply/orP; left.
+        by rewrite [in X in X && _]/point_under_edge (eqP le1on) lexx /= underW.
+      right; rewrite /edge_below; apply/orP; right; rewrite a.
+      by rewrite /point_strictly_under_edge (eqP le1on) ltxx.
+    rewrite -[X in is_true X -> _]/(left_pt e1 <<< e2) => e1u.
+    have [u | a] := boolP(right_pt e1 <<= e2).
+      by left; apply/orP; left; rewrite u underW.
+
 Lemma opening_cells_left e low_e high_e c :
 out_left_event e ->
 ~~(point e <<< low_e) -> point e <<< high_e ->
@@ -4175,6 +4339,17 @@ apply/orP; left; apply/hasP.
 move: keptopen; rewrite -has_cat=>/hasP[it + it2].
 by rewrite mem_cat=> infclc; exists it=> //; rewrite !mem_cat orbCA infclc orbT.
 Qed.
+
+Definition cell_no s i := nth dummy_cell s i.
+
+Definition disjoint_cells (s : seq cell) :
+  forall i j, (i < j < size s)%N ->
+   forall p, inside_open_cell p (cell_no s i) ->
+             inside_open_cell p (cell_no s j) ->
+             p === high (cell_no s i).
+
+Lemma step_keeps_disjoint :
+
 
 End proof_environment.
 
