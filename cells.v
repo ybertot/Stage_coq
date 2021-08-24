@@ -369,7 +369,7 @@ mc_ring.
 Qed.
 
 Lemma pue_f_on_edge_y a_x a_y b_x b_y m_x m_y :
-pue_f a_x a_y b_x b_y m_x m_y == 0 ->
+pue_f  m_x m_y a_x a_y b_x b_y == 0 ->
 (b_x - a_x) * m_y = m_x * (b_y -a_y)- (a_x * b_y - b_x *a_y).
 Proof.
 move => /eqP abmeq0.
@@ -381,9 +381,9 @@ mc_ring.
 Qed.
 
 Lemma pue_f_on_edge a_x a_y b_x b_y c_x c_y d_x d_y m_x m_y :
-pue_f a_x a_y b_x b_y m_x m_y == 0 ->
-(b_x - a_x) * pue_f c_x c_y d_x d_y m_x m_y ==
-(m_x - a_x) * pue_f c_x c_y d_x d_y b_x b_y + (b_x - m_x) * pue_f c_x c_y d_x d_y a_x a_y.
+pue_f  m_x m_y a_x a_y b_x b_y == 0 ->
+(b_x - a_x) * pue_f m_x m_y c_x c_y d_x d_y ==
+(m_x - a_x) * pue_f b_x b_y c_x c_y d_x d_y + (b_x - m_x) * pue_f a_x a_y c_x c_y d_x d_y.
 Proof.
 move => on_ed.
 rewrite pue_f_linear  /pue_f (pue_f_on_edge_y on_ed).
@@ -392,9 +392,9 @@ mc_ring.
 Qed.
 
 Lemma pue_f_triangle_on_edge a_x a_y b_x b_y p_x p_y p'_x p'_y :
-pue_f a_x a_y b_x b_y p'_x p'_y == 0 ->
-(b_x - a_x) * pue_f a_x a_y p_x p_y p'_x p'_y ==
-(p'_x - a_x) * pue_f a_x a_y p_x p_y b_x b_y .
+pue_f p'_x p'_y a_x a_y b_x b_y == 0 ->
+(b_x - a_x) * pue_f p'_x p'_y a_x a_y p_x p_y ==
+(p'_x - a_x) * pue_f b_x b_y a_x a_y p_x p_y .
 Proof.
 move=> on_ed.
 rewrite pue_f_linear  /pue_f (pue_f_on_edge_y on_ed).
@@ -403,41 +403,20 @@ mc_ring.
 Qed.
 
 Lemma pue_f_triangle_on_edge' a_x a_y b_x b_y p_x p_y p'_x p'_y :
-pue_f a_x a_y b_x b_y p'_x p'_y == 0 ->
-(b_x - a_x) * pue_f p_x p_y b_x b_y p'_x p'_y ==
+pue_f p'_x p'_y a_x a_y b_x b_y == 0 ->
+(b_x - a_x) * pue_f p'_x p'_y p_x p_y b_x b_y ==
 (b_x - p'_x) * pue_f a_x a_y p_x p_y b_x b_y .
 Proof.
 move => on_ed .
-rewrite pue_f_linear  /pue_f (pue_f_on_edge_y on_ed).
+rewrite pue_f_linear /pue_f (pue_f_on_edge_y on_ed).
 apply /eqP.
 mc_ring.
 Qed.
 
-Lemma pue_f_on_edge_same_point_counter_example :
-  ~ (forall a_x a_y b_x b_y p_x p_y p_x' p_y',
-    a_x != b_x ->  (* The two points are not on the same vertical *)
-    pue_f a_x a_y b_x b_y p_x p_y == 0 ->
-    pue_f a_x a_y b_x b_y p_x' p_y' == 0 ->
-    (p_y == p_y') = (p_x == p_x')).
-Proof.
-move=> bad_thm.
-have := bad_thm 1%:R 0 2%:R 0 1%:R 0 2%:R 0.
-rewrite (eqr_nat R 1%N 2%N) /=.
-have -> : pue_f 1%:R 0 2%:R 0 1%:R 0 == 0.
-  apply/eqP; rewrite /pue_f.
-  mc_ring.
-have -> : pue_f 1%:R 0 2%:R 0 2%:R 0 == 0.
-  apply/eqP; rewrite /pue_f.
-  mc_ring.
-move=> /(_ isT isT isT).
-rewrite eqxx.
-by[].
-Qed.
-
 Lemma pue_f_on_edge_same_point a_x a_y b_x b_y p_x p_y p_x' p_y':
 a_x != b_x ->
-pue_f a_x a_y b_x b_y p_x p_y == 0 ->
-pue_f a_x a_y b_x b_y p_x' p_y' == 0 ->
+pue_f p_x p_y a_x a_y b_x b_y == 0 ->
+pue_f p_x' p_y' a_x a_y b_x b_y == 0 ->
 (p_x == p_x') -> (p_y == p_y').
 Proof.
 move => axnbx puep0 puep'0.
@@ -490,20 +469,20 @@ Qed.
 
 Lemma line_intersection a_x a_y b_x b_y c_x c_y d_x d_y :
   c_x != d_x ->
-  0 < pue_f a_x a_y b_x b_y c_x c_y ->
-  pue_f a_x a_y b_x b_y d_x d_y < 0 ->
+  0 < pue_f c_x c_y a_x a_y b_x b_y ->
+  pue_f  d_x d_y a_x a_y b_x b_y < 0 ->
   exists p_x p_y,
-    pue_f a_x a_y b_x b_y p_x p_y = 0 /\
-    pue_f c_x c_y d_x d_y p_x p_y = 0 /\
-    (forall q_x q_y, pue_f a_x a_y b_x b_y q_x q_y = 0 ->
-       pue_f c_x c_y d_x d_y q_x q_y = 0 -> p_x = q_x /\ p_y = q_y).
+    pue_f p_x p_y a_x a_y b_x b_y = 0 /\
+    pue_f p_x p_y c_x c_y d_x d_y = 0 /\
+    (forall q_x q_y, pue_f q_x q_y a_x a_y b_x b_y = 0 ->
+       pue_f q_x q_y c_x c_y d_x d_y = 0 -> p_x = q_x /\ p_y = q_y).
 Proof.
 move=> cltd cabove cunder.
 set A := a_y - b_y; set B := b_x - a_x; set C := \det(mkmx2 a_x a_y b_x b_y).
-have puef1_id x y : pue_f a_x a_y b_x b_y x y = A * x + B * y + C.
+have puef1_id x y : pue_f x y a_x a_y b_x b_y = A * x + B * y + C.
   by rewrite /A /B /C det_mkmx2 /pue_f; mc_ring.
 set D := c_y - d_y; set E := d_x - c_x; set F := \det(mkmx2 c_x c_y d_x d_y).
-have puef2_id x y : pue_f c_x c_y d_x d_y x y = D * x + E * y + F.
+have puef2_id x y : pue_f x y c_x c_y d_x d_y = D * x + E * y + F.
   by rewrite /D /E /F det_mkmx2 /pue_f; mc_ring.
 set M := mkmx2 A B D E.
 set V1 := mkcv2 (b_x - a_x) (b_y - a_y).
@@ -531,8 +510,8 @@ have detm : \det M != 0.
   have dets : \det M = A * E - D * B.
     rewrite (expand_det_col _ ord0) big_ord_recr /= big_ord1 !mxE /= /cofactor.
     by rewrite !det_mx11 /= expr1 expr0 !mulNr !mulrN !mul1r !mxE.
-  have -> : \det M = pue_f a_x a_y b_x b_y d_x d_y -
-                  pue_f a_x a_y b_x b_y c_x c_y.
+  have -> : \det M = pue_f d_x d_y a_x a_y b_x b_y -
+                  pue_f c_x c_y a_x a_y b_x b_y.
     by rewrite dets /pue_f /A /B /D /E; mc_ring.
   rewrite subr_eq0; apply/eqP=> abs; move: cabove cunder; rewrite abs=> ca cu.
   by have := lt_trans ca cu; rewrite ltxx.
@@ -597,16 +576,16 @@ apply pue_f_two_points.
 Qed.
 
 Lemma pue_formula_on_edge a b c d m :
-pue_formula a b m == 0 ->
-(p_x b - p_x a) * pue_formula c d m ==
-(p_x m - p_x a) * pue_formula c d b + (p_x b - p_x m) * pue_formula c d a.
+pue_formula m a b == 0 ->
+(p_x b - p_x a) * pue_formula m c d ==
+(p_x m - p_x a) * pue_formula b c d + (p_x b - p_x m) * pue_formula a c d.
 Proof.
 move : a b c d m => [ax ay] [b_x b_y] [cx cy] [dx dy] [mx my]/=.
 apply pue_f_on_edge.
 Qed.
 
 Lemma pue_formula_on_edge_y a b m :
-pue_formula a b m == 0 ->
+pue_formula m a b == 0 ->
 (p_x b - p_x a) * p_y m = p_x m * (p_y b - p_y a) - (p_x a * p_y b - p_x b * p_y a).
 Proof.
 move : a b m => [ax ay] [b_x b_y]  [mx my]/=.
@@ -614,21 +593,21 @@ apply pue_f_on_edge_y.
 Qed.
 
 Lemma pue_formula_triangle_on_edge a b p p' :
-pue_formula a b p' == 0 ->
-(p_x b - p_x a) * pue_formula a p p' ==
-(p_x p' - p_x a) * pue_formula a p b.
+pue_formula p' a b == 0 ->
+(p_x b - p_x a) * pue_formula p' a p ==
+(p_x p' - p_x a) * pue_formula b a p.
 Proof.
 move : a b p p' => [ax ay] [b_x b_y] [px py] [p'x p'y] /=.
 apply pue_f_triangle_on_edge.
 Qed.
 
 Lemma pue_formula_triangle_on_edge' a b p p' :
-p_x p = p_x p' -> pue_formula a b p' == 0 ->
-(p_x b - p_x a) * pue_formula p b p' ==
+p_x p = p_x p' -> pue_formula p' a b == 0 ->
+(p_x b - p_x a) * pue_formula p' p b ==
 (p_x b - p_x p) * pue_formula a p b.
 Proof.
-move : a b p p' => [ax ay] [b_x b_y] [px py] [p'x p'y] /=.
-move => <-.
+move : a b p p' => [ax ay] [b_x b_y] [px py] [p'x p'y].
+rewrite !pue_formulaE /= => <-.
 apply pue_f_triangle_on_edge'.
 Qed.
 
@@ -817,35 +796,25 @@ split.
 by [].
 Qed.
 
-
 Lemma point_on_edge_above low_e high_e a :
 a === high_e ->
-~~  (left_pt high_e <<< low_e) ->
+~~ (left_pt high_e <<< low_e) ->
 ~~ (right_pt high_e <<< low_e) ->
 ~~ (a <<< low_e).
 Proof.
 move : high_e => [lr hr inH] /=.
-
 rewrite /point_on_edge /valid_edge => /andP [] /= poea /andP [] linfa ainfr.
-
 have pf := pue_formula_on_edge (left_pt low_e) (right_pt low_e) poea.
-rewrite /point_strictly_under_edge -!leNgt.
-rewrite -pue_formula_cycle => llrllh.
-rewrite -pue_formula_cycle => llrllrh.
+rewrite /point_strictly_under_edge -!leNgt => llrllh llrllrh.
 have diffa : (p_x lr - p_x a) <= 0.
   by rewrite subr_cp0.
 have diffb : (p_x hr - p_x a) >= 0.
   by rewrite subr_cp0.
 have difflh : (p_x lr - p_x hr) < 0.
   by rewrite subr_cp0.
-rewrite -pue_formula_cycle -( ler_nmul2l difflh _ 0) mulr0.
-move : pf.
-rewrite [x in _ == x] addrC -subr_eq => /eqP <-.
-rewrite -oppr_ge0 opprD /= addr_ge0//.
-  by rewrite -mulNr mulr_ge0 // oppr_ge0.
-by rewrite opprK mulr_ge0.
+rewrite -(ler_nmul2l difflh _ 0) mulr0 -opprB mulNr oppr_le0 (eqP pf).
+by rewrite addr_ge0 // mulr_ge0 // subr_ge0.
 Qed.
-
 
 Lemma point_on_edge_under low_e high_e a :
 a === (low_e) ->
@@ -854,26 +823,17 @@ a === (low_e) ->
   a <<= high_e.
 Proof.
 move : low_e => [lr hr inH] /=.
-
 rewrite /point_on_edge /valid_edge => /andP [] /= poea /andP [] linfa ainfr.
-
 have pf := pue_formula_on_edge (left_pt high_e) (right_pt high_e) poea.
-rewrite /point_under_edge .
-rewrite -pue_formula_cycle => /= llrllh.
-rewrite -pue_formula_cycle => /= llrllrh.
+rewrite /point_under_edge => llrllh llrllrh.
 have diffa : (p_x lr - p_x a) <= 0.
   by rewrite subr_cp0.
 have diffb : (p_x hr - p_x a) >= 0.
   by rewrite subr_cp0.
 have difflh : (p_x lr - p_x hr) < 0.
   by rewrite subr_cp0.
-rewrite -pue_formula_cycle -( ler_nmul2r difflh 0 _ ) mul0r mulrC.
-move : pf.
-rewrite [x in _ == x] addrC -subr_eq => /eqP <-.
-rewrite   /= addr_ge0//.
-   by rewrite mulr_le0 .
-rewrite -mulNr mulr_le0 // oppr_le0.
-by rewrite subr_cp0.
+rewrite -(ler_nmul2r difflh 0 _) mul0r mulrC -opprB mulNr (eqP pf) opprD.
+by rewrite addr_ge0 // -mulNr mulr_le0 // oppr_le0 subr_cp0.
 Qed.
 
 Lemma not_strictly_above' low_e high_e p':
@@ -1071,13 +1031,11 @@ Lemma on_edge_same_point e p p':
 p === e -> p' === e ->
 (p_x p == p_x p') -> (p_y p == p_y p').
 Proof.
-move : e => [l r inE].
-rewrite /point_on_edge /= => /andP [].
-rewrite -pue_formula_cycle=> p0 _ /andP [].
-rewrite -pue_formula_cycle=> p'0 _.
+move : e => [l r ec].
+rewrite /point_on_edge /= => /andP [] p0 _ /andP[] p'0 _.
 have dif : p_x l != p_x r.
-  by apply/eqP=> abs; move: inE; rewrite abs ltxx.
-move: l r p0 p'0 dif {inE}=> [a_x a_y][b_x b_y] p0 p'0 dif.
+  by apply/eqP=> abs; move: ec; rewrite abs ltxx.
+move: l r p0 p'0 dif {ec}=> [a_x a_y][b_x b_y] p0 p'0 dif.
 move: p p' p0 p'0 => [x y] [x' y'] puep0 puep'0.
 rewrite /=; apply: (pue_f_on_edge_same_point dif puep0 puep'0).
 Qed.
@@ -1092,18 +1050,16 @@ move => pue poep'.
 have := poep'.
 rewrite /point_on_edge /valid_edge /= =>  /andP [] p_on_edge_p'   /andP [] linfp pinfr eqx.
 move : pue.
-rewrite -pue_formula_cycle in p_on_edge_p'.
 rewrite -eqx in linfp pinfr.
 rewrite /point_under_edge /=.
 have := (pue_formula_triangle_on_edge p (p_on_edge_p')).
-
+rewrite -pue_formula_cycle.
 have /eqP := (pue_formula_vert l eqx  ) => ->.
 have inle: (p_x r - p_x l) >0.
   by rewrite subr_cp0.
-move => /eqP a.
-have pminusl : (0 <= p_x p - p_x l).
-  by rewrite subr_cp0.
-  rewrite pue_formula_opposite -pue_formula_cycle oppr_le0 => lprpos.
+rewrite -pue_formula_cycle => /eqP a.
+have pminusl : (0 <= p_x p - p_x l) by rewrite subr_cp0.
+rewrite pue_formula_opposite -pue_formula_cycle oppr_le0 => lprpos.
 have := (mulr_ge0 pminusl lprpos).
 rewrite eqx -a.
 rewrite (pmulr_rge0 _ inle).
@@ -1141,7 +1097,6 @@ move => pue poep'.
 have := poep'.
 rewrite /point_on_edge /valid_edge /= =>  /andP [] p_on_edge_p'   /andP [] linfp pinfeqr eqx.
 move : pue.
-rewrite -pue_formula_cycle in p_on_edge_p'.
 rewrite -eqx in linfp pinfeqr.
 rewrite /point_strictly_under_edge /=.
   have inle: (p_x r - p_x l) >0.
@@ -1149,7 +1104,7 @@ rewrite /point_strictly_under_edge /=.
 move: linfp; rewrite le_eqVlt=> /orP [/eqP lp | linfp].
   have : p_x p < p_x r by rewrite -lp.
   move=> { pinfeqr } pinfr.
-  have := (pue_formula_triangle_on_edge' eqx (p_on_edge_p')).
+  have := (pue_formula_triangle_on_edge' eqx p_on_edge_p').
 
   have /eqP := (pue_formula_vert r eqx  ); rewrite pue_formula_opposite.
   rewrite -pue_formula_cycle -[RHS]opprK => /oppr_inj ->.
@@ -1163,9 +1118,10 @@ move: linfp; rewrite le_eqVlt=> /orP [/eqP lp | linfp].
   rewrite -mulNr opprB.
   by rewrite (pmulr_rgt0 _ rminusp).
 have pminusl : 0 < p_x p - p_x l by rewrite subr_cp0.
-have := (pue_formula_triangle_on_edge p (p_on_edge_p')).
+have := (pue_formula_triangle_on_edge p p_on_edge_p').
+rewrite -pue_formula_cycle.
 have /eqP := (pue_formula_vert l eqx  )=> -> /eqP a.
-rewrite pue_formula_opposite -pue_formula_cycle oppr_lt0=> lprpos.
+rewrite pue_formula_opposite oppr_lt0=> lprpos.
 have := mulr_gt0 pminusl lprpos.
 rewrite eqx -a.
 by rewrite (pmulr_rgt0 _ inle) (pmulr_rgt0 _ pminusl).
@@ -1181,18 +1137,17 @@ move => pue poep'.
 have := poep'.
 rewrite /point_on_edge /valid_edge /= =>  /andP [] p_on_edge_p'   /andP [] linfp pinfr eqx.
 move : pue.
-rewrite -pue_formula_cycle in p_on_edge_p'.
 rewrite -eqx in linfp pinfr.
 rewrite /point_strictly_under_edge /=.
-have := (pue_formula_triangle_on_edge p (p_on_edge_p')).
-
+have := (pue_formula_triangle_on_edge p p_on_edge_p').
+rewrite -pue_formula_cycle.
 have /eqP := (pue_formula_vert l eqx  ) => ->.
 have inle: (p_x r - p_x l) >0.
   by rewrite subr_cp0.
 move => /eqP a.
 have pminusl : (0 <= p_x p - p_x l).
   by rewrite subr_cp0.
-  rewrite pue_formula_opposite -pue_formula_cycle oppr_lt0 -leNgt => lprpos.
+  rewrite pue_formula_opposite oppr_lt0 -leNgt => lprpos.
 have := mulr_ge0_le0 pminusl lprpos.
 rewrite eqx -a pmulr_rle0 //.
 
@@ -1208,7 +1163,7 @@ move => /le_anti eqxl.
 have /= lone:= left_on_edge (Bedge inE).
 
 move : lprpos.
-rewrite pue_formula_opposite oppr_le0.
+rewrite pue_formula_opposite pue_formula_cycle oppr_le0.
 have /eqP -> := (pue_formula_vert r eqxl).
 rewrite eqxl => yineq.
 have inle2: (p_x l - p_x r) < 0.
@@ -1539,38 +1494,35 @@ Lemma edge_dir_intersect p1 p2 e1 :
        pue_formula q p1 p2 = 0 -> p = q).
 Proof.
 move=> dif12.
-rewrite /point_under_edge -pue_formula_cycle pue_formulaE -ltNge => ca.
-rewrite /point_strictly_under_edge -pue_formula_cycle pue_formulaE => cu.
+rewrite /point_under_edge pue_formulaE -ltNge => ca.
+rewrite /point_strictly_under_edge pue_formulaE => cu.
 have [px [py []]] := line_intersection dif12 ca cu.
 rewrite -/(p_y (Bpt px py)); set py' := (p_y (Bpt px py)).
-rewrite -/(p_x (Bpt px py)) /py'.
+rewrite -/(p_x (Bpt px py)) /py' {py'}.
+move: ca cu; rewrite -4!pue_formulaE=> ca cu on_line1 [] on_line2 uniq.
+exists (Bpt px py); rewrite on_line1 on_line2;split;[ | split]=> //.
+by move=> [qx qy]; rewrite !pue_formulaE=> /uniq => U; move=> {U}/U[] /= -> ->.
+Qed.
 
 Lemma intersection_middle_au e1 e2 :
   ~~ (left_pt e2 <<= e1) -> right_pt e2 <<< e1 ->
   exists p, pue_formula p (left_pt e1) (right_pt e1) = 0 /\ p === e2.
 Proof.
-
-rewrite /point_under_edge -pue_formula_cycle pue_formulaE -ltNge => ca.
-rewrite /point_strictly_under_edge -pue_formula_cycle pue_formulaE => cu.
+move=> /[dup] ca; rewrite -ltNge=> ca' cu.
 have le2xnre2x : p_x (left_pt e2) != p_x (right_pt e2).
   by have := edge_cond e2; rewrite lt_neqAle=> /andP[].
-have [px [py []]] := line_intersection le2xnre2x ca cu.
-rewrite -/(p_y (Bpt px py)); set py' := (p_y (Bpt px py)).
-rewrite -/(p_x (Bpt px py)) /py'.
-rewrite -pue_formulaE pue_formula_cycle=> on_line1.
-case; rewrite -pue_formulaE pue_formula_cycle=> on_line2.
-move: ca cu; rewrite -!pue_formulaE => ca cu.
-exists (Bpt px py); split; first by rewrite on_line1.
-rewrite /point_on_edge on_line2 eqxx /valid_edge /=.
-have/eqP ol2 := on_line2.
+have [p [p1 [p2 pu]]] := edge_dir_intersect le2xnre2x ca cu.
+exists p; rewrite p1; split=> //.
+rewrite /point_on_edge p2 eqxx /= /valid_edge.
+have/eqP ol2 := p2.
 have := pue_formula_on_edge (left_pt e1) (right_pt e1) ol2 => /=.
-rewrite (pue_formula_cycle _ (Bpt _ _)) on_line1 mulr0 addr0 => /eqP signcond.
-case : (ltP px (p_x (right_pt e2))).
-  move=>/[dup]/ltW ->; rewrite andbT -subr_gt0 -subr_le0 => pe2.
-  move: ca; rewrite -(pmulr_rgt0 _ pe2) -signcond.
+rewrite p1 mulr0 eq_sym addrC addr_eq0 -mulNr opprB=> /eqP signcond.
+case : (ltP (p_x p) (p_x (right_pt e2))).
+  move=>/[dup]/ltW ->; rewrite andbT -subr_gt0 -subr_le0.
+  rewrite -(pmulr_lgt0 _ ca') signcond.
   by rewrite nmulr_lgt0 // => /ltW.
 move=>/[dup] re2lp.
-rewrite -subr_le0 -(pmulr_lle0 _ ca) -signcond.
+rewrite -subr_le0 -(pmulr_lle0 _ ca') signcond.
 by rewrite nmulr_lle0 // subr_ge0=> /(le_trans re2lp); rewrite leNgt edge_cond.
 Qed.
 
@@ -1578,28 +1530,23 @@ Lemma intersection_middle_ua e1 e2 :
   left_pt e2 <<< e1 -> ~~(right_pt e2 <<= e1) ->
   exists p, pue_formula p (left_pt e1) (right_pt e1) = 0 /\ p === e2.
 Proof.
-rewrite /point_strictly_under_edge -pue_formula_cycle pue_formulaE => cu.
-rewrite /point_under_edge -pue_formula_cycle pue_formulaE -ltNge => ca.
+move=> cu /[dup] ca; rewrite -ltNge=> ca'.
 have re2xnle2x : p_x (right_pt e2) != p_x (left_pt e2).
   by have := edge_cond e2; rewrite lt_neqAle eq_sym=> /andP[].
-have [px [py []]] := line_intersection re2xnle2x ca cu.
-rewrite -/(p_y (Bpt px py)); set py' := (p_y (Bpt px py)).
-rewrite -/(p_x (Bpt px py)) /py'.
-rewrite -pue_formulaE pue_formula_cycle=> on_line1.
-case=>[] /eqP.
-rewrite -pue_formulaE pue_formula_opposite oppr_eq0=>/[dup] ol2 /eqP on_line2.
-move: ca cu; rewrite -!pue_formulaE => ca cu.
-exists (Bpt px py); split; first by rewrite on_line1.
-rewrite /point_on_edge on_line2 eqxx /valid_edge /=.
+have [p [p1 [p2 pu]]] := edge_dir_intersect re2xnle2x ca cu.
+move: p2; rewrite pue_formula_opposite pue_formula_cycle => /eqP.
+rewrite oppr_eq0=> /[dup] ol2 /eqP p2.
+exists p; rewrite p1; split=> //.
+rewrite /point_on_edge p2 eqxx /= /valid_edge.
 have := pue_formula_on_edge (left_pt e1) (right_pt e1) ol2 => /=.
-rewrite (pue_formula_cycle _ (Bpt _ _)) on_line1 mulr0 addr0 => /eqP signcond.
-case : (ltrP px (p_x (right_pt e2))).
-- move=>/[dup]/ltW ->; rewrite andbT -subr_gt0 -subr_le0 => pe2.
-  move: cu; rewrite -(pmulr_rlt0 _ pe2) -signcond.
+rewrite p1 mulr0 eq_sym addrC addr_eq0 -mulNr opprB=> /eqP signcond.
+case : (ltP (p_x p) (p_x (right_pt e2))).
+  move=>/[dup]/ltW ->; rewrite andbT -subr_gt0 -subr_le0.
+  rewrite -(nmulr_llt0 _ cu) signcond.
   by rewrite pmulr_llt0 // => /ltW.
 move=>/[dup] re2lp.
-rewrite -subr_ge0 -(nmulr_lle0 _ cu) -oppr_ge0 -mulNr opprB -signcond.
-by rewrite pmulr_lge0 // subr_ge0=>/(le_trans re2lp); rewrite leNgt edge_cond.
+rewrite -subr_le0 -(nmulr_lge0 _ cu) signcond.
+by rewrite pmulr_lge0 // subr_ge0=> /(le_trans re2lp); rewrite leNgt edge_cond.
 Qed.
 
 Fixpoint contains (A : eqType) (s : seq A) (a : A) : bool :=
@@ -3811,13 +3758,11 @@ have main : (0 < pue_formula (left_pt e1) (left_pt e2) (right_pt e2)) =
     have pisl : p = left_pt e2 by apply: plp2.
     move: atleft; rewrite -pisl=> atleft; rewrite edge_and_left_vertical //.
     by rewrite -atleft pisl (edge_cond e2).
-  move: pone2'; rewrite -pue_formula_cycle=> pone2'.
   have fact1 : (0 < p_x p - p_x (left_pt e2)) by rewrite subr_gt0 -px.
-  rewrite -(pmulr_rgt0 _ fact1) pue_formula_opposite -pue_formula_cycle mulrN.
+  rewrite -(pmulr_rgt0 _ fact1) pue_formula_opposite mulrN.
   rewrite -(eqP (pue_formula_triangle_on_edge (left_pt e1) pone2')) -mulrN.
-  rewrite -pue_formula_opposite pmulr_rgt0 //.
+  rewrite -pue_formula_opposite pue_formula_cycle pmulr_rgt0 //.
   by apply: edge_and_right_vertical; rewrite -px.
-move: pone2'; rewrite -pue_formula_cycle=> pone2'.
 have arith : forall (a b : rat), a <= 0 -> b <= 0 -> a + b <= 0.
   clear=> a b al0 bl0.
   by rewrite -ler_subr_addr (le_trans al0) // ler_subr_addr add0r.
@@ -3830,30 +3775,25 @@ have case1 : left_pt e1 <<< e2 -> e1 <| e2.
     by move: (below); rewrite /point_strictly_under_edge orbC => ->.
   have : 0 < pue_formula p (left_pt e1) (right_pt e1).
     by rewrite edge_and_left_vertical // -px (edge_cond e1).
-  rewrite -(pmulr_rgt0 _ ce2) -pue_formula_cycle.
+  rewrite -(pmulr_rgt0 _ ce2).
   rewrite (eqP (pue_formula_on_edge (left_pt e1) (right_pt e1) pone2')).
   rewrite ltNge arith //.
     apply: mulr_ge0_le0; first by rewrite -px subr_ge0.
     by move: re2b; rewrite /point_under_edge -pue_formula_cycle.
   apply: mulr_ge0_le0; first by rewrite -px subr_ge0.
   by move: le2b; rewrite /point_under_edge -pue_formula_cycle.
-have case2 : ~~(left_pt e1 <<= e2) -> e2 <| e1.
-  move=> above; case: (nc) => // /orP[]; first by rewrite (negbTE above).
-  rewrite /point_strictly_under_edge -!leNgt => /andP[] le2a re2a.
-  have pyne1 : p_y (left_pt e1) != p_y p by apply: dify; right.
-  have ys : p_y p < p_y (left_pt e1).
-    by rewrite -main;move: (above); rewrite /point_under_edge -ltNge.
-  have : 0 < pue_formula (left_pt e1) p (right_pt e1).
-    by rewrite edge_and_left_vertical // (edge_cond e1).
-  rewrite pue_formula_opposite pue_formula_cycle.
-  rewrite -(pmulr_rgt0 _ dife2) mulrN.
-  move: (eqP (pue_formula_on_edge (left_pt e1) (right_pt e1) pone2')) => ->.
-  rewrite oppr_gt0 ltNge addr_ge0 //.
-    apply: mulr_ge0; first by rewrite -px subr_ge0.
-    by rewrite pue_formula_cycle.
-  apply: mulr_ge0; first by rewrite -px subr_ge0.
-  by rewrite pue_formula_cycle.
-by [].
+suff case2 : ~~(left_pt e1 <<= e2) -> e2 <| e1 by [].
+move=> above; case: (nc) => // /orP[]; first by rewrite (negbTE above).
+rewrite /point_strictly_under_edge -!leNgt => /andP[] le2a re2a.
+have pyne1 : p_y (left_pt e1) != p_y p by apply: dify; right.
+have ys : p_y p < p_y (left_pt e1).
+  by rewrite -main;move: (above); rewrite /point_under_edge -ltNge.
+have : 0 < pue_formula (left_pt e1) p (right_pt e1).
+  by rewrite edge_and_left_vertical // (edge_cond e1).
+rewrite pue_formula_opposite -pue_formula_cycle.
+rewrite -(pmulr_rgt0 _ dife2) mulrN.
+move: (eqP (pue_formula_on_edge (left_pt e1) (right_pt e1) pone2')) => ->.
+by rewrite oppr_gt0 ltNge addr_ge0 // mulr_ge0 // -px subr_ge0.
 Qed.
 
 Lemma inter_at_ext_no_crossing (s : seq edge) :
@@ -3871,32 +3811,69 @@ have [/eqP/ceq // | e1ne2] := boolP(e1 == e2).
 have [/eqP | {nc}nc ] := nc _ _ e1in e2in; first by rewrite (negbTE e1ne2).
 have [/eqP | {nc'}nc' ] := nc' _ _ e1in e2in; first by rewrite (negbTE e1ne2).
 have [ | ] := boolP(e1 <| e2); first by left.
-rewrite /edge_below; rewrite negb_or !negb_and !negbK.
-have [le1u /= | le1a /=] := boolP (left_pt e1 <<= e2).
-  have [re1u //= | re1a /=] := boolP (right_pt e1 <<= e2).
-  move=>/orP[le2u | re2u].
-    have [re2u | re2a] := boolP(right_pt e2 <<= e1).
-      by right; rewrite /edge_below re2u underW.
-    move: le1u; rewrite /point_under_edge le_eqVlt => /orP[le1on | ].
-      have [u | a] := boolP(right_pt e1 <<< e2).
-        left; rewrite /edge_below; apply/orP; left.
-        by rewrite [in X in X && _]/point_under_edge (eqP le1on) lexx /= underW.
-      right; rewrite /edge_below; apply/orP; right; rewrite a.
-      by rewrite /point_strictly_under_edge (eqP le1on) ltxx.
-    rewrite -[X in is_true X -> _]/(left_pt e1 <<< e2) => e1u.
-    have [u | a] := boolP(right_pt e1 <<= e2).
-      by left; apply/orP; left; rewrite u underW.
-have [p [pe2 /[dup]/andP[]/eqP pe1 _ pone1]]:= intersection_middle_ua e1u re1a.
-have [q [qe1 /[dup]/andP[]/eqP qe2 _ qone2]]:= intersection_middle_ua le2u re2a.
-have : q = p.
-  have le2nre2 : p_x (right_pt e2) != p_x (left_pt e2).
-    by have := edge_cond e2; rewrite lt_neqAle eq_sym => /andP[].
-  have := line_intersection.
-  have := re2a; rewrite /point_under_edge -pue_formula_cycle pue_formulaE.
-    rewrite -ltNge => re2a'.
-  have := le2u; rewrite /point_strictly_under_edge -pue_formula_cycle.
-  rewrite pue_formulaE=> le2u'.
-  have [px [py [_ uniq]]] := line_intersection le2nre2 re2a' le2u'.
+have [ | ] := boolP(e2 <| e1); first by right.
+rewrite /edge_below; rewrite !negb_or !negb_and !negbK=> noc.
+suff [it | [p [pone1 pone2]]] :
+  below_alt e1 e2 \/ exists p, p === e1 /\ p === e2; first by [].
+  have : p \in [:: left_pt e1; right_pt e1] by apply: nc.
+  rewrite !inE=> pext.
+  set other := if p == left_pt e1 then right_pt e1 else left_pt e1.
+  have dif : right_pt e1 != left_pt e1.
+    apply/eqP=> abs.
+    move: (edge_cond e1); rewrite lt_neqAle eq_sym => /andP[].
+    by rewrite abs eqxx.
+  have [ u' | /underWC a'] := boolP (other <<= e2).
+    left; apply/orP; left.
+    move: (pone2) u'=> /andP[] _ /under_onVstrict.
+    rewrite pone2 /= /other.
+    by  move: pext=> /orP[] /eqP -> ->; rewrite ?eqxx ?(negbTE dif) ?andbT.
+  right; apply/orP; right.
+    move: (pone2) a'=> /andP[] _/strict_nonAunder; rewrite pone2 /= /other.
+    by move: pext=>/orP[]/eqP -> ->; rewrite ?eqxx ?(negbTE dif)=> ->.
+move: noc {nc nc'} => /andP[] /orP[le2a | re2a].
+  have [ re2u | re2a _] := boolP(right_pt e2 <<< e1); last first.
+    by left; left; apply/orP; right; rewrite re2a underWC.
+  have dif2 : p_x (left_pt e2) != p_x (right_pt e2).
+    by have := edge_cond e2; rewrite lt_neqAle => /andP[].
+  have [r [_ [ _ uniq]]] := edge_dir_intersect dif2 le2a re2u.
+  move=> /orP[le1u | re1u].
+    have [re1u | re1a] := boolP(right_pt e1 <<= e2).
+      by left; left; apply/orP; left; rewrite re1u underW.
+    have [p [pe2 pe1]] := intersection_middle_ua le1u re1a.
+    have [q [qe1 qe2]] := intersection_middle_au le2a re2u.
+    move: (pe1) (qe2)=> /andP[] /eqP pe1' _ /andP[] /eqP qe2' _.
+    have rq := uniq _ qe1 qe2'; have rp := uniq _ pe1' pe2.
+    by right; exists r; rewrite [X in X === e2]rq rp.
+  have [le1u | le1a] := boolP(left_pt e1 <<= e2).
+      by left; left; apply/orP; left; rewrite le1u underW.
+  have [q [qe1 qe2]] := intersection_middle_au le2a re2u.
+  have [p [pe2 pe1]] := intersection_middle_au le1a re1u.
+  move: (pe1) (qe2)=> /andP[] /eqP pe1' _ /andP[] /eqP qe2' _.
+  have rq := uniq _ qe1 qe2'; have rp := uniq _ pe1' pe2.
+  by right; exists r; rewrite [X in X === e2]rq rp.
+have [ le2u | le2a _] := boolP(left_pt e2 <<< e1); last first.
+    by left; left; apply/orP; right; rewrite le2a underWC.
+have dif2 : p_x (right_pt e2) != p_x (left_pt e2).
+  by have := edge_cond e2; rewrite lt_neqAle eq_sym => /andP[].
+have [r [_ [ _ uniq]]] := edge_dir_intersect dif2 re2a le2u.
+have transfer a b c : pue_formula a b c = 0 -> pue_formula a c b = 0.
+  by move=> abc; rewrite pue_formula_opposite pue_formula_cycle abc oppr0.
+move=> /orP[le1u | re1u].
+  have [re1u | re1a] := boolP(right_pt e1 <<= e2).
+    by left; left; apply/orP; left; rewrite re1u underW.
+  have [p [/transfer pe2 pe1]] := intersection_middle_ua le1u re1a.
+  have [q [qe1 qe2]] := intersection_middle_ua le2u re2a.
+  move: (pe1) (qe2)=> /andP[] /eqP pe1' _ /andP[] /eqP /transfer qe2' _.
+  have rq := uniq _ qe1 qe2'; have rp := uniq _ pe1' pe2.
+  by right; exists r; rewrite [X in X === e2]rq rp.
+have [le1u | le1a] := boolP(left_pt e1 <<= e2).
+  by left; left; apply/orP; left; rewrite le1u underW.
+have [q [qe1 qe2]] := intersection_middle_ua le2u re2a.
+have [p [/transfer pe2 pe1]] := intersection_middle_au le1a re1u.
+move: (pe1) (qe2)=> /andP[] /eqP pe1' _ /andP[] /eqP /transfer qe2' _.
+have rq := uniq _ qe1 qe2'; have rp := uniq _ pe1' pe2.
+by right; exists r; rewrite [X in X === e2]rq rp.
+Qed.
 
 Lemma opening_cells_left e low_e high_e c :
 out_left_event e ->
@@ -4388,14 +4365,11 @@ Qed.
 
 Definition cell_no s i := nth dummy_cell s i.
 
-Definition disjoint_cells (s : seq cell) :
+Definition disjoint_open_cells (s : seq cell) :=
   forall i j, (i < j < size s)%N ->
    forall p, inside_open_cell p (cell_no s i) ->
              inside_open_cell p (cell_no s j) ->
              p === high (cell_no s i).
-
-Lemma step_keeps_disjoint :
-
 
 End proof_environment.
 
