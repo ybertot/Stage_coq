@@ -4365,12 +4365,64 @@ Qed.
 
 Definition cell_no s i := nth dummy_cell s i.
 
-Definition disjoint_open_cells (s : seq cell) :=
-  forall i j, (i < j < size s)%N ->
-   forall p, inside_open_cell p (cell_no s i) ->
-             inside_open_cell p (cell_no s j) ->
-             p === high (cell_no s i).
+Definition left_limit (c : cell) :=
+  p_x (last dummy_pt (left_pts c)).
 
+Definition strict_inside_open (p : pt) (c : cell) :=
+  (p <<< high c) && (~~(p <<= low c)) &&
+  (left_limit c < p_x p < right_limit c).
+
+Definition no_overlap_e (c1 c2 : cell) :=
+  c1 = c2 \/
+  forall p, ~~(strict_inside_open p c1 && strict_inside_open p c2).
+
+Definition disjoint_open_cells :=
+  forall c1 c2 : cell, no_overlap_e c1 c2.
+
+Lemma keep_under (p q : pt) e1 e2 :
+  inter_at_ext e1 e2 ->
+  {in [:: p; q] & [:: e1; e2], forall r e, valid_edge e r} ->
+  p <<< e1 -> ~~ (p <<= e2) -> q <<< e1 -> ~~(q <<= e2).
+Proof.
+case : (ltrgtP (p_x p) (p_x q)) => [pltq | qltp | pvertq].
+  move=> noc val.
+  have := line_intersection.
+
+Lemma disjoint_seq_higher_edge s c e p :
+  adjacent_cells (rcons s c) -> s_right_form (rcons s c) -> 
+  seq_valid (rcons s c) e ->
+  {in rcons s c &, disjoint_open_cells} ->
+  {in rcons s c, forall c1, strict_inside_open p c1 -> p <<< high c1}.
+Proof.
+elim: s => [ | c0 s Ih].
+  rewrite /= ?andbT => /= _ rfc _ c1 sval.
+  by rewrite inE=> /eqP -> /andP[] /andP[].
+rewrite -[rcons _ _]/(c0 :: rcons s c)=> /[dup]/adjacent_cons adj'.
+rewrite /= => adj /[dup] rf0 /andP[rfc0 rfo] sval disj c1 c1in /andP[] /andP[] puhc1 _ lims.
+have := strict_under_seq adj sval rf0.
+
+Lemma step_keeps_disjoint_open ev open closed open' closed' :
+  cells_bottom_top open ->
+  adjacent_cells open ->
+  inside_box (point ev) ->
+  seq_valid open (point ev) ->
+  s_right_form open ->
+  {in [seq low c | c <- open] ++ [seq high c | c <- open] ++
+      outgoing ev &, forall e1 e2, inter_at_ext e1 e2} ->
+  {in open &, disjoint_open_cells} ->
+  step ev open closed = (open', closed') ->
+  {in open' &, disjoint_open_cells}.
+Proof.
+move=> cbtom adj inbox_e sval rfo noc disj; rewrite /step.
+case oe: (open_cells_decomposition open (point ev)) => [[[[fc cc] lc] le] he].
+have ocd := decomposition_preserve_cells oe.
+move=> [] <- _ => c1 c2; rewrite !mem_cat !(orbCA (_ \in fc)).
+have /andP [eale euhe] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+have := l_h_in_open cbtom adj inbox_e.
+rewrite oe /= => -[cle [che [clein [chein [/esym cleq /esym cheq]]]]].
+have strictfcu c p : c \in fc -> strict_inside_open p c -> p <<< le.
+  admit.
+  
 End proof_environment.
 
 Lemma add_event_preserve_first p e inc ev evs :
