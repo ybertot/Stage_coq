@@ -987,6 +987,20 @@ rewrite -subr_cp0 -opprB oppr_lt0 in inE.
 by rewrite (pmulr_rle0 _  inE  ) .
 Qed.
 
+Lemma psue_right_edge e p :
+p_x (right_pt e) == p_x p ->
+(p <<< e) = ((p_y p - p_y (right_pt e)) < 0).
+Proof.
+move : e p  => [[ax ay][bx b_y] /= cnd] [px py]  /=.
+rewrite /point_strictly_under_edge /=.
+move => /eqP <- /=.
+have := (pue_f_vert py ax ay bx b_y).
+rewrite pue_f_c /pue_f.
+move => /eqP ->.
+rewrite -subr_gt0 in cnd.
+by rewrite (pmulr_rlt0 _  cnd) .
+Qed.
+
 Lemma pue_left_edge e p :
 p_x (left_pt e) == p_x p ->
 (p <<= e) = (0 <= (p_y (left_pt e) - p_y p )).
@@ -999,6 +1013,19 @@ rewrite -pue_f_c /pue_f.
 move => /eqP ->.
 rewrite -subr_cp0 in inE.
 by rewrite (nmulr_rle0 _  inE  ) .
+Qed.
+
+Lemma psue_left_edge e p :
+p_x (left_pt e) == p_x p ->
+(p <<< e) = (0 < p_y (left_pt e) - p_y p).
+Proof.
+move: e p => [[ax ay][bx b_y] /= cnd] [px py] /=.
+move=> /eqP <- /=.
+rewrite /point_strictly_under_edge /=.
+have := (pue_f_vert ay bx b_y ax py).
+rewrite -pue_f_c /pue_f => /eqP ->.
+rewrite -subr_cp0 in cnd.
+by rewrite (nmulr_rlt0 _ cnd).
 Qed.
 
 Lemma not_strictly_under low_e high_e  :
@@ -4385,8 +4412,35 @@ Lemma keep_under (p q : pt) e1 e2 :
   p <<< e1 -> ~~ (p <<= e2) -> q <<< e1 -> ~~(q <<= e2).
 Proof.
 case : (ltrgtP (p_x p) (p_x q)) => [pltq | qltp | pvertq].
-  move=> noc val.
-  have := line_intersection.
+- move=> noc val pue1 pae2 que1; apply/negP=> que2.
+  have valqe2 : valid_edge e2 q by apply: val; rewrite !inE eqxx ?orbT.
+  have [q2 q2P] := exists_point_valid valqe2.
+  have [qone2 q2q] := intersection_on_edge q2P.
+  have valqe1 : valid_edge e1 q by apply: val; rewrite !inE eqxx ?orbT.
+  have [q1 q1P] := exists_point_valid valqe1.
+  have [qone1 q1q] := intersection_on_edge q1P.
+  have valpe2 : valid_edge e2 p by apply: val; rewrite !inE eqxx ?orbT.
+  have [p2 p2P] := exists_point_valid valpe2.
+  have [pone2 p2p] := intersection_on_edge p2P.
+  have valpe1 : valid_edge e1 p by apply: val; rewrite !inE eqxx ?orbT.
+  have [p1 p1P] := exists_point_valid valpe1.
+  have [pone1 p1p] := intersection_on_edge p1P.
+  have := pue_formula_triangle_on_edge p (proj1 (andP pone1)) => /eqP sign1.
+  have := pone1=> /andP[] _ /andP[] + _; rewrite le_eqVlt=> /orP[/eqP atl1 | ].
+    have atl1' : p_x (left_pt e1) == p_x p by rewrite p1p atl1.
+    have := pue1; rewrite (psue_left_edge atl1').
+    have := pone2=> /andP[] _ /andP[] + _; rewrite le_eqV
+    rewrite subr_gt0 => yp1.
+    have yp2 : p_y (left_pt e2) < p_y p.
+      rewrite -subr_gt0 ltNge. rewrite -pue_left_edge.
+      apply: (point_valid_under_im
+p_y_inf pae2'). (left_on_edge _) atl1'.
+
+  have := proj1 (andP (proj2 (andP pone1)));
+  have : 0 < pue_formula p1 (left_pt e1) p.
+    have := edge_cond e1; rewrite -(subr_gt0 (p_x _)) => se1.
+    rewrite -(pmulr_rgt0 _ se1) sign1.
+pue_formula_triangle_on_edge
 
 Lemma disjoint_seq_higher_edge s c e p :
   adjacent_cells (rcons s c) -> s_right_form (rcons s c) -> 
