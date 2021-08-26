@@ -181,6 +181,8 @@ Definition point_strictly_under_edge (p : pt) (e : edge) : bool :=
 Notation "p '<<=' e" := (point_under_edge p e)( at level 70, no associativity).
 Notation "p '<<<' e" := (point_strictly_under_edge p e)(at level 70, no associativity).
 
+Notation "p '>>=' e" := (~~(point_strictly_under_edge p e))( at level 70, no associativity).
+Notation "p '>>>' e" := (~~(point_under_edge p e))(at level 70, no associativity).
 
 (*returns true if e1 is under e2*)
 
@@ -3058,7 +3060,7 @@ seq_valid open p ->
 forall first_cells contact last_cells low_f high_f,
 open_cells_decomposition open p  =
   (first_cells, contact, last_cells, low_f, high_f) ->
-~ (p <<< low_f) /\ (p <<= high_f).
+~~ (p <<< low_f) /\ (p <<= high_f).
 Proof.
 case : open  => [//=| c q ] cbtop adjopen insbox opval fc cc lc lowf highf.
 have := exists_cell cbtop adjopen insbox => [][]c' []cin cont.
@@ -3066,8 +3068,7 @@ have exi : (exists c0 : cell, (c0 \in c :: q) && contains_point p c0).
   exists c'.
   by rewrite cin cont.
 rewrite /open_cells_decomposition => op_f. 
-have := (l_h_above_under_fix exi op_f) => /andP [] /negP.
-by [].
+by have := (l_h_above_under_fix exi op_f) => /andP [].
 Qed. 
 
 Lemma l_under open p :
@@ -4507,32 +4508,49 @@ rewrite -sgrM ona' -sgrN -mulNr opprB sgrM (ltr0_sg xa'lta).
 by rewrite pue_formula_opposite sgrN mulrN mulNr opprK mul1r.
 Qed.
 
+Lemma common_point_edges_y_left r r1 r2 e1 e2 :
+   valid_edge e1 r -> p_x r <= p_x (left_pt e1) ->
+     p_x r = p_x r1 -> p_x r = p_x r2 -> left_pt e1 === e2 ->
+     r1 === e1 -> r2 === e2 ->
+     p_y r1 = p_y r2.
+Proof.
+move=> v xl rr1 rr2 e1e2 re1 re2.
+have xl': p_x r = p_x (left_pt e1) by apply: le_anti; rewrite xl; case/andP:v.
+have:= on_edge_same_point e1e2 re2; rewrite -xl' rr2 eqxx=> /(_ isT)/eqP <-.
+have:= on_edge_same_point (left_on_edge _) re1.
+by rewrite -xl' rr1 eqxx=>/(_ isT)/eqP<-.
+Qed.
+
+Lemma common_point_edges_y_right r r1 r2 e1 e2 :
+ valid_edge e1 r -> p_x (right_pt e1) <= p_x r ->
+     p_x r = p_x r1 -> p_x r = p_x r2 -> right_pt e1 === e2 ->
+     r1 === e1 -> r2 === e2 ->
+     p_y r1 = p_y r2.
+Proof.
+move=> v xl rr1 rr2 e1e2 re1 re2.
+have xl': p_x r = p_x (right_pt e1).
+  by apply: le_anti; rewrite xl andbC; case/andP:v.
+have:= on_edge_same_point e1e2 re2; rewrite -xl' rr2 eqxx=> /(_ isT)/eqP <-.
+have:= on_edge_same_point (right_on_edge _) re1.
+  by rewrite -xl' rr1 eqxx=>/(_ isT)/eqP<-.
+Qed.
+
+Lemma expand_valid p q (pq : p_x p < p_x q) e r :
+  valid_edge (Bedge pq) r ->
+  valid_edge e p -> valid_edge e q -> valid_edge e r.
+Proof.
+move=>/andP[]pr rq /andP[] lep pre /andP[]leq qre; rewrite /valid_edge.
+by rewrite (le_trans lep) ?(le_trans rq).
+Qed.
+
 Lemma keep_under (p q : pt) e1 e2 :
   inter_at_ext e1 e2 ->
   {in [:: p; q] & [:: e1; e2], forall r e, valid_edge e r} ->
   p <<< e1 -> ~~ (p <<< e2) -> ~~(q <<< e1) -> ~~(q <<< e2).
 Proof.
-move=> noc.
-have left_ext r r1 r2 : valid_edge e1 r -> p_x r <= p_x (left_pt e1) ->
-     p_x r = p_x r1 -> p_x r = p_x r2 -> left_pt e1 === e2 ->
-     r1 === e1 -> r2 === e2 ->
-     p_y r1 = p_y r2.
-  move=> v xl rr1 rr2 e1e2 re1 re2.
-  have xl': p_x r = p_x (left_pt e1) by apply: le_anti; rewrite xl; case/andP:v.
-  have:= on_edge_same_point e1e2 re2; rewrite -xl' rr2 eqxx=> /(_ isT)/eqP <-.
-  have:= on_edge_same_point (left_on_edge _) re1.
-  by rewrite -xl' rr1 eqxx=>/(_ isT)/eqP<-.
-have right_ext r r1 r2 : valid_edge e1 r -> p_x (right_pt e1) <= p_x r ->
-     p_x r = p_x r1 -> p_x r = p_x r2 -> right_pt e1 === e2 ->
-     r1 === e1 -> r2 === e2 ->
-     p_y r1 = p_y r2.
-  move=> v xl rr1 rr2 e1e2 re1 re2.
-  have xl': p_x r = p_x (right_pt e1).
-   by apply: le_anti; rewrite xl andbC; case/andP:v.
-  have:= on_edge_same_point e1e2 re2; rewrite -xl' rr2 eqxx=> /(_ isT)/eqP <-.
-  have:= on_edge_same_point (right_on_edge _) re1.
-  by rewrite -xl' rr1 eqxx=>/(_ isT)/eqP<-.
-move=> val pue1 pae2 qae1; apply/negP=> que2; set v := valid_edge.
+have left_ext r r1 r2 := @common_point_edges_y_left r r1 r2 e1 e2.
+have right_ext r r1 r2 := @common_point_edges_y_right r r1 r2 e1 e2.
+move=> noc val pue1 pae2 qae1; apply/negP=> que2; set v := valid_edge.
 have : [/\ v e1 p, v e2 p, v e1 q & v e2 q].
   by split; apply: val; rewrite !inE eqxx ?orbT.
 have pr e r: valid_edge e r ->
@@ -4551,101 +4569,66 @@ have qylt : p_y q < p_y q2 by rewrite -(abbrev _ _ _ _ qone2).
 have yp : p_y p2 < p_y p1 by rewrite (le_lt_trans pyge).
 have yq : p_y q1 < p_y q2 by rewrite (le_lt_trans qyge).
 move=> {pyge qyge pylt qylt abbrev}.
+have [/[dup]p1p2 + /[dup] q1q2 +] : [/\ p_x p1 == p_x p2 & p_x q1 == p_x q2].
+  by rewrite -p1p p2p -q1q q2q !eqxx.
+move=>/eqP/esym/eqP p2p1 /eqP/esym/eqP q2q1.
+move: (pone1) (pone2) (qone1) (qone2).
+move=>/andP[]pl1 _ /andP[]pl2 _ /andP[]ql1 _ /andP[] ql2 _.
 have [pltq | qltp | pq ] := ltrgtP (p_x p) (p_x q).
 - have [p1q1 p2q2] : p_x p1 < p_x q1 /\ p_x p2 < p_x q2.
     by rewrite -p1p -q1q -p2p -q2q .
-  set e3 := Bedge p1q1; set e4 := Bedge p2q2.  
-  have samel43: p_x (left_pt e4) == p_x (left_pt e3).
-    by apply/eqP; rewrite /= -p1p.
-  have samer43: p_x (right_pt e4) == p_x (right_pt e3).
-    by apply/eqP; rewrite /= -q1q.
+  set e3 := Bedge p1q1; set e4 := Bedge p2q2.
   have l3a : ~~(left_pt e3 <<= e4).
-    by move/pue_left_edge:samel43=> -> /=; rewrite subr_ge0 -ltNge.
+    by move/(@pue_left_edge e4):p2p1=> -> /=; rewrite subr_ge0 -ltNge.
   have r3u : right_pt e3 <<< e4.
-    by move/psue_right_edge:samer43=> -> /=; rewrite subr_lt0.
+    by move/(@psue_right_edge e4):q2q1=> -> /=; rewrite subr_lt0.
   have [pi [pi4 /andP[pi3 piint]]] := intersection_middle_au l3a r3u.
   have pi1 : pi === e1.
-    apply/andP; split.
-      rewrite -sgr_eq0 (pue_formula_change_ext pi _ (edge_cond e3)).
-      - by rewrite sgr_eq0 // pi3.
-      - by apply: edge_cond.
-      - by move: pone1=> /andP[] +.
-      by move: qone1=> /andP[] +.
-    case/andP: piint=> /= [] ppi piq.
-    rewrite /valid_edge (le_trans _ ppi); last first.
-      by rewrite -p1p; case/andP: vp1.
-    by rewrite (le_trans piq) // -q1q; case/andP: vq1.
+    apply/andP; split; last first.
+      by apply: (expand_valid piint); rewrite /valid_edge -?p1p -?q1q.
+    rewrite -sgr_eq0 (pue_formula_change_ext _ (edge_cond e1) p1q1) //.
+    by rewrite (eqP pi3).
   have pi2 : pi === e2.
-    apply/andP; split.
-      rewrite -sgr_eq0 (pue_formula_change_ext pi _ (edge_cond e4)).
-      - by rewrite sgr_eq0 // pi4.
-      - by apply: edge_cond.
-      - by move: pone2=> /andP[] +.
-      by move: qone2=> /andP[] +.
-    case/andP: piint=> /= [] ppi piq.
-    rewrite /valid_edge (le_trans _ ppi); last first.
-      by rewrite -p1p; case/andP: vp2.
-    by rewrite (le_trans piq) // -q1q; case/andP: vq2.
+    apply/andP; split; last first.
+      by apply:(expand_valid piint); rewrite /valid_edge -?p1p -?q1q.
+    rewrite -sgr_eq0 (pue_formula_change_ext _ (edge_cond e2) p2q2) //.
+    by rewrite pi4.
+  move: piint; rewrite /valid_edge /e3/= -p1p -q1q=> /andP[] ppi piq.
   case: noc=> [E | /(_ pi pi1 pi2) piext]; first by move: pae2; rewrite -E pue1.
-  move: (piext) (piint) pi1 pi2; rewrite !inE.
-  move => /orP[]/eqP/[dup]pival ->.
-    move=> /andP[] + _ /=.
-    rewrite /e3 /= -p1p => pll _ le2.
-    have abs := left_ext _ _ _ vp1 pll p1p p2p le2 pone1 pone2.
+  move: (piext) ppi piq pi1 pi2 { pi3 pi4 }; rewrite !inE.
+  move => /orP[]/eqP/[dup]pival -> ppi piq pi1 pi2.
+    have abs := left_ext _ _ _ vp1 ppi p1p p2p pi2 pone1 pone2.
     by move: yp; rewrite abs ltxx.
-  move=>/andP[] _ /=.
-  rewrite -q1q => rlq _ re2.
-  have abs := right_ext _ _ _ vq1 rlq q1q q2q re2 qone1 qone2.
+  have abs := right_ext _ _ _ vq1 piq q1q q2q pi2 qone1 qone2.
   by move: yq; rewrite abs ltxx.
 - have [q1p1 q2p2] : p_x q1 < p_x p1 /\ p_x q2 < p_x p2.
     by rewrite -p1p -q1q -p2p -q2q .
-  set e3 := Bedge q1p1; set e4 := Bedge q2p2.  
-  have samel43: p_x (left_pt e4) == p_x (left_pt e3).
-    by apply/eqP; rewrite /= -q1q.
-  have samer43: p_x (right_pt e4) == p_x (right_pt e3).
-    by apply/eqP; rewrite /= -p1p.
+  set e3 := Bedge q1p1; set e4 := Bedge q2p2.
   have l3u : left_pt e3 <<< e4.
-    by move/psue_left_edge:samel43=> -> /=; rewrite subr_gt0.
-  have r3a : ~~(right_pt e3 <<= e4).
-    by move/pue_right_edge:samer43=> -> /=; rewrite subr_le0 -ltNge.
+    by move/(@psue_left_edge e4):q2q1=> -> /=; rewrite subr_gt0.
+  have r3a : right_pt e3 >>> e4.
+    by move/(@pue_right_edge e4):p2p1=> -> /=; rewrite subr_le0 -ltNge.
   have [pi [pi4 /andP[pi3 piint]]] := intersection_middle_ua l3u r3a.
   have pi1 : pi === e1.
-    apply/andP; split.
-      rewrite -sgr_eq0 (pue_formula_change_ext pi _ (edge_cond e3)).
-      - by rewrite sgr_eq0 // pi3.
-      - by apply: edge_cond.
-      - by move: qone1=> /andP[] +.
-      by move: pone1=> /andP[] +.
-    case/andP: piint=> /= [] ppi piq.
-    rewrite /valid_edge (le_trans _ ppi); last first.
-      by rewrite -q1q; case/andP: vq1.
-    by rewrite (le_trans piq) // -p1p; case/andP: vp1.
+    apply/andP; split; last first.
+      by apply: (expand_valid piint); rewrite /valid_edge -?p1p -?q1q.
+    rewrite -sgr_eq0 (pue_formula_change_ext _ (edge_cond e1) q1p1) //.
+    by rewrite (eqP pi3).
   have pi2 : pi === e2.
-    apply/andP; split.
-      rewrite -sgr_eq0 (pue_formula_change_ext pi _ (edge_cond e4)).
-      - by rewrite sgr_eq0 // pi4.
-      - by apply: edge_cond.
-      - by move: qone2=> /andP[] +.
-      by move: pone2=> /andP[] +.
-    case/andP: piint=> /= [] ppi piq.
-    rewrite /valid_edge (le_trans _ ppi); last first.
-      by rewrite -q1q; case/andP: vq2.
-    by rewrite (le_trans piq) // -p1p; case/andP: vp2.
+    apply/andP; split; last first.
+      by apply:(expand_valid piint); rewrite /valid_edge -?p1p -?q1q.
+    rewrite -sgr_eq0 (pue_formula_change_ext _ (edge_cond e2) q2p2) //.
+    by rewrite pi4.
+  move: piint; rewrite /valid_edge /e3/= -p1p -q1q=> /andP[] qpi pip.
   case: noc=> [E | /(_ pi pi1 pi2) piext]; first by move: pae2; rewrite -E pue1.
-  move: (piext) (piint) pi1 pi2; rewrite !inE.
-  move => /orP[]/eqP/[dup]pival ->.
-    move=> /andP[] + _ /=.
-    rewrite /e3 /= -q1q => qll _ le2.
-    have abs := left_ext _ _ _ vq1 qll q1q q2q le2 qone1 qone2.
+  move: (piext) qpi pip pi1 pi2 { pi3 pi4 }; rewrite !inE.
+  move => /orP[]/eqP/[dup]pival -> qpi pip pi1 pi2.
+    have abs := left_ext _ _ _ vq1 qpi q1q q2q pi2 qone1 qone2.
     by move: yq; rewrite abs ltxx.
-  move=>/andP[] _ /=.
-  rewrite -p1p => rlp _ re2.
-  have abs := right_ext _ _ _ vp1 rlp p1p p2p re2 pone1 pone2.
+  have abs := right_ext _ _ _ vp1 pip p1p p2p pi2 pone1 pone2.
   by move: yp; rewrite abs ltxx.
-have := on_edge_same_point pone1 qone1.
-rewrite -p1p pq q1q eqxx=>/(_ isT)/eqP p1q1.
-have := on_edge_same_point pone2 qone2.
-rewrite -p2p pq q2q eqxx=>/(_ isT)/eqP p2q2.
+have := conj (on_edge_same_point pone1 qone1) (on_edge_same_point pone2 qone2).
+rewrite -p1p -p2p pq q1q q1q2 !eqxx=> -[]/(_ isT)/eqP p1q1 /(_ isT)/eqP p2q2.
 by move: yp; rewrite p1q1 p2q2; rewrite ltNge le_eqVlt yq orbT.
 Qed.
 
@@ -4663,11 +4646,7 @@ rewrite /= => adj /[dup] rf0 /andP[rfc0 rfo] sval disj c1 c1in /andP[] /andP[] p
 (* We cannot use order_edges_strict_viz_point' inductively,
    because this requires validity of all edges on the recursion. *)
 (* we need some form of transitivity for edge_below. *)
-
-{in rcons s c, &, forall g1 g2, inter_at_ext g1 g2} ->
-seq_valid (rcons s c) p,
-{in rcons s c, 
-have := strict_under_seq adj sval rf0.
+Admitted.
 
 Lemma step_keeps_disjoint_open ev open closed open' closed' :
   cells_bottom_top open ->
@@ -4690,6 +4669,7 @@ have := l_h_in_open cbtom adj inbox_e.
 rewrite oe /= => -[cle [che [clein [chein [/esym cleq /esym cheq]]]]].
 have strictfcu c p : c \in fc -> strict_inside_open p c -> p <<< le.
   admit.
+Admitted.
   
 End proof_environment.
 
