@@ -5027,6 +5027,49 @@ have noc' : {in [seq high i | i <- rcons s c] &, no_crossing}.
 apply: (Ih tr' adj' rfo sval' clae' noc' c1 intail pinc1).
 Qed.
 
+Definition open_cell_side_limit_ok c :=
+  [&& left_pts c != [::],
+   all (fun p => p_x p == p_x (last dummy_pt (left_pts c))) (left_pts c),
+  sorted >%R [seq p_y p | p <- left_pts c],
+  (head dummy_pt (left_pts c) === high c) &
+  (last dummy_pt (left_pts c) === low c)].
+
+Lemma opening_cells_side_limit e s le he c :
+  valid_edge he e ->
+  (forall g, g \in s -> left_pt g = e) ->
+  c \in opening_cells e s le he ->
+  open_cell_side_limit_ok c.
+Proof.
+Admitted.
+
+Lemma opening_cells_below_high p e c s le he:
+  (e >>> le) && (e <<< he) ->
+  valid_edge he e ->
+  valid_edge he p -> (forall g, g \in s -> left_pt g = e) ->
+  {in he::s &, no_crossing} ->
+  c \in opening_cells e s le he -> strict_inside_open p c -> p <<< he.
+Proof.
+move=> ebounds ve vp gleft noc oc /andP[]/andP[] plhc _ plim.
+have := opening_cells_subset oc => /andP[] _; rewrite inE=>/orP[/eqP <- //|hcin].
+have hcin' : high c \in he :: s by rewrite inE hcin orbT.
+have hein : he \in he :: s by rewrite inE eqxx.
+have blo : high c <| he.
+  have := no_crossingE (@noc _ _ hcin' hein).
+  rewrite (gleft _ hcin) ve.
+  by move: ebounds=> /andP[] _ -> /(_ isT)[] /(_ isT).
+apply: (order_edges_strict_viz_point' _ vp blo).
+move: plim; rewrite /left_limit /right_limit => /andP[] pl pr.
+have:= opening_cells_side_limit ve gleft oc => /andP[] sn0 /andP[]/allP eqx.
+move=> /andP[] _ /andP[] /andP[] _ /andP[] vlh _ /andP[] _ _.
+have : p_x (left_pt he) <= p_x (last dummy_pt (left_pts c)).
+  have/eqP <- //: 
+    p_x (head dummy_pt (left_pts c)) == p_x (last dummy_pt (left_pts c)).
+    by apply/eqx/head_in_not_nil.
+    
+
+rewrite /valid_edge (ltW (le_lt_trans vll pl)).
+
+
 Lemma left_side_below_seq_higher_edge s c e p evs :
   p_x e <= p_x p ->
   {in evs, forall ev, lexPt p (point ev)} ->
