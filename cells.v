@@ -502,7 +502,7 @@ have sys_to_mx_eqn :
     by rewrite !mxE big_ord_recr /= big_ord1 /= !mxE.
   have := mxq (Ordinal (isT : (1 < 2)%N)) (Ordinal (isT : (0 < 1)%N)).
   by rewrite !mxE big_ord_recr /= big_ord1 /= !mxE.
-set sol := - (M ^-1 *m mkcv2 C F).
+set sol := - (M ^-1 *m mkcv2 C F) : 'cV_2.
 have soleq : sol = mkcv2 (sol ord0 ord0) (sol ord_max ord0).
   apply/matrixP=> [][[ | [ | i]]] // ip [ [ | j]] // jp; rewrite /= !mxE /=;
     (rewrite (_ : Ordinal jp = ord0); last apply: val_inj=> //).
