@@ -33,6 +33,9 @@ Qed.
 
 Canonical pt_eqType := EqType pt (EqMixin pt_eqP).
 
+Lemma pt_eqE p1 p2 : (p1 == p2) = (p_x p1 == p_x p2) && (p_y p1 == p_y p2).
+Proof. by move: p1 p2 => [? ?][? ?]. Qed.
+
 Record edge := Bedge {left_pt : pt; right_pt : pt;
     _ : p_x left_pt < p_x right_pt}.
 
@@ -4703,6 +4706,49 @@ rewrite /e2' /= [in LHS](mulrC (p_x _ - _)) opprB.
 by rewrite -4![in LHS](opprB (_ (right_pt e1))) 2!mulrNN.
 Qed.
 
+Lemma sub_edge_right (p : pt) (e : edge) : p === e ->
+  p_x p < p_x (right_pt e) ->
+  {e' | [/\ left_pt e' = p, right_pt e' = right_pt e &
+        forall e2, cmp_slopes e' e2 = cmp_slopes e e2]}.
+Proof.
+move=>/[dup] one /andP[] aligned val dif; exists (Bedge dif).
+split => // e2; rewrite !cmp_slopesE.
+by rewrite (@on_edge_same_slope_right e (Bedge dif) one erefl).
+Qed.
+
+Lemma sub_edge_left (p : pt) (e : edge) : p === e ->
+  p_x (left_pt e) < p_x p ->
+  {e' | [/\ left_pt e' = left_pt e, right_pt e' = p &
+        forall e2, cmp_slopes e' e2 = cmp_slopes e e2]}.
+Proof.
+move=>/[dup] one /andP[] aligned val dif; exists (Bedge dif).
+split => // e2; rewrite !cmp_slopesE.
+by rewrite (@on_edge_same_slope_left e (Bedge dif) one erefl).
+Qed.
+
+Lemma intersection_imp_crossing e1 e2 p :
+  p === e1 -> p === e2 ->
+  p_x (left_pt e1) < p_x p -> p_x p < p_x (right_pt e1) ->
+  p_x (left_pt e2) < p_x p -> p_x p < p_x (right_pt e2) ->
+  ~below_alt e1 e2 \/ cmp_slopes e1 e2 == 0.
+Proof.
+move=> on1 on2 l1ltp pltr1 l2ltp pltr2.
+have [e2' [le2' re2' sle2']] := sub_edge_left on2 l2ltp.
+have [e2'' [le2'' re2'' sle2'']] := sub_edge_right on2 pltr2.
+have [e1' [le1' re1' sle1']] := sub_edge_left on1 l1ltp.
+have [e1'' [le1'' re1'' sle1'']] := sub_edge_right on1 pltr1.
+have /contact_left_slope/= : left_pt e2'' === e1 by rewrite le2''.
+have /contact_right_slope/= : right_pt e2' === e1 by rewrite re2'.
+have /contact_left_slope/= : left_pt e1'' === e2 by rewrite le1''.
+have /contact_right_slope/= : right_pt e1' === e2 by rewrite re1'.
+rewrite le1' le2' re2'' re1'' sle1' sle1'' sle2' sle2'' -(cmp_slopesNC e1).
+rewrite !oppr_lte0 !oppr_gte0 => -[]D' D []C' C []B' B []A' A.
+rewrite /below_alt/edge_below.
+have [ | difslope] := boolP(cmp_slopes e1 e2 == 0); first by right.
+left; rewrite D' C' A B A' B' D C -!leNgt orbC=> /orP; rewrite andbC !orbb.
+by move/le_anti/esym/eqP; rewrite (negbTE difslope).
+Qed.
+
 Lemma edge_below_equiv p (s : pred edge) :
   {in s, forall e, valid_edge e p && (p_x p < p_x (right_pt e))} ->
   {in s &, no_crossing} ->
@@ -4711,10 +4757,10 @@ Proof.
 move=> val noc e1 e2.
 move=> /[dup] e1in /val /andP[] /[dup] ve1 /exists_point_valid [p1 p1P] re1.
 move: (p1P); rewrite (pvertE ve1) =>/esym[] p1q.
-move: (ve1)=> /pvert_on on1.
+move: (ve1)=> /pvert_on; rewrite -p1q=> on1.
 move=> /[dup] e2in /val /andP[] /[dup] ve2 /exists_point_valid [p2 p2P] re2.
 move: (p2P); rewrite (pvertE ve2) =>/esym[] p2q.
-move: (ve2)=> /pvert_on on2; rewrite /pedge_below.
+move: (ve2)=> /pvert_on; rewrite -p2q=> on2; rewrite /pedge_below.
 have p1p2 : p_x p1 = p_x p2 by rewrite p1q p2q.
 have [vylt /= | vylt' /= | vyq] := ltrgtP.
 - case: (noc e1 e2 e1in e2in) => // abs.
@@ -4722,122 +4768,69 @@ have [vylt /= | vylt' /= | vyq] := ltrgtP.
   by rewrite p1q p2q /= vylt.
 - have re1' : p_x p1 < p_x (right_pt e1) by rewrite p1q.
   have p2u : p2 <<< e1.
-    rewrite (strict_under_edge_lower_y (esym p1p2)).
-      by rewrite p2q p1q.
-    apply/andP; split; last by rewrite/valid_edge p1q; exact: ve1.
-    by rewrite p1q; case/andP: on1.
+    by rewrite (strict_under_edge_lower_y (esym p1p2)); rewrite // p2q p1q.
   have p1a : p1 >>> e2.
-    rewrite (under_edge_lower_y p1p2).
-      by rewrite -ltNge p2q p1q.
-    apply/andP; split; last by rewrite/valid_edge p2q; exact: ve2.
-    by rewrite p2q; case/andP: on2.
+    by rewrite (under_edge_lower_y p1p2); rewrite // -ltNge p2q p1q.
   apply/negP=> /orP[|] /andP[]leftc rightc.
     by move: p1a; rewrite (point_on_edge_under _ leftc rightc) // p1q.
-  move: p2u. rewrite -(negbK (_ <<< _)). 
+  move: p2u; rewrite -(negbK (_ <<< _)).
   by rewrite (point_on_edge_above _ leftc rightc) // p2q.
-rewrite /=.
-(*
-have := pue_formula_on_edge (left_pt e2) (right_pt e2) (proj1 (andP on1)).
-  rewrite vyq; move: (on2)=> /andP[] /eqP -> _; rewrite mulr0 /= => cnd1.
-have := pue_formula_on_edge (left_pt e1) (right_pt e1) (proj1 (andP on2)).
-  rewrite -vyq; move: (on1)=> /andP[] /eqP -> _; rewrite mulr0 /= => cnd2.
-*)
 have pp : p1 = p2 by rewrite p1q p2q vyq.
-move: (ve1) => /andP[] + _; rewrite le_eqVlt=>/orP[/eqP pleft | pmid].
-  have p1l : p1 = left_pt e1. 
-    have := on_edge_same_point (left_on_edge _) on1.
-    rewrite /= pleft eqxx => /(_ isT)/eqP ys; rewrite p1q -ys -pleft.
-    by case: (left_pt e1).
+move: (ve1) => /andP[] + _; rewrite le_eqVlt=>/orP[/eqP pleft | pmid] /=.
+  have p1l : p1 = left_pt e1.
+    apply/esym/eqP; rewrite pt_eqE.
+    by rewrite (on_edge_same_point (left_on_edge _) on1) pleft p1q eqxx.
   move: ve2 => /andP[] + _; rewrite le_eqVlt=> /orP [/eqP pleft2 | pmid2].
     have p2l : p2 = left_pt e2.
-      have := on_edge_same_point (left_on_edge _) on2.
-      rewrite /= pleft2 eqxx p2q -pleft2 => /(_ isT)/eqP <-.
-      by case: (left_pt e2).
+      apply/esym/eqP; rewrite pt_eqE.
+      by rewrite (on_edge_same_point (left_on_edge _) on2) pleft2 p2q eqxx.
     by apply: same_left_edge_below_slopes; rewrite -p1l pp.
   have le2ltp2 : p_x (left_pt e2) < p_x p2 by rewrite p2q.
-  set e2' := Bedge le2ltp2.
-  have re2'e2 : right_pt e2' === e2 by have := on2; rewrite -p2q.
-  have sle2' := on_edge_same_slope_left re2'e2 erefl.
-  have re2'e1 : right_pt e2' === e1 by have := on1; rewrite -p1q pp.
+  have [e2' [le2' re2' sle2']] := sub_edge_left on2 le2ltp2.
+  have re2'e1 : right_pt e2' === e1 by rewrite re2' -pp.
   rewrite /edge_below.
-  have := (contact_right_slope re2'e1) => /= -[] _ ->.
+  have := (contact_right_slope re2'e1) => /= -[] _; rewrite le2' sle2' => ->.
   have p2ltre2 : p_x p2 < p_x (right_pt e2) by rewrite p2q.
-  set e2'' := Bedge p2ltre2.
-  have le2''e2 : left_pt e2'' === e2 by have:= on2; rewrite -p2q.
-  have sle2'' := on_edge_same_slope_right le2''e2 erefl.
-  have le2''e1 : left_pt e2'' === e1 by have := on1; rewrite -p1q pp.
-  have /= := (contact_left_slope le2''e1) => - [] _ /= tmp.
-  rewrite {}[in X in _ || X = _]tmp -2!leNgt !cmp_slopesE sle2'' sle2'.
+  have [e2'' [le2'' re2'' sle2'']] := sub_edge_right on2 p2ltre2.
+  have le2''e1 : left_pt e2'' === e1 by rewrite le2'' -pp.
+  have := (contact_left_slope le2''e1) => -[] _; rewrite re2'' sle2'' => ->.
+  rewrite -2!leNgt.
   set W := (X in _ || X); have [ | difslope] := boolP W.
-    rewrite {}/W=>/le_anti/esym/eqP; rewrite sgr_eq0 subr_eq0 orbT => /eqP ->.
-    by rewrite subrr sgr0 lexx.
-  rewrite orbF.
-  rewrite -p1l pp p2q {1}/point_under_edge; move: (on2); rewrite /point_on_edge.
+    rewrite {}/W=>/le_anti/esym/eqP.
+    by rewrite -cmp_slopesNC oppr_eq0 orbT=> /eqP->.
+  rewrite orbF -p1l pp {1}/point_under_edge; move: (on2); rewrite /point_on_edge.
   move=> /andP[] /eqP -> _; rewrite lexx /=.
-  move: (on2); rewrite -p2q -pp p1l=>/contact_left_slope.
-  by rewrite -cmp_slopesE=> -[] -> _.
+  by move: (on2); rewrite -pp p1l=>/contact_left_slope=>-[].
 have le1ltp1 : p_x (left_pt e1) < p_x p1 by rewrite p1q.
-set e1' := Bedge le1ltp1.
-have re1'e1 : right_pt e1' === e1 by have := on1; rewrite -p1q.
-have sle1' := on_edge_same_slope_left re1'e1 erefl.
-have re1'e2 : right_pt e1' === e2 by have := on2; rewrite -p2q -pp.
+have [e1' [le1' re1' sle1']] := sub_edge_left on1 le1ltp1.
+have re1'e2 : right_pt e1' === e2 by rewrite re1' pp.
 rewrite /edge_below.
 set W := (X in X || _); set W' := (X in _ || X).
-have := (contact_right_slope re1'e2) => /= -[] eq1 _.
+have := (contact_right_slope re1'e2); rewrite le1' sle1' => /= -[] eq1 _.
 have p1ltre1 : p_x p1 < p_x (right_pt e1) by rewrite p1q.
-set e1'' := Bedge p1ltre1.
-have le1''e1 : left_pt e1'' === e1 by have:= on1; rewrite -p1q.
-have sle1'' := on_edge_same_slope_right le1''e1 erefl.
-have le1''e2 : left_pt e1'' === e2 by have := on2; rewrite -p2q -pp.
-have /= := (contact_left_slope le1''e2) => - [] /= eq2 _.
+have [e1'' [le1'' re1'' sle1'']] := sub_edge_right on1 p1ltre1.
+have le1''e2 : left_pt e1'' === e2 by rewrite le1'' pp.
+have /= := (contact_left_slope le1''e2); rewrite re1'' sle1'' => - [] /= eq2 _.
 have Weq : W = (cmp_slopes e1 e2 == 0).
-  rewrite /W eq1 eq2 2!leNgt 2!cmp_slopesE sle1'' sle1'.
-  rewrite -cmp_slopesE -2!leNgt.
-   apply/idP/eqP; first by apply/le_anti.
-   by move=> ->; rewrite !lexx.
+  rewrite /W eq1 eq2; apply/idP/eqP; first by apply/le_anti.
+  by move=> ->; rewrite lexx.
 have [ | difslope /=] := boolP W.
   by rewrite /= le_eqVlt Weq => /eqP ->; rewrite eqxx.
 rewrite le_eqVlt eq_sym -Weq (negbTE difslope) /=.
 move: (ve2) => /andP[] + _; rewrite le_eqVlt => /orP [/eqP l2p | l2ltp].
-  have le2p1 : left_pt e2 = p1.
-    have p1e2 : p1 === e2 by rewrite pp p2q.
-    have := @on_edge_same_point e2 _ p1 (left_on_edge _).
-    rewrite /= pp p2q /= on2 l2p=> /(_ isT (eqxx _))/eqP <-.
-    by rewrite -l2p; case: (left_pt e2).
-  have/contact_left_slope[_ eq3] : left_pt e2 === e1.
-    by rewrite le2p1.
-  move: on1=>/andP[] /eqP + _; rewrite -p1q -le2p1 => eq4.
+  have /eqP p2l : left_pt e2 == p1.
+    rewrite pt_eqE.
+    rewrite (eqP (on_edge_same_point (left_on_edge _) on2 _)) -pp l2p p1q //=.
+    by rewrite !eqxx.
+  have/contact_left_slope[_ eq3] : left_pt e2 === e1 by rewrite p2l.
+  move: on1=>/andP[] /eqP + _; rewrite -p2l => eq4.
   rewrite /W' eq3 lt_neqAle -cmp_slopesNC eq_sym oppr_eq0 -Weq difslope /=.
   by rewrite -leNgt eq4 lexx -ltNge oppr_lt0.
-have l2ltp2 : p_x (left_pt e2) < p_x p2 by rewrite p2q.
-set e2' := Bedge l2ltp2.
-have /on_edge_same_slope_left/(_ erefl) sle2' : right_pt e2' === e2.
-  by rewrite /e2' /= p2q.
-have p2ltr2 : p_x p2 < p_x (right_pt e2) by rewrite p2q.
-set e2'' := Bedge p2ltr2.
-have /on_edge_same_slope_right/(_ erefl) sle2'' : left_pt e2'' === e2.
-  by rewrite /e2'' /= p2q.
-have /contact_left_slope/=[A' A]  : left_pt e2'' === e1 by rewrite /= -pp p1q.
-have /contact_right_slope/=[B' B]  : right_pt e2' === e1 by rewrite /= -pp p1q.
-have [C' C] := contact_right_slope re1'e2.
-have [D' D] := contact_left_slope le1''e2.
-move: A' A B' B C' C D' D; rewrite /= !cmp_slopesE sle2' sle2'' sle1' sle1''.
-rewrite -(opprB (slope e2)) !sgrN.
-rewrite !oppr_lte0 !oppr_gte0 -/W -cmp_slopesE => A' A B' B C' C D' D.
-have notedgebelow : ~~W'.
-  rewrite negb_and !negbK.
-  have [E | F | aligned] := ltrgtP (cmp_slopes e1 e2) 0 ; last first.
-      by case/negP: difslope; rewrite Weq aligned eqxx.
-    by rewrite B F.
-  by rewrite A E orbT.
-have := noc e1 e2 e1in e2in; rewrite /below_alt.
-  have -> /= : e1 <| e2 = false.
-  by rewrite /edge_below -/W -/W' (negbTE difslope) (negbTE notedgebelow).
-move/orP=> /=; rewrite /edge_below.
-have [E |F |/esym aligned ] := ltrgtP 0 (cmp_slopes e1 e2); last first.
-    by case/negP: difslope; rewrite Weq aligned eqxx.
-  by rewrite B' leNgt C F.
-by rewrite A' leNgt D E !andbF.
+have xpp1 : p_x p = p_x p1 by rewrite p1q.
+move: on2 l2ltp re2; rewrite -pp xpp1 => on2 l2ltp re2.
+have := intersection_imp_crossing on1 on2 le1ltp1 p1ltre1 l2ltp re2=> -[[]|abs].
+  by apply: noc.
+by case/negP: difslope; rewrite Weq.
 Qed.
 
 Lemma edge_below_trans p (s : pred edge) :
