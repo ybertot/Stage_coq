@@ -527,12 +527,9 @@ split; first by rewrite puef1_id.
 split; first by rewrite puef2_id.
 move=> qx qy; rewrite puef1_id puef2_id=> tmp1 tmp2; have := conj tmp1 tmp2.
 rewrite sys_to_mx_eqn addrC => /addr0_eq solmq {tmp1 tmp2}.
-suff : mkcv2 qx qy = sol.
-  move/matrixP=> mxq; split.
-    by rewrite -(mxq ord0 ord0) mxE.
-  by rewrite -(mxq ord_max ord0) mxE.
-rewrite -(mul1mx (mkcv2 qx qy)) -[in LHS](mulVmx Munit) -!mulmxA.
-by rewrite -solmq mulmxN.
+suff/matrixP mq : mkcv2 qx qy = sol.
+  by split; rewrite -?(mq ord0 ord0) -?(mq ord_max ord0) mxE.
+by rewrite /sol -mulmxN solmq mulKmx.
 Qed.
 
 Lemma pue_f_eq_slopes ax ay bx b_y mx my :
