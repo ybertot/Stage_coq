@@ -198,14 +198,12 @@ Definition compare_outgoing (e1 e2 : edge) : bool :=
   let: Bedge _ b _ := e1 in
    b <<= e2.
 
+(* Check @Bedge (Bpt 3%:Q 4%:Q) (Bpt 4%:Q 4%:Q) isT. *)
+
+(* Compute compare_incoming  (@Bedge  (Bpt 2%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ). *)
 
 
-Check @Bedge (Bpt 3%:Q 4%:Q) (Bpt 4%:Q 4%:Q) isT.
-
-Compute compare_incoming  (@Bedge  (Bpt 2%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ).
-
-
-Compute compare_outgoing (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 1%:Q) isT ) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
+(* Compute compare_outgoing (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 1%:Q) isT ) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT). *)
 
 Definition sort_incoming (inc : seq edge) : seq edge :=
   sort compare_incoming inc.
@@ -218,13 +216,13 @@ Definition E2 : edge := (@Bedge  (Bpt (@Rat (7%:Z, 3%:Z) isT)  10%:Q) (Bpt 3%:Q 
 Definition E3 : edge := (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
 
 Definition sorted_inc := map left_pt (sort_incoming [:: E1; E2; E3]).
-Eval lazy in sorted_inc.
+(* Eval lazy in sorted_inc. *)
 
 Definition E4 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 6%:Q) isT).
 Definition E5 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 5%:Q 3%:Q) isT).
 Definition E6 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 3%:Q) isT).
 Definition sorted_out := map right_pt (sort_outgoing [:: E4; E5; E6]).
-Eval lazy in sorted_out.
+(* Eval lazy in sorted_out. *)
 
 
 Section ring_sandbox.
@@ -676,7 +674,6 @@ Proof. by move/negP=> it; apply/negP=> it'; case: it; apply : underW. Qed.
 
 Lemma compare_outgoing_total p : {in [pred e | left_pt e == p] &, total compare_outgoing} .
 Proof.
-Check sort_sorted_in.
 rewrite /total.
 move => ab cd /eqP lp /eqP lp2.
 have: left_pt ab = left_pt cd.
@@ -1493,7 +1490,7 @@ rewrite -/(p_y (Bpt px py)); set py' := (p_y (Bpt px py)).
 rewrite -/(p_x (Bpt px py)) /py' {py'}.
 move: ca cu; rewrite -4!pue_formulaE=> ca cu on_line1 [] on_line2 uniq.
 exists (Bpt px py); rewrite on_line1 on_line2;split;[ | split]=> //.
-by move=> [qx qy]; rewrite !pue_formulaE=> /uniq => U; move=> {U}/U[] /= -> ->.
+by move=> [qx qy]; rewrite !pue_formulaE=> /uniq => U; move=> {}/U[] /= -> ->.
 Qed.
 
 Lemma intersection_middle_au e1 e2 :
