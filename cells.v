@@ -2053,6 +2053,14 @@ Definition adjacent_cells open : bool :=
   | b::q => adjacent_cells_aux q (high b)
   end.
 
+Lemma adjacent_cells_sorted s :
+  adjacent_cells s = sorted (fun c1 c2 => high c1 == low c2) s.
+Proof.
+case: s => [// | a s] /=.
+elim: s a => [// | b s Ih] a /=.
+by rewrite Ih.
+Qed.
+
 Lemma l_h_c_decomposition open_cells pt :
 forall first_cells contact last_cells low_f high_f,
 open_cells_decomposition open_cells pt  = (first_cells, contact, last_cells, low_f, high_f)   ->
@@ -5265,6 +5273,23 @@ by rewrite -sq; apply: Ih.
 Qed.
 
 
+Lemma opening_cells_seq_edge_shift p oe le he :
+  {in oe, forall g, left_pt g = p} ->
+  valid_edge le p -> valid_edge he p ->
+  le :: [seq high i | i <- opening_cells p oe le he] =
+  rcons [seq low i | i <- opening_cells p oe le he] he.
+Proof.
+move=> + + vh.
+elim: oe le => [ | g oe Ih] le leftg vl.
+  rewrite /=; case: (exists_point_valid vl) => [p1 ->].
+  by case: (exists_point_valid vh) => [p2 ->].
+rewrite /=; case: (exists_point_valid vl) => [p1 ->] /=.
+rewrite Ih //; last first.
+  have gin : g \in g :: oe by rewrite inE eqxx.
+  by have := @valid_edge_extremities g p; rewrite (leftg g gin) eqxx; apply.
+by move=> g' gin; apply: leftg; rewrite inE gin orbT.
+Qed.
+
 Lemma opening_cells_disjoint (s oe : seq edge) p le he :
     p >>> le -> p <<< he -> le \in s -> he \in s -> le <| he ->
     valid_edge le p -> valid_edge he p -> {subset oe <= s} ->
@@ -5281,6 +5306,7 @@ elim: oe oesub leftg le lowhigh pl lein vl soe
   by move=> c1 c2; rewrite !inE /= => /eqP -> /eqP ->; left.
 rewrite /=; case vip : (vertical_intersection_point _ _) => [p1 |//].
 set W := Bcell _ _ _ _.
+have logp : left_pt og = p by apply/leftg; rewrite inE eqxx.
 suff main : forall c, c \in opening_cells p oe og he -> no_overlap_e W c.
   move=> c1 c2; rewrite !inE => /orP[/eqP c1W |c1in] /orP[/eqP c2W | c2in].
   - by left; rewrite c1W c2W.
@@ -5289,27 +5315,82 @@ suff main : forall c, c \in opening_cells p oe og he -> no_overlap_e W c.
   apply: (Ih _ _ og) => //.
   - by move=> x xin; rewrite oesub // inE xin orbT.
   - by move=> x xin; rewrite leftg // inE xin orbT.
-  - have := no_crossingE.  have := noc _ _  _ hein.
+  - have ogin : og \in s by rewrite oesub // inE eqxx.
+    have := no_crossingE (noc _ _  ogin hein); rewrite logp vh ph.
+    by move=> /(_ isT)[]/(_ isT).
   - by rewrite -(leftg og) ?left_pt_above // inE eqxx.
   - by rewrite oesub // inE eqxx.
   - by rewrite /valid_edge -(leftg og) ?lexx ?ltW ?edge_cond // inE eqxx.
   by move: soe=> /=/andP[] _.
 move=> c cin; right=> q.
+have oc0q : opening_cells p (og :: oe) le he = W :: opening_cells p oe og he.
+  by rewrite /= vip.
 have [/andP[]/andP[] Main w lims/= | qnW//] := boolP(strict_inside_open q W).
 have vhwq : valid_edge (high W) q.
   apply: valid_high_limits => //.
   apply: (opening_cells_side_limit vl vh leftg).
-  by rewrite /= vip inE eqxx.
+  by rewrite oc0q inE eqxx.
+have adj0 := adjacent_opening' p (og :: oe) le he.
+have rf0 := opening_cells_right_form' pl ph vh lein hein lowhigh leftg noc
+         oesub soe erefl.
+have := seq_edge_below' adj0 rf0; rewrite oc0q [head _ _]/= => srt.
+have vog : valid_edge og q by move: vhwq; rewrite [high W]/=.
+case ocq : (opening_cells p oe og he) => [ | c0 q0].
+  by move: cin; rewrite ocq.
+move: adj0; rewrite /= ocq vip /= => /andP[/eqP ogl adj'].
+move: vog; rewrite ogl=> vog.
+move: (cin) => /(nthP W) [rank rltsize /esym ceq].
+have ceq' : c = nth W (c0 :: q0) rank by move: ceq; rewrite ocq.
+case rankeq: rank => [ | rank'].
+  have cc0 : c = c0 by rewrite ceq' rankeq.
+  move: Main; rewrite /W /= => Main.
+  by rewrite /strict_inside_open cc0 -ogl underW ?andbF.
+have cq0 : c \in q0.
+  have/(mem_nth W) : (rank' < size q0)%N.
+    by rewrite -ltnS -[(size _).+1]/(size (c0 :: q0)) -ocq -rankeq.
+  by rewrite -[nth _ _ _]/(nth W (c0::q0) rank'.+1) -rankeq -ceq'.
+have c0q0cut : c0 :: q0 = take rank (c0::q0) ++ drop rank (c0 :: q0).
+  by rewrite cat_take_drop.
+set c' := last W (take rank (c0 :: q0)).
 have := adjacent_opening' p (og :: oe) le he.
-  rewrite /= vip /=.
-  case ocq : opening_cells => [ | c0 q0]; first by move: cin; rewrite ocq.
-have := seq_edge_below' (adjacent_opening' p (og::oe) le he).
-have := opening_cells_right_form' pl ph vh lein hein.
-have := order_edges_strict_viz_point vhwq.
+  rewrite adjacent_cells_sorted oc0q /= ocq c0q0cut.
+  have := drop_nth W rltsize; rewrite ocq => ->.
+  rewrite cat_path => /andP[] _; rewrite -/c' /= => /andP[] /eqP + _.
+  rewrite -ceq' => hic'.
+apply/negP; rewrite /strict_inside_open => inc.
+have valq : valid_edge (low c) q.
+  apply: valid_low_limits.
+    apply: (opening_cells_side_limit vl vh leftg).
+    by rewrite oc0q inE cin orbT.
+  by move: inc=> /andP[] _ //.
+have c'in : c' \in opening_cells p oe og he.
+  have /(last_in_not_nil W) : take rank (c0 :: q0) != [::].
+    apply/eqP=> abs.
+    have : size (take rank (c0 :: q0)) = rank.
+      by rewrite size_takel // ltnW // -ocq rltsize.
+    by rewrite abs rankeq.
+  by rewrite -/c' ocq; apply: mem_take.
+have tr : {in (og :: oe) & & , transitive edge_below}.
+  apply: (@edge_below_trans p); last by move: noc; apply: sub_in2.
+    by left; move=> g gin; rewrite -(leftg g gin) edge_cond.
+  by move=> g gin; apply: valid_edge_extremities; rewrite leftg ?eqxx.
+have  : all (mem (og :: oe)) [seq low i | i <- opening_cells p oe og he].
+  apply/allP=> g /mapP [c2 c2p1 ->].
+  by have := opening_cells_subset c2p1=> /andP[].
+rewrite ocq /==> allid.
+have := path_sorted_inE tr allid => patheq.
+move: srt; simpl map.
+rewrite opening_cells_seq_edge_shift //; last first.
+- by apply: valid_edge_extremities; rewrite (leftg og) ?inE ?eqxx.
+- by move=> g' gin; apply leftg; rewrite inE gin orbT.
+rewrite ocq /= -cats1 cat_path -ogl => /andP[] _ /andP[].
+rewrite ogl patheq -ogl => /andP[] /allP /(_ (low c)) pathconcl _ _.
+have lowcin : low c \in [seq low i | i <- q0] by apply: map_f.
+have qu:= order_edges_strict_viz_point' vhwq valq (pathconcl lowcin) Main.
+move: inc; rewrite underW; first by rewrite ?andbF.
+exact: qu.
+Qed.
 
-  have Win : W \in opening_cells p (og :: oe) le he by rewrite /= vip inE eqxx.
-
-rewrite /strict_inside_open.
 Lemma step_keeps_disjoint_open ev open closed open' closed' :
   cells_bottom_top open ->
   adjacent_cells open ->
