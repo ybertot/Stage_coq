@@ -723,7 +723,17 @@ move => p s.
 apply /sort_sorted_in /compare_incoming_total.
 Qed.
 
-Definition valid_edge e p := (p_x (left_pt e) <= p_x p) && (p_x p <= p_x (right_pt e)).
+Definition valid_edge e p := p_x (left_pt e) <= p_x p <= p_x (right_pt e).
+
+Lemma valid_edge_extremities e0 p:
+(left_pt e0 == p) || (right_pt e0 == p) ->
+valid_edge e0 p.
+Proof.
+rewrite /valid_edge.
+by move => /orP [/eqP eq |/eqP eq ];
+rewrite -eq lexx ?andbT /= {eq} ltW // ; case : e0 .
+Qed.
+
 Definition valid_cell c x := (valid_edge (low c) x) /\ (valid_edge (high c) x).
 
 
@@ -736,8 +746,17 @@ Definition edge_below (e1 : edge) (e2 : edge) : bool :=
 ((left_pt e1 <<= e2) && (right_pt e1 <<= e2))
 || (~~  (left_pt e2 <<< e1) && ~~ (right_pt e2<<< e1)).
 
+Notation "e1 '<|' e2" := (edge_below e1 e2)( at level 70, no associativity).
+
 Definition below_alt (e1 : edge) (e2 : edge) :=
   edge_below e1 e2 \/ edge_below e2 e1.
+
+Lemma edge_below_refl e : e <| e.
+Proof.
+apply/orP; left; rewrite /point_under_edge.
+rewrite (eqP (proj1 (pue_formula_two_points _ _))).
+by rewrite (eqP (proj1 (proj2 (pue_formula_two_points _ _)))) lexx.
+Qed.
 
 Lemma below_altC e1 e2 : below_alt e1 e2 <-> below_alt e2 e1.
 Proof. by rewrite /below_alt or_comm. Qed.
@@ -761,10 +780,7 @@ Qed.
 
 Definition no_crossing := forall e1 e2, below_alt e1 e2.
 
-Notation "e1 '<|' e2" := (edge_below e1 e2)( at level 70, no associativity).
-
-Definition right_form (c : cell) : bool :=
-  (low c) <| (high c).
+Definition right_form (c : cell) : bool := low c <| high c.
 
 Lemma left_on_edge e :
 (left_pt e) === e.
@@ -1567,7 +1583,6 @@ Fixpoint closing_rest (p: pt) (rest : seq cell) : (seq cell) :=
        | c::q =>  Bcell  (left_pts c) [::p] (low c) (high c)::closing_rest p q
     end.
 
-
 Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
     match contact_cells with
       | [::] => [::]
@@ -1579,12 +1594,12 @@ Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
                           |(Some(p0),Some(p1)) =>
                               Bcell  (left_pts only_cell) (no_dup_seq [:: p0; p; p1])(low only_cell) (high only_cell)::[::]
                       end
-      | c::q => let op0 := vertical_intersection_point p (low c) in
-                    match op0 with
-                       | None => [::]
-                       | Some(p0) =>
-                        Bcell  (left_pts c) (no_dup_seq [:: p0; p]) (low c) (high c) :: (closing_rest p q)
-                    end
+      | c::q => match vertical_intersection_point p (low c) with
+                | None => [::]
+                | Some(p0) =>
+                   Bcell  (left_pts c) (no_dup_seq [:: p0; p])
+                           (low c) (high c) :: (closing_rest p q)
+                end
     end.
 
 (* at each step we create the cell under the first outgoing edge and when there's only one left,
@@ -2254,6 +2269,36 @@ move: (eqP (pue_formula_on_edge (left_pt e1) (right_pt e1) pone2')) => ->.
 by rewrite oppr_gt0 ltNge addr_ge0 // mulr_ge0 // -px subr_ge0.
 Qed.
 
+Lemma opening_cells_seq_edge_shift p oe le he :
+  {in oe, forall g, left_pt g = p} ->
+  valid_edge le p -> valid_edge he p ->
+  le :: [seq high i | i <- opening_cells p oe le he] =
+  rcons [seq low i | i <- opening_cells p oe le he] he.
+Proof.
+move=> + + vh.
+elim: oe le => [ | g oe Ih] le leftg vl.
+  rewrite /=; case: (exists_point_valid vl) => [p1 ->].
+  by case: (exists_point_valid vh) => [p2 ->].
+rewrite /=; case: (exists_point_valid vl) => [p1 ->] /=.
+rewrite Ih //; last first.
+  have gin : g \in g :: oe by rewrite inE eqxx.
+  by have := @valid_edge_extremities g p; rewrite (leftg g gin) eqxx; apply.
+by move=> g' gin; apply: leftg; rewrite inE gin orbT.
+Qed.
+
+Lemma opening_cells_subset c p s le he:
+  c \in opening_cells p s le he ->
+  (low c \in le :: s) && (high c \in he :: s).
+Proof.
+elim: s le => [ | ed s Ih] le /=.
+by do 2 case: (vertical_intersection_point p _) => [? | //];
+  rewrite !inE => /eqP -> /=; rewrite !eqxx.
+case: (vertical_intersection_point p le) => [p' | //].
+rewrite !inE=> /orP[/eqP -> /=| ]; rewrite ?eqxx ?orbT //.
+move=> /Ih /andP[]; rewrite !inE=> ->; rewrite ?orbT /= orbCA => ->.
+by rewrite orbT.
+Qed.
+
 Lemma opening_cells_right_form' (ctxt s : seq edge) p low_e high_e :
 p >>= low_e -> p <<< high_e -> valid_edge high_e p ->
 low_e \in ctxt -> high_e \in ctxt ->
@@ -2291,13 +2336,6 @@ have paboveg1 : p >>= g1 by rewrite strict_nonAunder ?pong //; case/andP: pong.
 move: (sorted_e) => /=/andP[] low_eg1 _.
 have g1in : g1 \in ctxt by rewrite allin // inE eqxx.
 by case: ifP => _ s <- /=; rewrite /right_form /= ?low_eg1 /=; apply: (IH g1).
-Qed.
-
-Lemma edge_below_refl e : e <| e.
-Proof.
-apply/orP; left; rewrite /point_under_edge.
-rewrite (eqP (proj1 (pue_formula_two_points _ _))).
-by rewrite (eqP (proj1 (proj2 (pue_formula_two_points _ _)))) lexx.
 Qed.
 
 Lemma opening_cells_right_form e low_e high_e :
@@ -2723,15 +2761,6 @@ Qed.
 
 Definition out_left_event ev :=
   {in outgoing ev, forall e, left_pt e == point(ev)}.
-
-Lemma valid_edge_extremities e0 p:
-(left_pt e0 == p) || (right_pt e0 == p) ->
-valid_edge e0 p.
-Proof.
-rewrite /valid_edge.
-by move => /orP [/eqP eq |/eqP eq ];
-rewrite -eq lexx ?andbT /= {eq} ltW // ; case : e0 .
-Qed.
 
 Lemma open_not_nil out low_e high_e p :
 valid_edge low_e p -> valid_edge high_e p ->
@@ -4171,19 +4200,6 @@ rewrite addSn; congr (_.+1); apply: Ih=> //; last first.
 by apply: valid_edge_extremities; rewrite cond_out // inE eqxx.
 Qed.
 
-Lemma opening_cells_subset c p s le he:
-  c \in opening_cells p s le he ->
-  (low c \in le :: s) && (high c \in he :: s).
-Proof.
-elim: s le => [ | ed s Ih] le /=.
-by do 2 case: (vertical_intersection_point p _) => [? | //];
-  rewrite !inE => /eqP -> /=; rewrite !eqxx.
-case: (vertical_intersection_point p le) => [p' | //].
-rewrite !inE=> /orP[/eqP -> /=| ]; rewrite ?eqxx ?orbT //.
-move=> /Ih /andP[]; rewrite !inE=> ->; rewrite ?orbT /= orbCA => ->.
-by rewrite orbT.
-Qed.
-
 (* This will be necessary to prove that the no_crossing property is preserved. *)
 Lemma step_edges_open_subset e open closed open' closed' :
   cells_bottom_top open ->
@@ -5140,19 +5156,18 @@ rewrite /point_under_edge.
 by rewrite (eqP (proj1 (proj2 (pue_formula_two_points _ _)))) lexx.
 Qed.
 
-Lemma opening_cells_side_limit e s le he c :
+Lemma opening_cells_side_limit e s le he :
   valid_edge le e -> valid_edge he e -> le <| he ->
   e >>= le -> e <<< he ->
   {in [:: le, he & s] &, no_crossing} ->
   {in s, forall g, left_pt g = e} ->
-  c \in opening_cells e s le he ->
-  open_cell_side_limit_ok c.
+  all open_cell_side_limit_ok (opening_cells e s le he).
 Proof.
 move=> + vh.
 elim : s le=> [ | g s Ih] le /= vl lowhigh above under noc lg;
    set vip := vertical_intersection_point.
   case vip1 : vip => [p1 | //]; case vip2 : vip => [p2 | //].
-  rewrite inE /open_cell_side_limit_ok => /eqP -> /=.
+  apply/allP=> c; rewrite inE /open_cell_side_limit_ok => /eqP -> /=.
   have [v1 on1 x1] : [/\ valid_edge le p1, p1 === le & p_x e = p_x p1].
     have [on1 xp] := intersection_on_edge vip1; split => //.
     rewrite /valid_edge -xp; exact vl.
@@ -5181,26 +5196,27 @@ case vip1 : vip => [p1 | //].
 have [v1 on1 x1] : [/\ valid_edge le p1, p1 === le & p_x e = p_x p1].
   have [on1 xp] := intersection_on_edge vip1; split => //.
   rewrite /valid_edge -xp; exact vl.
-have eong : e === g.
-  by rewrite -(lg g) ?inE ?eqxx // left_on_edge.
-rewrite inE=> /orP[/eqP -> | cintl]; last first.
-  apply: (Ih g) => //.
-  - by apply: valid_edge_extremities; rewrite lg ?inE eqxx.
-  - have [hein gin] : he \in [:: le , he, g & s] /\ g \in [:: le, he, g & s].
-      by split; rewrite !inE eqxx ?orbT.
-    have := no_crossingE (noc _ _ gin hein).
-    rewrite lg; last by rewrite inE eqxx.
-    by move=> /(_ vh) [] /(_ under).
-  - by rewrite -(lg g) ?inE ?eqxx ?left_pt_above.
-  - move: noc; apply: sub_in2.
-    by move=> g'; rewrite !inE => /orP [-> |/orP[-> | ->]]; rewrite ?orbT.
-  by move: lg; apply: sub_in1 => g' gin; rewrite inE gin orbT.
-rewrite /open_cell_side_limit_ok.
-case: ifP=> [eisp1 | enp1] /=;
-  rewrite -?x1 !eqxx on1 -?(eqP eisp1) ?eong ?andbT //=.
-rewrite ltNge le_eqVlt negb_or.
-rewrite -(strict_under_edge_lower_y x1 on1) above andbT.
-by apply/negP=> A; case/negP: enp1; rewrite pt_eqE (eqP A) x1 ?eqxx.
+have eong : e === g by rewrite -(lg g) ?inE ?eqxx // left_on_edge.
+apply/allP=> c; rewrite inE=> /orP[/eqP -> | cintl].
+  rewrite /open_cell_side_limit_ok.
+  case: ifP=> [eisp1 | enp1] /=;
+    rewrite -?x1 !eqxx on1 -?(eqP eisp1) ?eong ?andbT //=.
+  rewrite ltNge le_eqVlt negb_or.
+  rewrite -(strict_under_edge_lower_y x1 on1) above andbT.
+  by apply/negP=> A; case/negP: enp1; rewrite pt_eqE (eqP A) x1 ?eqxx.
+suff/allP/(_ c cintl) : all open_cell_side_limit_ok (opening_cells e s g he).
+  by [].
+apply: (Ih g) => //.
+- by apply: valid_edge_extremities; rewrite lg ?inE eqxx.
+- have [hein gin] : he \in [:: le , he, g & s] /\ g \in [:: le, he, g & s].
+    by split; rewrite !inE eqxx ?orbT.
+  have := no_crossingE (noc _ _ gin hein).
+  rewrite lg; last by rewrite inE eqxx.
+  by move=> /(_ vh) [] /(_ under).
+- by rewrite -(lg g) ?inE ?eqxx ?left_pt_above.
+- move: noc; apply: sub_in2.
+  by move=> g'; rewrite !inE => /orP [-> |/orP[-> | ->]]; rewrite ?orbT.
+by move: lg; apply: sub_in1 => g' gin; rewrite inE gin orbT.
 Qed.
 
 Lemma valid_high_limits c p :
@@ -5249,7 +5265,8 @@ have blo : high c <| he.
   rewrite (gleft _ hcin) vhe.
   by move: ebounds=> /andP[] _ -> /(_ isT)[] /(_ isT).
 apply: (order_edges_strict_viz_point' _ vp blo plhc).
-have cok := opening_cells_side_limit vle vhe lowhigh labove under noc gleft oc.
+have cok := opening_cells_side_limit vle vhe lowhigh labove under noc gleft.
+move: cok =>/allP/(_ c oc) {}cok.
 by apply: valid_high_limits cok plim.
 Qed.
 
@@ -5275,7 +5292,8 @@ have blo : le <| low c.
   by move: ebounds=> /andP[] -> _ /(_ isT)[] _ /(_ isT).
 apply/negP=> pule; case/negP: palc.
 apply: (order_edges_viz_point' vp _ blo pule).
-have cok := opening_cells_side_limit vle vhe lowhigh labove under noc gleft oc.
+have cok := opening_cells_side_limit vle vhe lowhigh labove under noc gleft.
+move: cok => /allP/(_ c oc) {}cok.
 by apply: (valid_low_limits cok).
 Qed.
 
@@ -5335,24 +5353,6 @@ have -> : high c0 = head dummy_edge [seq low i | i <- c1 :: s'].
 by rewrite -sq; apply: Ih.
 Qed.
 
-
-Lemma opening_cells_seq_edge_shift p oe le he :
-  {in oe, forall g, left_pt g = p} ->
-  valid_edge le p -> valid_edge he p ->
-  le :: [seq high i | i <- opening_cells p oe le he] =
-  rcons [seq low i | i <- opening_cells p oe le he] he.
-Proof.
-move=> + + vh.
-elim: oe le => [ | g oe Ih] le leftg vl.
-  rewrite /=; case: (exists_point_valid vl) => [p1 ->].
-  by case: (exists_point_valid vh) => [p2 ->].
-rewrite /=; case: (exists_point_valid vl) => [p1 ->] /=.
-rewrite Ih //; last first.
-  have gin : g \in g :: oe by rewrite inE eqxx.
-  by have := @valid_edge_extremities g p; rewrite (leftg g gin) eqxx; apply.
-by move=> g' gin; apply: leftg; rewrite inE gin orbT.
-Qed.
-
 Lemma opening_cells_disjoint (s oe : seq edge) p le he :
     p >>> le -> p <<< he -> le \in s -> he \in s -> le <| he ->
     valid_edge le p -> valid_edge he p -> {subset oe <= s} ->
@@ -5383,60 +5383,43 @@ suff main : forall c, c \in opening_cells p oe og he -> no_overlap_e W c.
     by move=> /(_ isT)[]/(_ isT).
   - by rewrite -(leftg og) ?left_pt_above // inE eqxx.
   - by rewrite oesub // inE eqxx.
-  - by rewrite /valid_edge -(leftg og) ?lexx ?ltW ?edge_cond // inE eqxx.
+  - by rewrite valid_edge_extremities // leftg ?inE ?eqxx.
   by move: soe=> /=/andP[] _.
 move=> c cin; right=> q.
 have oc0q : opening_cells p (og :: oe) le he = W :: opening_cells p oe og he.
   by rewrite /= vip.
 have noc' : {in [:: le, he , og & oe] &, no_crossing}.
-  move: noc; apply: sub_in2.
-  move=> g; rewrite 2!inE=> /orP[/eqP ->| /orP[/eqP -> | ginoe]] //.
-  by apply: oesub.
+  move: noc; apply: sub_in2 => g; rewrite 2!inE.
+  by move=> /orP[/eqP ->| /orP[/eqP -> | ginoe]] //; apply: oesub.
+have/allP cok := opening_cells_side_limit vl vh lowhigh pl ph noc' leftg.
 have [/andP[]/andP[] Main w lims/= | qnW//] := boolP(strict_inside_open q W).
 have vhwq : valid_edge (high W) q.
   apply: valid_high_limits => //.
-  apply: (opening_cells_side_limit vl vh lowhigh pl ph noc' leftg).
-  by rewrite oc0q inE eqxx.
+  by apply: cok; rewrite oc0q inE eqxx.
 have adj0 := adjacent_opening' p (og :: oe) le he.
 have rf0 := opening_cells_right_form' pl ph vh lein hein lowhigh leftg noc
          oesub soe erefl.
 have := seq_edge_below' adj0 rf0; rewrite oc0q [head _ _]/= => srt.
 have vog : valid_edge og q by move: vhwq; rewrite [high W]/=.
-case ocq : (opening_cells p oe og he) => [ | c0 q0].
+case ocq : (opening_cells p oe og he) => [| c0 q0].
   by move: cin; rewrite ocq.
 move: adj0; rewrite /= ocq vip /= => /andP[/eqP ogl adj'].
 move: vog; rewrite ogl=> vog.
 move: (cin) => /(nthP W) [rank rltsize /esym ceq].
-have ceq' : c = nth W (c0 :: q0) rank by move: ceq; rewrite ocq.
+have {}ceq : c = nth W (c0 :: q0) rank by move: ceq; rewrite ocq.
 case rankeq: rank => [ | rank'].
-  have cc0 : c = c0 by rewrite ceq' rankeq.
+  have cc0 : c = c0 by rewrite ceq rankeq.
   move: Main; rewrite /W /= => Main.
   by rewrite /strict_inside_open cc0 -ogl underW ?andbF.
 have cq0 : c \in q0.
   have/(mem_nth W) : (rank' < size q0)%N.
     by rewrite -ltnS -[(size _).+1]/(size (c0 :: q0)) -ocq -rankeq.
-  by rewrite -[nth _ _ _]/(nth W (c0::q0) rank'.+1) -rankeq -ceq'.
-have c0q0cut : c0 :: q0 = take rank (c0::q0) ++ drop rank (c0 :: q0).
-  by rewrite cat_take_drop.
-set c' := last W (take rank (c0 :: q0)).
-have := adjacent_opening' p (og :: oe) le he.
-  rewrite adjacent_cells_sorted oc0q /= ocq c0q0cut.
-  have := drop_nth W rltsize; rewrite ocq => ->.
-  rewrite cat_path => /andP[] _; rewrite -/c' /= => /andP[] /eqP + _.
-  rewrite -ceq' => hic'.
+  by rewrite -[nth _ _ _]/(nth W (c0::q0) rank'.+1) -rankeq -ceq.
 apply/negP; rewrite /strict_inside_open => inc.
 have valq : valid_edge (low c) q.
   apply: valid_low_limits.
-    apply: (opening_cells_side_limit vl vh lowhigh pl ph noc' leftg).
-    by rewrite oc0q inE cin orbT.
+    by apply: cok; rewrite oc0q ocq !inE cq0 ?orbT.
   by move: inc=> /andP[] _ //.
-have c'in : c' \in opening_cells p oe og he.
-  have /(last_in_not_nil W) : take rank (c0 :: q0) != [::].
-    apply/eqP=> abs.
-    have : size (take rank (c0 :: q0)) = rank.
-      by rewrite size_takel // ltnW // -ocq rltsize.
-    by rewrite abs rankeq.
-  by rewrite -/c' ocq; apply: mem_take.
 have tr : {in (og :: oe) & & , transitive edge_below}.
   apply: (@edge_below_trans p); last by move: noc; apply: sub_in2.
     by left; move=> g gin; rewrite -(leftg g gin) edge_cond.
@@ -5444,20 +5427,171 @@ have tr : {in (og :: oe) & & , transitive edge_below}.
 have  : all (mem (og :: oe)) [seq low i | i <- opening_cells p oe og he].
   apply/allP=> g /mapP [c2 c2p1 ->].
   by have := opening_cells_subset c2p1=> /andP[].
+have vog' : valid_edge og p.
+  by rewrite valid_edge_extremities // (leftg og) ?inE ?eqxx.
 rewrite ocq /==> allid.
 have := path_sorted_inE tr allid => patheq.
-move: srt; simpl map.
-rewrite opening_cells_seq_edge_shift //; last first.
-- by apply: valid_edge_extremities; rewrite (leftg og) ?inE ?eqxx.
-- by move=> g' gin; apply leftg; rewrite inE gin orbT.
+have leftg' : {in oe, forall g, left_pt g = p}.
+  by move: leftg; apply: sub_in1=> g' gin; rewrite inE gin orbT.
+move: srt; rewrite [X in path _ _ X]/= opening_cells_seq_edge_shift //.
 rewrite ocq /= -cats1 cat_path -ogl => /andP[] _ /andP[].
 rewrite ogl patheq -ogl => /andP[] /allP /(_ (low c)) pathconcl _ _.
 have lowcin : low c \in [seq low i | i <- q0] by apply: map_f.
 have qu:= order_edges_strict_viz_point' vhwq valq (pathconcl lowcin) Main.
-move: inc; rewrite underW; first by rewrite ?andbF.
-exact: qu.
+by move: inc; rewrite (underW qu) !andbF.
 Qed.
 
+Definition closed_cell_side_limit_ok c :=
+ [&& left_pts c != [::],
+   all (fun p : pt => p_x p == p_x (last dummy_pt (left_pts c))) (left_pts c),
+   sorted >%R [seq p_y p | p <- left_pts c],
+   head dummy_pt (left_pts c) === high c,
+   last dummy_pt (left_pts c) === low c,
+    right_pts c != [::],
+   all (fun p : pt => p_x p == p_x (head dummy_pt (right_pts c))) (right_pts c),
+   sorted <%R [seq p_y p | p <- right_pts c],
+   head dummy_pt (right_pts c) === low c &
+   last dummy_pt (right_pts c) === high c].
+
+Lemma closing_rest_side_limit e cc :
+  s_right_form cc ->
+  all open_cell_side_limit_ok cc ->
+  all (contains_point e) cc ->
+  all closed_cell_side_limit_ok (closing_cells e cc).
+Proof.
+set vip := vertical_intersection_point.
+case: cc => [ // | c0 q /=].
+move=> /andP[] rf0 rfr /andP[] lim0 limr /andP[] ct0 ctr.
+  rewrite -/vip; move: rf0 lim0.
+  rewrite /right_form /open_cell_side_limit_ok => lowhigh /andP[] ln0.
+  move=> /andP[] lxs /andP[] ls /andP[] onh onl.
+  case vip1 : vip => [p1 | //];[ |by case: (q)]; case vip2 : vip => [p2 /=| //];
+  have [onlr x1] := intersection_on_edge vip1.
+  have [onhr x2] := intersection_on_edge vip2.
+elim: q rfr limr ctr => [/= | c1 q Ih].
+  move=> _ _ _ /=.
+  have vl : valid_edge (low c0) e.
+    by move: onlr=> /andP[] _; rewrite /valid_edge x1.
+  have vh : valid_edge (high c0) e.
+    by move: onhr=> /andP[] _; rewrite /valid_edge x2.
+  case: ifP => [/eqP p1ise | p1ne]; case :ifP => [/eqP eisp2 | enp2] /=;
+  rewrite /closed_cell_side_limit_ok /= ln0 lxs ls onh onl ?onhr ?onlr 
+   ?eqxx ?andbT /=.
+  - by rewrite -eisp2 -p1ise.
+  - rewrite x2 eqxx -p1ise onlr andbT /=.
+    move: ct0; rewrite /contains_point p1ise under_onVstrict // => /andP[] _.
+    move/orP=> [ | str]; last by rewrite -(strict_under_edge_lower_y x2 onhr).
+    move=> eoh; have := on_edge_same_point eoh onhr => tmp.
+    by case/negP: enp2; rewrite pt_eqE tmp x2 eqxx.
+  - rewrite -x1 -x2 eqxx /=.
+    move: ct0; rewrite /contains_point strict_nonAunder // => /andP[] + _.
+    rewrite negb_and negbK=> /orP[eol| ]; last first.
+      by rewrite (under_edge_lower_y x1 onlr); rewrite -ltNge eisp2.
+    have := on_edge_same_point onlr eol => {}eol; case/negP:p1ne.
+    by rewrite pt_eqE eol x1 eqxx.
+  rewrite -x1 -x2 ?eqxx /=.
+  move: ct0; rewrite /contains_point strict_nonAunder // => /andP[] + under2.
+  rewrite negb_and negbK=> /orP[eol| ]; last first.
+    rewrite (under_edge_lower_y x1 onlr) -ltNge => -> /=.
+    move: under2; rewrite under_onVstrict // => /orP[eoh| ]; last first.
+      by rewrite (strict_under_edge_lower_y x2 onhr).
+    have := on_edge_same_point onhr eoh => {}eoh; case/negP:enp2.
+    by rewrite eq_sym pt_eqE eoh x2 eqxx.
+  have := on_edge_same_point onlr eol => {}eol; case/negP:p1ne.
+  by rewrite pt_eqE eol x1 eqxx.
+rewrite /= => /andP[] rf1 rfr /andP[] lim1 limr /andP[] ct1 ctr.
+apply/andP; split; last first.
+  rewrite -/vip; case: (vip _ _) => [p3 /= | //].
+
+
+Lemma closing_cells_side_limit e cc :
+  s_right_form cc ->
+  all open_cell_side_limit_ok cc ->
+  all (contains_point e) cc ->
+  all closed_cell_side_limit_ok (closing_cells e cc).
+Proof.
+set vip := vertical_intersection_point.
+case: cc => [ // | c0 q /=].
+move=> /andP[] rf0 rfr /andP[] lim0 limr /andP[] ct0 ctr.
+  rewrite -/vip; move: rf0 lim0.
+  rewrite /right_form /open_cell_side_limit_ok => lowhigh /andP[] ln0.
+  move=> /andP[] lxs /andP[] ls /andP[] onh onl.
+  case vip1 : vip => [p1 | //];[ |by case: (q)]; case vip2 : vip => [p2 /=| //];
+  have [onlr x1] := intersection_on_edge vip1.
+  have [onhr x2] := intersection_on_edge vip2.
+elim: q rfr limr ctr => [/= | c1 q Ih].
+  move=> _ _ _ /=.
+  have vl : valid_edge (low c0) e.
+    by move: onlr=> /andP[] _; rewrite /valid_edge x1.
+  have vh : valid_edge (high c0) e.
+    by move: onhr=> /andP[] _; rewrite /valid_edge x2.
+  case: ifP => [/eqP p1ise | p1ne]; case :ifP => [/eqP eisp2 | enp2] /=;
+  rewrite /closed_cell_side_limit_ok /= ln0 lxs ls onh onl ?onhr ?onlr 
+   ?eqxx ?andbT /=.
+  - by rewrite -eisp2 -p1ise.
+  - rewrite x2 eqxx -p1ise onlr andbT /=.
+    move: ct0; rewrite /contains_point p1ise under_onVstrict // => /andP[] _.
+    move/orP=> [ | str]; last by rewrite -(strict_under_edge_lower_y x2 onhr).
+    move=> eoh; have := on_edge_same_point eoh onhr => tmp.
+    by case/negP: enp2; rewrite pt_eqE tmp x2 eqxx.
+  - rewrite -x1 -x2 eqxx /=.
+    move: ct0; rewrite /contains_point strict_nonAunder // => /andP[] + _.
+    rewrite negb_and negbK=> /orP[eol| ]; last first.
+      by rewrite (under_edge_lower_y x1 onlr); rewrite -ltNge eisp2.
+    have := on_edge_same_point onlr eol => {}eol; case/negP:p1ne.
+    by rewrite pt_eqE eol x1 eqxx.
+  rewrite -x1 -x2 ?eqxx /=.
+  move: ct0; rewrite /contains_point strict_nonAunder // => /andP[] + under2.
+  rewrite negb_and negbK=> /orP[eol| ]; last first.
+    rewrite (under_edge_lower_y x1 onlr) -ltNge => -> /=.
+    move: under2; rewrite under_onVstrict // => /orP[eoh| ]; last first.
+      by rewrite (strict_under_edge_lower_y x2 onhr).
+    have := on_edge_same_point onhr eoh => {}eoh; case/negP:enp2.
+    by rewrite eq_sym pt_eqE eoh x2 eqxx.
+  have := on_edge_same_point onlr eol => {}eol; case/negP:p1ne.
+  by rewrite pt_eqE eol x1 eqxx.
+rewrite /= => /andP[] rf1 rfr /andP[] lim1 limr /andP[] ct1 ctr.
+apply/andP; split; last first.
+
+move=>/andP[] rf0 rfr /andP[]lim0 limr /andP[] ct0 ctr /=.
+rewrite -/vip; case vip1 : vip => [p1 /= | // ].
+apply/andP; split; last first.
+  have {Ih} := Ih rfr limr ctr.
+  rewrite /=.
+rewrite -[X in all _ X]/(closing_cells e q).
+apply: (Ih rfr limr ctr).
+
+  
+
+  have p2ne : p2 != e.
+    apply/eqP=> A; have := strict_under_edge_lower_y x2 on2.
+    by rewrite under => /esym; rewrite ltNge A lexx.
+  rewrite (negbTE p2ne); case: ifP => [p1ise | p1ne] /=;
+    move: on1 on2; rewrite ?(eqP p2ise) -?(eqP p1ise) => on1 on2;
+    rewrite ?eqxx ?on1 ?on2 ?(eqP p2ise) -?(eqP p1ise) -?x1 -?x2
+        ?eqxx ?andbT //=.
+  - have euh : e <<= he.
+      apply: (order_edges_viz_point' vl)=> //.
+      move: on1; rewrite /point_on_edge /point_under_edge=>/andP[]/eqP -> _.
+      by rewrite lexx.
+    rewrite lt_neqAle -(under_edge_lower_y x2 on2) euh andbT.
+    by apply/negP=> A; case/negP: p2ne; rewrite pt_eqE (eqP A) x2 ?eqxx.
+  rewrite -(strict_under_edge_lower_y x2 on2) under /=.
+  rewrite ltNge le_eqVlt negb_or.
+  rewrite -(strict_under_edge_lower_y x1 on1) above andbT.
+  by apply/negP=> A;case/negbT/negP:p1ne; rewrite pt_eqE -?x1 (eqP A) !eqxx.
+
+
+    move/orP=> [ | str]; last by rewrite -(strict_under_edge_lower_y x2 onhr).
+    move=> eoh; have := on_edge_same_point eoh onhr => tmp.
+    by case/negP: enp2; rewrite pt_eqE tmp x2 eqxx.
+
+
+Lemma closing_cells_subset_contact p cc c c1 :
+  all open_cell_side_limit_ok cc ->
+ c \in closing_cells p cc -> 
+ strict_inside_closed q c ->
+ exists2 c1, c1 \in cc & strict_inside_open q c1.
 Lemma step_keeps_disjoint_open ev open closed open' closed' :
   cells_bottom_top open ->
   adjacent_cells open ->
