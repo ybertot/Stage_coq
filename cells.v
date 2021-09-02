@@ -11,6 +11,9 @@ Import Order.TTheory GRing.Theory Num.Theory Num.ExtraDef Num.
 
 Open Scope ring_scope.
 
+Lemma allcons [T : predArgType]
+  (f : T -> bool) a q' : all f (a :: q') = f a && all f q'.
+Proof.  by []. Qed.
 
 Record pt := Bpt {p_x : rat; p_y : rat}.
 
@@ -1649,6 +1652,24 @@ Definition closing_cells (p : pt) (contact_cells: seq cell) : (seq cell) :=
                 end
     end.
 
+Variant list_position := SINGLE | HEAD | MIDDLE | TAIL.
+
+Definition build_right_pts (v : list_position) (p pbot ptop : pt) :=
+  match v with
+  | SINGLE => no_dup_seq [:: pbot; p; ptop]
+  | HEAD => no_dup_seq [:: pbot; p]
+  | MIDDLE => [:: p]
+  | LAST => no_dup_seq [:: p; ptop]
+  end.
+
+Definition close_cell (v : list_position)(p : pt)(c : cell) :=
+  match vertical_intersection_point p (low c),
+        vertical_intersection_point p (high c) with
+  | None, _ | _, None => dummy_cell
+  | Some p1, Some p2 => 
+    Bcell (left_pts c) (build_right_pts v p p1 p2) (low c) (high c)
+  end.
+
 (* at each step we create the cell under the first outgoing edge and when there's only one left,
 we create the two last cells *)
 Fixpoint opening_cells (p : pt) (out : seq edge) (low_e : edge) (high_e : edge) : (seq cell) :=
@@ -2448,7 +2469,6 @@ Proof.
 
 *)
 
-
 Definition seq_valid (s : seq cell) (p : pt) : bool :=
     all (fun c => (valid_edge (low c) p) && (valid_edge (high c) p)) s.
 
@@ -2458,6 +2478,51 @@ seq_valid first_cells p -> seq_valid  new_open_cells p ->
 seq_valid last_cells p -> seq_valid  (first_cells++new_open_cells++ last_cells) p.
 Proof.
 apply insert_opening_all.
+Qed.
+
+Lemma closing_cell1 p c :
+  seq_valid [:: c] p ->
+  closing_cells p [:: c] = [:: close_cell SINGLE p c].
+Proof.
+rewrite /close_cell/build_right_pts/= => /andP[] /andP[] vl vh _.
+have [p1 p1q] := (exists_point_valid vl); rewrite p1q.
+by have [p2 p2q] := (exists_point_valid vh); rewrite p2q.
+Qed.
+
+Definition cutlast (T : Type) (s : seq T) :=
+match s with | a :: s => belast a s | [::] => [::] end.
+
+Lemma closing_rest_map dummy p s :
+  (0 < size s)%N ->
+  seq_valid s p ->
+  closing_rest p s =
+  rcons (map (close_cell MIDDLE p) (cutlast s))
+   (close_cell TAIL p (last dummy s)).
+Proof.
+pattern s, (closing_rest p s); apply:(@closing_rest_ind p) => //.
+- by move=> c abs sz /andP[] /andP[] vl /exists_point_valid [?]; rewrite abs.
+- rewrite /close_cell/build_right_pts/cutlast/=; move=> c p1 /[dup] vip1 ->.
+  by move=> _ /andP[] /andP[] /exists_point_valid [p2 ->].
+move=> c a q Ih _ /= /andP[] /andP[]vl vh sv; congr (_ :: _).
+  rewrite /close_cell; have [p1 ->] := exists_point_valid vl.
+  by have [p2 ->] := exists_point_valid vh.
+by rewrite -[LHS]/(closing_rest p (a :: q)); apply: Ih.
+Qed.
+
+Lemma closing_cells_map p s :
+  (1 < size s)%N ->
+  seq_valid s p ->
+  closing_cells p s =
+  close_cell HEAD p (head dummy_cell s) ::
+  rcons (map (close_cell MIDDLE p) (cutlast (behead s)))
+   (close_cell TAIL p (last dummy_cell s)).
+Proof.
+case: s => [ // | c [ // | a s]] _.
+rewrite /seq_valid allcons -/(seq_valid (a :: s) p)=> /andP[]/andP[]vl vh vs.
+rewrite /= [close_cell _ _ _ as X in (X :: _)]/close_cell.
+have [p1 ->] := exists_point_valid vl.
+have [p2 ->] := exists_point_valid vh; congr (_ :: _).
+by rewrite -[LHS]/(closing_rest p (a :: s)); apply: (closing_rest_map a).
 Qed.
 
 Lemma strict_under_seq p c q :
@@ -5549,10 +5614,6 @@ rewrite /closed_cell_side_limit_ok /=.
 move: limc=> /andP[] ln0 /andP[] lxs /andP[]ls /andP[]onlh onll.
 by rewrite ln0 lxs ls onlh onll eqxx elow/=.
 Qed.
-
-Lemma allcons [T : predArgType]
-  (f : T -> bool) a q' : all f (a :: q') = f a && all f q'.
-Proof.  by []. Qed.
 
 Lemma closing_cells_side_limit e cc :
   s_right_form cc ->
