@@ -1709,10 +1709,17 @@ Definition build_right_pts (v : list_position) (p pbot ptop : pt) :=
 Definition close_cell (v : list_position)(p : pt)(c : cell) :=
   match vertical_intersection_point p (low c),
         vertical_intersection_point p (high c) with
-  | None, _ | _, None => dummy_cell
+  | None, _ | _, None => c
   | Some p1, Some p2 => 
     Bcell (left_pts c) (build_right_pts v p p1 p2) (low c) (high c)
   end.
+
+Lemma close_cell_preserve_3sides v p c :
+  [/\ low (close_cell v p c) = low c,
+      high (close_cell v p c) = high c &
+      left_pts (close_cell v p c) = left_pts c].
+Proof.
+
 
 (* at each step we create the cell under the first outgoing edge and when there's only one left,
 we create the two last cells *)
@@ -5863,6 +5870,15 @@ rewrite /right_limit /open_limit.
 rewrite -(eqP (allP eqs (last dummy_pt (right_pts c)) (last_in_not_nil _ ln0))).
 by case : (lerP (p_x (right_pt (low c))) (p_x (right_pt (high c)))).
 Qed.
+
+Lemma close_cell_subset_contact v p q c :
+  closed_cell_side_limit_ok (close_cell v p c) ->
+  strict_inside_closed q (close_cell v p c) -> strict_inside_open q c.
+Proof.
+move=>/closed_right_imp_open cok.
+rewrite /strict_inside_closed/strict_inside_open.
+move=> /andP[] /andP[] ->.
+rewrite 
 
 Lemma closing_rest_subset_contact p cc c :
  c \in closing_rest p cc -> 
