@@ -1719,7 +1719,10 @@ Lemma close_cell_preserve_3sides v p c :
       high (close_cell v p c) = high c &
       left_pts (close_cell v p c) = left_pts c].
 Proof.
-
+rewrite /close_cell.
+case: (vertical_intersection_point p (low c))=> [p1 | ] //.
+by case: (vertical_intersection_point p (high c))=> [p2 | ].
+Qed.
 
 (* at each step we create the cell under the first outgoing edge and when there's only one left,
 we create the two last cells *)
@@ -5871,14 +5874,95 @@ rewrite -(eqP (allP eqs (last dummy_pt (right_pts c)) (last_in_not_nil _ ln0))).
 by case : (lerP (p_x (right_pt (low c))) (p_x (right_pt (high c)))).
 Qed.
 
+Lemma open_limit_close_cell v p c :
+  open_limit (close_cell v p c) = open_limit c.
+Proof.
+rewrite /close_cell.
+case : (vertical_intersection_point p (low c)) => [p1 | ]//.
+by case : (vertical_intersection_point p (high c)) => [p2 | ].
+Qed.
+
 Lemma close_cell_subset_contact v p q c :
+  valid_cell c p -> 
   closed_cell_side_limit_ok (close_cell v p c) ->
   strict_inside_closed q (close_cell v p c) -> strict_inside_open q c.
 Proof.
-move=>/closed_right_imp_open cok.
-rewrite /strict_inside_closed/strict_inside_open.
-move=> /andP[] /andP[] ->.
-rewrite 
+move=>[] vl vh.
+move=>/closed_right_imp_open.
+rewrite /strict_inside_closed/strict_inside_open/close_cell.
+have [p1 vip1] := exists_point_valid vl.
+have [p2 vip2] := exists_point_valid vh.
+rewrite vip1 vip2 /= => cok /andP[]/andP[] -> -> /andP[] -> rlim /=.
+by apply: (lt_le_trans rlim cok).
+Qed.
+
+Section abstract_subsets_and_partition.
+
+Variable sub : cell -> cell -> Prop.
+Variable exclude : cell -> cell -> Prop.
+
+Variable close : cell -> cell.
+
+Hypothesis excludeC : forall c1 c2, exclude c1 c2 -> exclude c2 c1.
+Hypothesis close_sub : forall c, sub (close c) c.
+Hypothesis exclude_sub : 
+  forall c1 c2 c3, exclude c1 c2 -> sub c3 c1 -> exclude c3 c2.
+
+Lemma add_closed (s1 : pred cell) (s2 : seq cell) :
+    all (predC s1) s2 ->
+    {in predU s1 (mem s2) &, forall c1 c2, c1 = c2 \/ exclude c1 c2} ->
+  {in predU s1 (mem [seq close c | c <- s2]) &,
+    forall c1 c2, c1 = c2 \/ exclude c1 c2}.
+Proof.
+have symcase : forall (s : pred cell) (s' : seq cell),
+  all (predC s) s' -> 
+  {in predU s (mem s') &, forall c1 c2, c1 = c2 \/ exclude c1 c2} ->
+  forall c1 c2, s c1 -> c2 \in s' -> exclude c1 (close c2).
+  move=> s s' dif exc c1 c2 sc1 c2s'.
+  apply/excludeC/(exclude_sub _ (close_sub _)).  
+  have := exc c2 c1; rewrite 2!inE c2s' orbT inE sc1 => /(_ isT isT).
+  by move=> -[abs | //]; have := allP dif _ c2s'; rewrite inE abs sc1.
+elim: s2 => [ // | c s2 Ih] s1nots2.
+move=> oldx g1 g2; rewrite inE => /orP[g1old | /mapP[co1 co1in g1c]];
+  rewrite 2!inE=> /orP[g2old |/mapP[co2 co2in g2c ]].
+- by apply: oldx; rewrite inE ?g1old ?g2old.
+- by right; rewrite g2c; apply: (symcase _ _ s1nots2 oldx).
+- by right; rewrite g1c; apply excludeC; apply: (symcase _ _ s1nots2 oldx).
+have [/eqP co1co2 | co1nco2] := boolP(co1 == co2).
+  by left; rewrite g1c g2c co1co2.
+Admitted.
+
+Lemma add_closed' (s1 : pred cell) (s2 : seq cell) :
+    all (predC s1) s2 ->
+    {in predU s1 (mem s2) &, forall c1 c2, c1 = c2 \/ exclude c1 c2} ->
+  {in predU s1 (mem [seq close c | c <- s2]) &,
+    forall c1 c2, c1 = c2 \/ exclude c1 c2}.
+Proof.
+have symcase : forall (s : pred cell) (s' : seq cell),
+  all (predC s) s' -> 
+  {in predU s (mem s') &, forall c1 c2, c1 = c2 \/ exclude c1 c2} ->
+  forall c1 c2, s c1 -> c2 \in s' -> exclude c1 (close c2).
+  move=> s s' dif exc c1 c2 sc1 c2s'.
+  apply/excludeC/(exclude_sub _ (close_sub _)).  
+  have := exc c2 c1; rewrite 2!inE c2s' orbT inE sc1 => /(_ isT isT).
+  by move=> -[abs | //]; have := allP dif _ c2s'; rewrite inE abs sc1.
+move=> s1nots2 oldx g1 g2; rewrite inE => /orP[g1old | /mapP[co1 co1in g1c]];
+  rewrite inE =>  /orP[g2old |/mapP[co2 co2in g2c ]].
+- by apply: oldx; rewrite inE ?g1old ?g2old.
+- by right; rewrite g2c; apply: (symcase _ _ s1nots2 oldx).
+- by right; rewrite g1c; apply excludeC; apply: (symcase _ _ s1nots2 oldx).
+have [/eqP co1co2 | co1nco2] := boolP(co1 == co2).
+  by left; rewrite g1c g2c co1co2.
+right; rewrite g1c; apply/(exclude_sub _ (close_sub _)).
+rewrite g2c; apply/excludeC/(exclude_sub _ (close_sub _)).
+have := oldx co2 co1; rewrite !inE co2in co1in !orbT=> /(_ isT isT).
+by case=> [abs | //]; case/negP: co1nco2; rewrite abs eqxx.
+Qed.
+(* This model is too simple to be used here, because we do not use one
+  function f, but 4 different ones.  On the other hand, we can use a
+  stronger hypothesis on s2: all elements are unique. *)
+
+End abstract_subsets_and_partition.
 
 Lemma closing_rest_subset_contact p cc c :
  c \in closing_rest p cc -> 
