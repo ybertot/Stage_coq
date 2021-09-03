@@ -5863,6 +5863,26 @@ rewrite allcons andbT; apply: close_cell_ok => //.
 by move: oks; rewrite sq /= andbT.
 Qed.
 
+(* TODO : take this proof out of one of the previous lemmas
+  closing_cells_side_limit' *)
+Lemma contact_at_point p cc s1 s2 c :
+  adjacent_cells cc ->
+  seq_valid cc p ->
+  all (contains_point p) cc ->
+  cc = s1 ++ c :: s2 ->
+  (s1 != nil -> p === low c) /\ (s2 != nil -> p === high c).
+Proof.
+Qed.
+
+Lemma closing_cells_map' p cc :
+  adjacent_cells cc ->
+  seq_valid cc p ->
+  p >>> low (head dummy_cell cc) -> p <<< high (last dummy_cell cc) ->
+  all (contains_point p) cc ->
+  closing_cells p cc = map (close_cell SINGLE p) cc.
+Proof.
+Qed.
+
 Lemma closed_right_imp_open c:
   closed_cell_side_limit_ok c -> right_limit c <= open_limit c.
 Proof.
