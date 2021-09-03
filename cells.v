@@ -3138,6 +3138,15 @@ Proof.
 by elim: s x => [// | y s Ih] x /=; rewrite Ih.
 Qed.
 
+Lemma adjacent_catW s1 s2 : 
+  adjacent_cells (s1 ++ s2) -> adjacent_cells s1 /\ adjacent_cells s2.
+Proof.
+case : s1 => [ // | c s1 /=].
+rewrite adj_aux_path cat_path => /andP[].
+rewrite -2!adj_aux_path => leftside /adjacent_cons rightside.
+split;[exact leftside | exact rightside].
+Qed.
+
 Definition adjacent_cells' open : bool :=
     sorted adj_rel open.
 
@@ -4448,6 +4457,143 @@ move=> [] _ <- _ _ _; rewrite inE => /orP[/eqP -> //| ].
 by apply: ctn'.
 Qed.
 
+Lemma close_cell_equivalence_head p c:
+  p === high c -> close_cell HEAD p c = close_cell SINGLE p c.
+Proof.
+move=> on.
+rewrite /close_cell /build_right_pts.
+case vip1 : (vertical_intersection_point _ _) => [p1 | //].
+case vip2 : (vertical_intersection_point _ _) => [p2 | //].
+have := intersection_on_edge vip2=> -[on2 xs].
+have /eqP pp2 : p == p2 by rewrite pt_eqE (on_edge_same_point on on2) xs eqxx.
+by rewrite /= pp2 eqxx.
+Qed.
+
+Lemma close_cell_equivalence_last p c:
+  p === low c -> close_cell LAST p c = close_cell SINGLE p c.
+Proof.
+move=> on.
+rewrite /close_cell /build_right_pts.
+case vip1 : (vertical_intersection_point _ _) => [p1 | //].
+case vip2 : (vertical_intersection_point _ _) => [p2 | //].
+have := intersection_on_edge vip1=> -[on1 xs].
+have /eqP pp1 : p == p1 by rewrite pt_eqE (on_edge_same_point on on1) xs eqxx.
+by rewrite /= pp1 eqxx.
+Qed.
+
+Lemma close_cell_equivalence_middle p c:
+  p === low c -> p === high c -> close_cell MIDDLE p c = close_cell SINGLE p c.
+Proof.
+move=> onl onh.
+rewrite /close_cell /build_right_pts.
+case vip1 : (vertical_intersection_point _ _) => [p1 | //].
+case vip2 : (vertical_intersection_point _ _) => [p2 | //].
+have := intersection_on_edge vip1=> -[on1 x1].
+have := intersection_on_edge vip2=> -[on2 x2].
+have /eqP pp1 : p == p1 by rewrite pt_eqE (on_edge_same_point onl on1) x1 eqxx.
+have /eqP pp2 : p == p2 by rewrite pt_eqE (on_edge_same_point onh on2) x2 eqxx.
+by rewrite /= -pp1 -pp2 eqxx.
+Qed.
+
+Lemma behead_cutlasteq (T : Type) a (s : seq T) :
+  (1 < size s)%N -> s = head a s :: rcons (cutlast (behead s)) (last a s).
+Proof.
+by case: s => [ | b [ | c s]] //= _; congr (_ :: _); rewrite -lastI.
+Qed.
+
+Lemma cutlast_subset (T : eqType) (s : seq T) : {subset cutlast s <= s}.
+Proof.
+rewrite /cutlast; case: s => [// | a s].
+elim: s a => [ // | b s Ih /=] a e; rewrite inE=> /orP[/eqP -> | ein].
+  by rewrite inE eqxx.
+by rewrite inE Ih ?orbT.
+Qed.
+
+Lemma behead_subset (T : eqType) (s : seq T) : {subset behead s <= s}.
+Proof. by case: s => [ | a s] // e /=; rewrite inE orbC => ->. Qed.
+
+Lemma contact_middle_at_point p cc s1 s2 c :
+  adjacent_cells cc ->
+  seq_valid cc p ->
+  all (contains_point p) cc ->
+  cc = s1 ++ c :: s2 ->
+  (s1 != nil -> p === low c) /\ (s2 != nil -> p === high c).
+Proof.
+move=> adj sv ctps dec.
+have cin : c \in cc by rewrite dec !(inE, mem_cat) eqxx ?orbT.
+have [vlc vhc] : valid_cell c p by move: (allP sv _ cin) => /andP.
+have /andP[plc phc] := (allP ctps _ cin).
+split.
+elim/last_ind: s1 dec => [// | s1 a _] dec _.
+  have /eqP ac : high a == low c.
+    case: s1 dec adj => [ | b s1] -> /=; first by move => /andP[] ->.
+    by rewrite adj_aux_path cat_path last_rcons /= => /andP[] _ /andP[].
+  have ain : a \in cc by rewrite dec -cats1 !(mem_cat, inE) eqxx ?orbT.
+  apply: (under_above_on vlc _ plc).
+  by rewrite -ac; move: (allP ctps _ ain)=> /andP[].
+case: s2 dec => [// | a s2] + _.
+rewrite -[ c :: _]/([:: c] ++ _) catA => dec.
+have /eqP ca : high c == low a.
+  case: s1 dec adj => [ | b s1] -> /=; first by move=> /andP[] ->.
+  by rewrite adj_aux_path cats1 cat_path last_rcons /= => /andP[] _/andP[].
+have ain : a \in cc by rewrite dec !(mem_cat, inE) eqxx ?orbT.
+apply: (under_above_on vhc phc).
+by rewrite ca; move: (allP ctps _ ain)=> /andP[].
+Qed.
+
+Lemma closing_cells_single_map p cc :
+  adjacent_cells cc ->
+  seq_valid cc p ->
+  p >>> low (head dummy_cell cc) -> p <<< high (last dummy_cell cc) ->
+  all (contains_point p) cc ->
+  closing_cells p cc = map (close_cell SINGLE p) cc.
+Proof.
+move=> adj val pl ph ctps.
+have [large | small] := boolP (1 < size cc)%N.
+  have iq := closing_cells_map large val.
+  have ccdq := behead_cutlasteq dummy_cell large.
+  have sz :
+    size (closing_cells p cc) = size [seq close_cell SINGLE p i | i <- cc].
+    by rewrite [in RHS]ccdq iq /= !size_rcons !size_map size_rcons.
+  have := eq_from_nth sz=> /(_ dummy_cell); apply => -[ | i].
+    rewrite [in RHS] ccdq iq /= => _; apply: close_cell_equivalence_head.
+    move: ccdq; rewrite -[X in cc = X]/([::] ++ [:: _] ++ _) => ccdq'.
+    have [_ it] := contact_middle_at_point adj val ctps ccdq'.
+    by apply: it; case: (cutlast _).
+  move: (sz)=> /[swap].
+  rewrite iq /= ltnS leq_eqVlt=> /orP[ | ].
+    rewrite size_rcons eqSS => /eqP atend sz'.
+    rewrite nth_rcons [in LHS]atend !ltnn !eqxx.
+    have  : i.+1 = (size cc).-1 /\ (i.+1 < (size cc))%N.
+      move: sz' large=> /eqP; rewrite -atend size_map.
+      by case: (size cc) => [ | [ |  ?]] //=; rewrite eqSS => /eqP ->.
+    rewrite -(size_map (close_cell SINGLE p)) => -[icc ilcc].
+    rewrite (set_nth_default (close_cell SINGLE p dummy_cell) _ ilcc).
+    rewrite icc nth_last last_map; apply: close_cell_equivalence_last.
+    move: ccdq; rewrite -cats1 /= -cat_cons => ccdq'.
+    by have [it _] := contact_middle_at_point adj val ctps ccdq'; apply: it.
+  rewrite size_rcons ltnS=> inmiddle sz'.
+  rewrite nth_rcons inmiddle; move: (inmiddle); rewrite size_map => inmiddle'. 
+  rewrite (nth_map dummy_cell _ _ inmiddle').
+  move: inmiddle; rewrite -2!ltnS sz' size_map.
+  move=> /(ltn_trans (ltnSn _)) => inmiddle''.
+  rewrite (nth_map dummy_cell _ _ inmiddle'') [in RHS]ccdq /=.
+  rewrite nth_rcons inmiddle'.
+  set protected := nth _ _ _.
+  move: ccdq.
+  have := mem_nth dummy_cell inmiddle'=> /splitPr[s1 s2].
+  rewrite -cats1 -2!(cat_cons (head _ cc)) -!catA (cat_cons (nth _ _ _)).
+  rewrite -/protected => ccdq.
+  have := contact_middle_at_point adj val ctps ccdq=> -[trick trick2].
+  apply: close_cell_equivalence_middle; rewrite ?trick ?trick2 //.
+  by case: (s2).
+move: small; case cceq: cc => [ | c [ | ? ?]] // _.
+rewrite /close_cell /=.
+move: val; rewrite cceq /= => /andP[] /andP[] vl vh _.
+have [p1 ->] := exists_point_valid vl.
+by have [p2 ->] := exists_point_valid vh.
+Qed.
+
 Lemma step_keeps_cover e open closed open' closed' p evs :
   sorted lexPt [seq point x | x <- (e :: evs)] ->
   cells_bottom_top open ->
@@ -4497,73 +4643,37 @@ have [qright | qleft] := boolP(lexPt (point e) q).
   by apply: (contains_to_inside_open_cell sval' clae').
 have qe : p_x q <= p_x (point e).
   by apply: lexePt_xW; rewrite lexePtNgt.
-(* TODO : redo this proof using closing_rest_ind *)
-have inrest : forall CC c, c \in CC -> inside_open_cell q c ->
-  (forall c, c \in CC -> valid_edge (low c) (point e) &&
-     (valid_edge (high c) (point e))) ->
-  exists2 c', c' \in closing_rest (point e) CC & inside_closed_cell q c'.
-  elim => [// | c' cc' Ih] c.
-  rewrite inE=> /orP[/eqP cisc' | cincc'] inq sval'.
-    rewrite /=; case: cc' Ih sval' => [ | c2 cc'2] Ih sval'.
-      have /exists_point_valid [p2 vp2] : valid_edge (high c') (point e).
-        by have := sval' c'; rewrite inE eqxx => /(_ isT)/andP[].
-      rewrite vp2; set c'' := (X in [:: X]); exists c''.
-        by rewrite inE eqxx.
-      rewrite /inside_closed_cell.
-      case/andP: inq=> ctn /andP[liml _] /=.
-      move: ctn; rewrite /contains_point /c'' /= cisc' => ->.
-      have p2e : p_x p2 = p_x (point e).
-        by have [_ ->] := intersection_on_edge vp2.
-      move: liml; rewrite /right_limit cisc' => ->.
-      by  case: ifP=> _ /=; rewrite p2e.
-    set c'' := (X in X :: closing_rest _ _); exists c''.
-      by rewrite inE eqxx.
-    rewrite /inside_closed_cell.
-    case/andP: inq=> ctn /andP[liml _] /=.
-    move: ctn; rewrite /contains_point /c'' /= cisc' => ->.
-    by rewrite -cisc' liml.
-  have sval2 : forall c, c \in cc' ->
-        valid_edge (low c) (point e) && valid_edge (high c) (point e).
-    by move=> c0 c0in; apply sval'; rewrite inE c0in orbT.
-  case: (Ih _ cincc' inq sval2)=> [c'' c''in insc'']; exists c''=> //.
-  rewrite /=.
-  by case: (cc') cincc' c''in => // [a l] _ it; rewrite inE it orbT.
 have inclosing : forall c, c \in cc -> inside_open_cell q c ->
   (forall c, c \in cc -> valid_edge (low c) (point e) &&
      (valid_edge (high c) (point e))) ->
   exists2 c', c' \in closing_cells (point e) cc & inside_closed_cell q c'.
-  case: (cc) => [// | c' cc'] c.
-  rewrite inE=> /orP[/eqP cisc' | cincc'] inq sval'.
-    rewrite /closing_cells; case: cc' sval' => [ | c2 cc'2] sval'.
-      have /exists_point_valid [p2 vp2] : valid_edge (high c') (point e).
-        by have := sval' c'; rewrite inE eqxx => /(_ isT)/andP[].
-      have /exists_point_valid [p1 vp1] : valid_edge (low c') (point e).
-        by have := sval' c'; rewrite inE eqxx => /(_ isT)/andP[].
-      rewrite vp1 vp2; set c'' := (X in [:: X]); exists c''.
-        by rewrite inE eqxx.
-      rewrite /inside_closed_cell.
-      case/andP: inq=> ctn /andP[liml _] /=.
-      move: ctn; rewrite /contains_point /c'' /= cisc' => ->.
-      by move: liml; rewrite /right_limit cisc' (no_dup_seq_x3 _ vp2) => ->.
-    have /exists_point_valid [p1 vp1] : valid_edge (low c') (point e).
-      by have := sval' c'; rewrite inE eqxx => /(_ isT)/andP[].
-    rewrite vp1 /=; set c'' := (X in X :: _).
-    exists c''; first by rewrite inE eqxx.
-    rewrite /inside_closed_cell.
-    case/andP: inq=> ctn /andP[liml _] /=.
-    move: ctn; rewrite /contains_point /c'' /= cisc' => ->.
-    by move: liml; rewrite cisc' => ->; case: ifP=> _ /=.
-  rewrite /closing_cells.
-  case cc'eq: cc' => [  | a s] //; first by move: cincc'; rewrite cc'eq.
-  have /exists_point_valid [p1 vp1] : valid_edge (low c') (point e).
-    by have := sval' c'; rewrite inE eqxx => /(_ isT)/andP[].
-  rewrite vp1 -cc'eq.
-  have sval2 : forall c, c \in cc' ->
-     valid_edge (low c) (point e) && valid_edge (high c) (point e).
-    by move=> c0 c0in; apply sval'; rewrite inE c0in orbT.
-  have [c'' c''in insc''] := inrest _ _ cincc' inq sval2.
-  by exists c''=> //; rewrite inE c''in orbT.
-clear inrest.
+  move=> c cin ins allval.
+  have /allP ctps : forall c, c \in cc -> contains_point (point e) c.
+    by move=> ?; apply: (open_cells_decomposition_contains oe).
+  have [/eqP/esym lel [/eqP/esym heh _]] :=
+     l_h_c_decomposition oe (exists_cell cbtom adj (inbox_e)).
+  have/andP [eabovel ebelowh] :=
+        l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+  have ccsub : {subset cc <= open}.
+    by move=> x xin; rewrite (decomposition_preserve_cells oe) !mem_cat xin orbT.
+  exists (close_cell SINGLE (point e) c).
+    rewrite closing_cells_single_map => //; last first.
+    - by rewrite -heh.
+    - by rewrite -lel.
+    - by apply/allP=> x /ccsub xin; apply: (allP sval).
+    - have := adj; rewrite (decomposition_preserve_cells oe)=>/adjacent_catW.
+      by move=> [] _ /adjacent_catW[].
+    by apply: map_f.
+  rewrite /inside_closed_cell.
+  case/andP: ins=> ctn /andP[liml _] /=.
+  move: ctn=>/andP [qlc qhc].
+  rewrite /contains_point/close_cell /=.
+  have [p1 vip1] := exists_point_valid (proj1 (andP (allval _ cin))).
+  have [p2 vip2] := exists_point_valid (proj2 (andP (allval _ cin))).
+  have [onl x1] := intersection_on_edge vip1.
+  have [onh x2] := intersection_on_edge vip2.
+  by rewrite vip1 vip2 qlc qhc /=; case: ifP => [p1e | p1ne];
+    case: ifP => [p2e | p2ne]; rewrite liml /right_limit /= -?x2 -?x1.
 move: qleft; rewrite -lexePtNgt lexePt_eqVlt.
 have svalcc :
    forall c : cell_eqType,
@@ -4601,8 +4711,6 @@ apply/orP; left; apply/hasP.
 move: keptopen; rewrite -has_cat=>/hasP[it + it2].
 by rewrite mem_cat=> infclc; exists it=> //; rewrite !mem_cat orbCA infclc orbT.
 Qed.
-
-Definition cell_no s i := nth dummy_cell s i.
 
 Definition strict_inside_open (p : pt) (c : cell) :=
   (p <<< high c) && (~~(p <<= low c)) &&
@@ -5758,52 +5866,6 @@ case: ifP=>[/eqP q1| enp2]; move: (o2);
 by rewrite el (under_edge_strict_lower_y x2 (negbT enp2) eh).
 Qed.
 
-Lemma behead_cutlasteq (T : Type) a (s : seq T) :
-  (1 < size s)%N -> s = head a s :: rcons (cutlast (behead s)) (last a s).
-Proof.
-by case: s => [ | b [ | c s]] //= _; congr (_ :: _); rewrite -lastI.
-Qed.
-
-Lemma cutlast_subset (T : eqType) (s : seq T) : {subset cutlast s <= s}.
-Proof.
-rewrite /cutlast; case: s => [// | a s].
-elim: s a => [ // | b s Ih /=] a e; rewrite inE=> /orP[/eqP -> | ein].
-  by rewrite inE eqxx.
-by rewrite inE Ih ?orbT.
-Qed.
-
-Lemma behead_subset (T : eqType) (s : seq T) : {subset behead s <= s}.
-Proof. by case: s => [ | a s] // e /=; rewrite inE orbC => ->. Qed.
-
-Lemma contact_middle_at_point p cc s1 s2 c :
-  adjacent_cells cc ->
-  seq_valid cc p ->
-  all (contains_point p) cc ->
-  cc = s1 ++ c :: s2 ->
-  (s1 != nil -> p === low c) /\ (s2 != nil -> p === high c).
-Proof.
-move=> adj sv ctps dec.
-have cin : c \in cc by rewrite dec !(inE, mem_cat) eqxx ?orbT.
-have [vlc vhc] : valid_cell c p by move: (allP sv _ cin) => /andP.
-have /andP[plc phc] := (allP ctps _ cin).
-split.
-elim/last_ind: s1 dec => [// | s1 a _] dec _.
-  have /eqP ac : high a == low c.
-    case: s1 dec adj => [ | b s1] -> /=; first by move => /andP[] ->.
-    by rewrite adj_aux_path cat_path last_rcons /= => /andP[] _ /andP[].
-  have ain : a \in cc by rewrite dec -cats1 !(mem_cat, inE) eqxx ?orbT.
-  apply: (under_above_on vlc _ plc).
-  by rewrite -ac; move: (allP ctps _ ain)=> /andP[].
-case: s2 dec => [// | a s2] + _.
-rewrite -[ c :: _]/([:: c] ++ _) catA => dec.
-have /eqP ca : high c == low a.
-  case: s1 dec adj => [ | b s1] -> /=; first by move=> /andP[] ->.
-  by rewrite adj_aux_path cats1 cat_path last_rcons /= => /andP[] _/andP[].
-have ain : a \in cc by rewrite dec !(mem_cat, inE) eqxx ?orbT.
-apply: (under_above_on vhc phc).
-by rewrite ca; move: (allP ctps _ ain)=> /andP[].
-Qed.
-
 Lemma closing_cells_side_limit' e cc :
   s_right_form cc ->
   seq_valid cc e ->
@@ -5862,15 +5924,6 @@ rewrite allcons andbT; apply: close_cell_ok => //.
 - by move: val; rewrite sq /= andbT=>/andP[] .
 - by move: val; rewrite sq /= andbT=>/andP[] .
 by move: oks; rewrite sq /= andbT.
-Qed.
-
-Lemma closing_cells_map' p cc :
-  adjacent_cells cc ->
-  seq_valid cc p ->
-  p >>> low (head dummy_cell cc) -> p <<< high (last dummy_cell cc) ->
-  all (contains_point p) cc ->
-  closing_cells p cc = map (close_cell SINGLE p) cc.
-Proof.
 Qed.
 
 Lemma closed_right_imp_open c:
