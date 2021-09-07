@@ -6441,7 +6441,6 @@ Lemma all_edges_opening_cells_above_first e open fc cc lc le he outg:
   seq_valid open (point e) ->
   inside_box (point e) ->
   {in cell_edges open ++ outg, forall g, inside_box (left_pt g)} ->
-  {in cell_edges open ++ outg, forall g, inside_box (right_pt g)} ->
   {in cell_edges fc, forall g, p_x (point e) < p_x (right_pt g)} ->
   {in cell_edges open ++ outg &, no_crossing} ->
   {in outg, forall g, left_pt g == (point e)} ->
@@ -6449,7 +6448,7 @@ Lemma all_edges_opening_cells_above_first e open fc cc lc le he outg:
       [seq high i | i <- (opening_cells (point e) outg le he)],
       forall g1 g2, (g1 <| g2) && ~~ (g2 <| g1)}.
 Proof.
-move=> oe cbtom adj rfo sval inbox_e lefts rights rightslt noc outs g1 g2.
+move=> oe cbtom adj rfo sval inbox_e lefts rightslt noc outs g1 g2.
 have ocd := decomposition_preserve_cells oe.
 have adjf : adjacent_cells fc by move: adj; rewrite ocd => /adjacent_catW [].
 have [/eqP -> | fcn0]:= (boolP (fc == [::])) => //.
@@ -6469,13 +6468,13 @@ rewrite (cell_edges_high fcn0 adjf) inE => /orP[/eqP -> | ].
   have g2in : g2 \in cell_edges open ++ outg.
     move: gin; rewrite !mem_cat => /orP[-> | ]; rewrite ?orbT //.
     by rewrite !inE => /eqP ->; rewrite -?loeq -?hieq ?map_f ?orbT.
+  have : below_alt bottom g2.
+    apply: noc=> //; rewrite ocd; move: fcn0 hdfc.
+    by case: (fc) => [ | ? ?] //= _ <-; rewrite inE eqxx.
   have := pvert_y_bottom (lefts _ g2in); rewrite ltNge => /negbTE clbot.
   have := (lefts _ g2in) => /inside_box_valid_bottom_top/(_ bin)=> vl2.
-  have := (rights _ g2in) => /inside_box_valid_bottom_top/(_ bin)=> vr2.
   have g2lab : left_pt g2 >>> bottom by move: (lefts _ g2in) => /andP[]/andP[].
-  have g2rab : right_pt g2 >>> bottom 
-      by move: (rights _ g2in) => /andP[]/andP[].
-  apply/andP; split; first by apply/orP; right; rewrite !underWC.
+  suff : ~~(g2 <| bottom) by rewrite /below_alt => /negbTE -> [-> | //].
   apply/negP=> absglow.
   have : (left_pt g2 == left_pt g2) || (right_pt g2 == left_pt g2).
     by rewrite eqxx.
