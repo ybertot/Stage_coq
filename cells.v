@@ -4374,7 +4374,7 @@ Qed.
 Lemma step_keeps_right_form e open closed op2 cl2 :
   cells_bottom_top open -> adjacent_cells open -> 
   inside_box (point e) -> seq_valid open (point e) ->
-  {in [seq low c | c <- open] ++ [seq high c | c <- open] ++
+  {in ([seq low c | c <- open] ++ [seq high c | c <- open]) ++
       outgoing e &, no_crossing} ->
   out_left_event e ->
   s_right_form open ->
@@ -4388,8 +4388,7 @@ have ocd := decomposition_preserve_cells oe.
 have/andP[lP hP] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
 have [c1 [c2 [c1in [c2in]]]] := l_h_in_open cbtom adj inbox_e.
 rewrite oe /= => [][le_eq he_eq].
-set bigs := [seq low c | c <- open] ++ [seq high c | c <- open] ++
-           outgoing e.
+set bigs := cell_edges open ++ outgoing e.
 have lein : le \in bigs by rewrite !mem_cat -le_eq map_f ?orbT.
 have hein : he \in bigs by rewrite !mem_cat -he_eq map_f ?orbT.
 have obig : {subset (outgoing e) <= bigs}.
@@ -4402,7 +4401,7 @@ have /allP rfn : s_right_form
     (opening_cells (point e) (sort edge_below (outgoing e)) le he).
   apply: (opening_cells_right_form hev (underWC lP) hP) => //.
   apply: (open_cells_decomposition_low_under_high _ _ _ _ _ _ oe)=> //.
-  by move: noc; apply: sub_in2=> x xin; rewrite catA mem_cat xin.
+  by move: noc; apply: sub_in2=> x xin; rewrite mem_cat xin.
 apply/allP=> x; rewrite !mem_cat orbCA=> /orP[/rfn// | ].
 by move=> xin; apply: (allP rfo); rewrite ocd !mem_cat orbCA xin orbT.
 Qed.
@@ -6522,7 +6521,7 @@ have:= edge_below_pvert_y vg' vg g'g; rewrite leNgt.
 by rewrite (le_lt_trans _ g'iny).
 Qed.
 
-Lemma in_new_cell_not_in_old e open fc cc lc le he:
+Lemma in_new_cell_not_in_first_old e open fc cc lc le he:
   open_cells_decomposition open (point e) = (fc, cc, lc, le, he) ->
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -6530,11 +6529,12 @@ Lemma in_new_cell_not_in_old e open fc cc lc le he:
   seq_valid open (point e) ->
   inside_box (point e) ->
   out_left_event e ->
+  {in cell_edges open ++ outgoing e &, no_crossing} ->
   {in fc & opening_cells (point e) 
              (sort edge_below (outgoing e))
         le he, forall c1 c2, o_disjoint c1 c2}.
 Proof.
-move=> oe cbtom adj rfo sval inbox_e outs.
+move=> oe cbtom adj rfo sval inbox_e outs noc.
 have ocd := decomposition_preserve_cells oe.
 set result_open :=
    fc ++ opening_cells (point e) (sort edge_below (outgoing e)) le he ++ lc.
@@ -6566,27 +6566,59 @@ have lfceq : high lfc = le.
   rewrite last_rcons.
   by move: ccn0 ole; case: (cc) => [ | b cc'] //= _ -> /andP[]/eqP ->.
 set s1 := [seq high c | c <- fc'].
-set s2 := [seq high c | c <- behead new_cells].
+set s2 := [seq high c | c <- behead new_cells ++ lc].
 set g2 := high (head dummy_cell new_cells).
 have roeq : [seq high c | c <- result_open] = s1 ++ [:: le, g2 & s2].
+  rewrite /result_open map_cat fceq -cats1 map_cat -catA /=.
+  congr (_ ++ (_ :: _)) => //.
+  rewrite /g2 /s2 2!map_cat -/new_cells.
+  by move: ncn0; case: (new_cells).
 have val' : all (valid_edge^~ (point e)) (s1 ++ [:: le, g2 & s2]).
-  move=> 
-  apply/allP=> g; rewrite mem_cat inE=> /orP[/mapP[c cin ->] |].
-    have := (allP sval c); rewrite ocd fceq mem_cat mem_rcons inE cin ?orbT.
-    by move=> /(_ isT)=> /andP[].
-  move=> /orP[/eqP -> // | gnew ].
-  have [c cin ->] : exists2 c, c \in new_cells & g = high c.
-    move: gnew; rewrite inE => /orP[gg2 | gs2].
+  apply/allP=> g; rewrite mem_cat=> /orP[/mapP[c cin ->] | innc].
+    apply: (proj2 (andP (allP sval c _))); rewrite ocd fceq mem_cat mem_rcons.
+    by rewrite inE cin orbT.
+  move: innc; rewrite inE=> /orP[/eqP -> // | gnew].
+    have [c cin ->] : exists2 c, c \in new_cells ++ lc & g = high c.
+      move: gnew; rewrite inE => /orP[gg2 | gs2].
       exists (head dummy_cell new_cells);[ | by rewrite (eqP gg2)].
-      by rewrite head_in_not_nil.
-    by move: gs2=> /mapP[c /behead_subset cin ->]; exists c.
-   move: cin=>/opening_cells_subset=>/andP[] _.
-   rewrite /= inE mem_sort=> /orP[/eqP -> //| /outs it].
+      by rewrite mem_cat head_in_not_nil.
+    move: gs2; rewrite /s2 map_cat mem_cat => /orP[].
+      move=> /mapP[c /behead_subset cin ->]; exists c=> //.
+      by rewrite mem_cat cin.
+    by move=> /mapP[c cin ->]; exists c=> //; rewrite mem_cat cin orbT.
+  move: cin; rewrite mem_cat=> /orP[] cin; last first.
+    by have:= allP sval c; rewrite ocd !mem_cat cin !orbT => /(_ isT)/andP[].
+  move: cin=>/opening_cells_subset=>/andP[] _.
+  rewrite /= inE mem_sort=> /orP[/eqP -> //| /outs it].
   by apply: valid_edge_extremities; rewrite it.
-
-have := edges_partition_strictly_above val'.
-         [seq high c | c <- fc ++ new_cells ++ lc].
-
+have rfr' : sorted edge_below (s1 ++ [:: le, g2 & s2]).
+  have rfr := step_keeps_right_form cbtom adj inbox_e sval noc outs rfo steq.
+  by have /path_sorted := seq_edge_below' adj' rfr; rewrite roeq.
+set p' := Bpt (p_x (point e)) (pvert_y (point e) le).
+have samex : p_x (point e) == p_x p' by apply: eqxx.
+have vle' : valid_edge le p' by rewrite -(same_x_valid le samex).
+have vg2 : valid_edge g2 (point e).
+  by apply: (allP val'); rewrite !mem_cat !inE; rewrite eqxx !orbT.
+have vg2' : valid_edge g2 p'.
+   by rewrite -(same_x_valid _ samex).
+have p'above : p' >>= le.
+  by rewrite (strict_nonAunder vle') negb_and negbK (pvert_on vle).
+have /andP[A B] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+have p'under : p' <<< g2.
+  have : head dummy_cell new_cells \in new_cells by rewrite head_in_not_nil.
+  move=>/opening_cells_subset=> /andP[] _; rewrite -/g2 => g2in.
+  rewrite (strict_under_pvert_y vg2').
+  rewrite -(eqP (same_pvert_y vg2 samex)).
+  apply: (lt_le_trans (_ : p_y p' < p_y (point e))).
+    by rewrite [X in X < _]/= ltNge -(under_pvert_y vle).
+  move: g2in; rewrite inE=> /orP[/eqP -> | ].
+    by apply: ltW; rewrite -(strict_under_pvert_y vhe).
+  rewrite mem_sort=>/outs/eqP lg2e.
+  by rewrite -(under_pvert_y vg2) -lg2e left_pt_below.
+have val'' : all (valid_edge^~ p') (s1 ++ [:: le, g2 & s2]).
+  by apply/allP=> g gin; rewrite -(same_x_valid _ samex); apply: (allP val').
+have := edges_partition_strictly_above val'' rfr' p'above p'under.
+fail.
 
      
 
