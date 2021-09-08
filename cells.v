@@ -6433,6 +6433,95 @@ case : (fc2) => [ | c' s'] //=; first by rewrite geq edge_below_refl.
 by rewrite mem_last => /(_ isT); rewrite geq.
 Qed.
 
+Lemma edge_below_pvert_y g1 g2 p :
+  valid_edge g1 p -> valid_edge g2 p ->
+  g1 <| g2 -> pvert_y p g1 <= pvert_y p g2.
+Proof.
+move=> v1 v2 g1g2.
+have := pvert_on v1; set p' := Bpt _ _ => p'on.
+have/esym := @same_x_valid p p' g1 (eqxx _); rewrite v1 => v'1.
+have/esym := @same_x_valid p p' g2 (eqxx _); rewrite v2 => v'2.
+have := order_edges_viz_point' v'1 v'2 g1g2.
+rewrite (under_onVstrict v'1) p'on => /(_ isT).
+by rewrite under_pvert_y //.
+Qed.
+
+(* To be added to math-comp. *)
+Lemma sorted_catW (T : Type) (r : rel T) s s' :
+ (sorted r (s ++ s')) -> sorted r s && sorted r s'.
+Proof.
+case: s => [// | a s] /=.
+by rewrite cat_path => /andP[] ->; apply: path_sorted.
+Qed.
+
+Lemma edges_partition_strictly_above p g1 g2 s1 s2:
+  all (fun g => valid_edge g p) (s1 ++ g1 :: g2 :: s2) ->
+  sorted edge_below (s1 ++ g1 :: g2 :: s2) ->
+  p >>= g1 -> p <<< g2 ->
+  {in rcons s1 g1 &  g2 :: s2, forall g g', ~~ (g' <| g)}.
+Proof.
+move=> aval pth pg1 pg2.
+have vg1 : valid_edge g1 p.
+  by apply: (allP aval); rewrite !(mem_cat, inE) eqxx ?orbT.
+have vg2 : valid_edge g2 p.
+  by apply: (allP aval); rewrite !(mem_cat, inE) eqxx ?orbT.
+have pg1y : pvert_y p g1 <= p_y p by rewrite leNgt -strict_under_pvert_y.
+have pg2y : p_y p < pvert_y p g2 by rewrite -strict_under_pvert_y.
+have g1g2 : pvert_y p g1 < pvert_y p g2 by apply: (le_lt_trans pg1y).
+have mp : {in s1++ g1 :: g2 :: s2 &,
+           {homo (pvert_y p) : x y / x <| y >-> x <= y}}.
+    move=> u v /(allP aval) vu /(allP aval) vv uv.
+    by apply: edge_below_pvert_y vu vv uv.
+have sb2 : {subset [:: g1, g2 & s2] <= (s1 ++ [:: g1, g2 & s2])}.
+  by move=> u uin; rewrite mem_cat uin orbT.
+have g2s2y : {in g2 :: s2, forall g, pvert_y p g1 < pvert_y p g}.
+  move=> g; rewrite inE => /orP[/eqP -> //| gin].
+  have pthy : sorted <=%R [seq pvert_y p h | h <- g2 :: s2].
+    apply: (homo_path_in mp); last first.
+      move: pth.
+      rewrite (_ : s1 ++ _ = (s1 ++[:: g1]) ++ g2 :: s2); last first.
+        by rewrite /= -!catA.
+      by move/sorted_catW=> /andP[].
+    apply: (sub_all sb2).
+    by apply/allP => z; rewrite !(mem_cat, inE) => /orP[] ->; rewrite ?orbT.
+  have /(allP aval) gin' : g \in (s1 ++ [:: g1, g2 & s2]).
+    by rewrite mem_cat !inE gin ?orbT.
+  move: pthy; rewrite /= (path_sortedE le_trans) => /andP[] /allP.
+  have giny : pvert_y p g \in [seq pvert_y p h | h <- s2] by apply: map_f.
+  by move=> /(_ _ giny) => /(lt_le_trans g1g2).
+have sb1 : {subset rcons s1 g1 <= s1 ++ [:: g1, g2 & s2]}.
+  by move=> x; rewrite mem_rcons mem_cat !inE => /orP[] ->; rewrite ?orbT.
+have s1g1y : {in rcons s1 g1, forall g, pvert_y p g <= pvert_y p g1}.
+  move=> g; rewrite mem_rcons inE => /orP[/eqP ->| gin].
+    apply: le_refl.
+  case s1eq : s1 gin => [// | init s1']; rewrite -s1eq => gin.
+  have pthy : sorted <=%R [seq pvert_y p h | h <- rcons s1 g1].
+    rewrite s1eq /=; apply: (homo_path_in mp); last first.
+      move: pth; rewrite s1eq/=.
+      rewrite (_ : s1' ++ _ = (s1' ++ [:: g1]) ++ g2 :: s2); last first.
+        by rewrite -catA.
+      by rewrite cat_path cats1 => /andP[].
+    by apply: (sub_all sb1); rewrite s1eq; apply: allss.
+  have [s' [s'' s'eq]] : exists s' s'', s1 = s' ++ g :: s''.
+    by move: gin=> /splitPr [s' s'']; exists s', s''.
+  have dc : rcons (init :: s1') g1 = (s' ++ [:: g]) ++ rcons s'' g1.
+   by rewrite -s1eq s'eq -!cats1 /= -?catA.
+  case s'eq2 : s' => [ | init' s'2].
+    move: pthy; rewrite s1eq dc s'eq2 /= (path_sortedE le_trans)=> /andP[].
+    move=> /allP/(_ (pvert_y p g1)) + _; apply.
+    by rewrite map_f // mem_rcons inE eqxx.
+  move: pthy; rewrite s1eq dc s'eq2 /= map_cat cat_path => /andP[] _.
+  rewrite !map_cat cats1 last_rcons (path_sortedE le_trans) => /andP[] + _.
+  move=> /allP/(_ (pvert_y p g1)); apply.
+  by apply: map_f; rewrite mem_rcons inE eqxx.
+move=> g g' /[dup]gin /s1g1y giny /[dup] g'in /g2s2y g'iny; apply/negP=> g'g.
+have vg : valid_edge g p by apply: (allP aval); apply: sb1.
+have vg' : valid_edge g' p.
+  by apply: (allP aval); apply: sb2; rewrite inE g'in orbT.
+have:= edge_below_pvert_y vg' vg g'g; rewrite leNgt.
+by rewrite (le_lt_trans _ g'iny).
+Qed.
+
 Lemma all_edges_opening_cells_above_first e open fc cc lc le he outg:
   open_cells_decomposition open (point e) = (fc, cc, lc, le, he) ->
   cells_bottom_top open ->
