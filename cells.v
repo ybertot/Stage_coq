@@ -6530,11 +6530,12 @@ Lemma in_new_cell_not_in_first_old e open fc cc lc le he:
   inside_box (point e) ->
   out_left_event e ->
   {in cell_edges open ++ outgoing e &, no_crossing} ->
+  all open_cell_side_limit_ok open ->
   {in fc & opening_cells (point e) 
              (sort edge_below (outgoing e))
         le he, forall c1 c2, o_disjoint c1 c2}.
 Proof.
-move=> oe cbtom adj rfo sval inbox_e outs noc.
+move=> oe cbtom adj rfo sval inbox_e outs noc lok.
 have ocd := decomposition_preserve_cells oe.
 set result_open :=
    fc ++ opening_cells (point e) (sort edge_below (outgoing e)) le he ++ lc.
@@ -6603,7 +6604,7 @@ have vg2' : valid_edge g2 p'.
    by rewrite -(same_x_valid _ samex).
 have p'above : p' >>= le.
   by rewrite (strict_nonAunder vle') negb_and negbK (pvert_on vle).
-have /andP[A B] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+have /andP[lu ha] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
 have p'under : p' <<< g2.
   have : head dummy_cell new_cells \in new_cells by rewrite head_in_not_nil.
   move=>/opening_cells_subset=> /andP[] _; rewrite -/g2 => g2in.
@@ -6617,7 +6618,42 @@ have p'under : p' <<< g2.
   by rewrite -(under_pvert_y vg2) -lg2e left_pt_below.
 have val'' : all (valid_edge^~ p') (s1 ++ [:: le, g2 & s2]).
   by apply/allP=> g gin; rewrite -(same_x_valid _ samex); apply: (allP val').
-have := edges_partition_strictly_above val'' rfr' p'above p'under.
+have strict_above:= edges_partition_strictly_above val'' rfr' p'above p'under.
+move=> c1 c2 c1in c2in p; apply/negP=> /andP[]/andP[] /andP[]belhc1 _ c1l.
+move=>/andP[] /andP[] _ ablc2 c2l.
+have c1ok : open_cell_side_limit_ok c1.
+  by apply: (allP lok); rewrite ocd !mem_cat c1in.
+have leop : le \in cell_edges open by rewrite -leeq mem_cat map_f.
+have heop : he \in cell_edges open by rewrite -heeq mem_cat map_f ?orbT.
+have lectxt : le \in cell_edges open ++ outgoing e by rewrite mem_cat leop.
+have hectxt : he \in cell_edges open ++ outgoing e by rewrite mem_cat heop.
+have lebhe : le <| he.
+  have [// | abs ] : below_alt le he by apply: noc.
+  by move: lu; have := order_edges_viz_point' vhe vle abs (underW ha)=> ->.
+have outs':
+   {in sort edge_below (outgoing e), forall g, left_pt g == (point e)}.
+ by move: outs; apply: sub_in1=> g; rewrite mem_sort.
+have c2ok : open_cell_side_limit_ok c2.
+  have noco : {in [:: le, he & sort edge_below (outgoing e)] &, no_crossing}.
+    move: noc; apply: sub_in2=> g; rewrite !inE mem_sort.
+    move=> /orP[/eqP -> // | /orP[/eqP -> // | gino]].
+    by rewrite mem_cat gino orbT.
+  have := opening_cells_side_limit vle vhe lebhe (underWC lu) ha noco outs'.
+  by move=> /allP/(_ c2 c2in).
+move: (c1l) (c2l) => /valid_high_limits => /(_ c1ok) vc1. 
+move=>/valid_low_limits =>/(_ c2ok) vc2.
+have highc1in : high c1 \in rcons s1 le.
+  move: c1in; rewrite fceq !mem_rcons !inE => /orP[/eqP -> | ].
+    by rewrite lfceq eqxx.
+  by move=> ?; rewrite map_f ?orbT.
+have lowc2in : low c2 = le \/ low c2 \in [seq high i | i <- new_cells].
+  have := opening_cells_seq_edge_shift outs' vle vhe.
+  set tmp := rcons _ _.
+  have /[swap] <- : low c2 \in tmp by rewrite mem_rcons inE map_f ?orbT.
+  by rewrite inE -/new_cells=> /orP[/eqP -> // |];[left | right].
+case: lowc2in=> [lowc2le | lowc2hnc].
+ (* can't use strict_above in this case. *) admit.
+(*should use strict_above in this case. *) admit.
 fail.
 
      
