@@ -6521,6 +6521,31 @@ have:= edge_below_pvert_y vg' vg g'g; rewrite leNgt.
 by rewrite (le_lt_trans _ g'iny).
 Qed.
 
+(* TODO consider for math-comp inclusion. *)
+Lemma sorted_rconsE (T : eqType)(leT : rel T) :
+  transitive leT -> forall x s y, x \in s -> sorted leT (rcons s y) -> leT x y.
+Proof.
+move=> tr x s y.
+case: s=> [ | init s] //=; rewrite inE=> /orP[/eqP -> | xins].
+  rewrite (path_sortedE tr)=> /andP[] /allP/(_ y).
+  by rewrite mem_rcons inE eqxx=> /(_ isT).
+have [s' [s'' ->]] : exists s' s'', s = s' ++ x :: s''.
+  by move/splitPr: xins=> [s' s'']; exists s',  s''.
+rewrite [rcons _ _](_ : _ = rcons s' x ++ rcons s'' y); last first.
+  by rewrite -!cats1 -!catA/=.
+rewrite cat_path [X in _ && X](path_sortedE tr) => /andP[] _ /andP[] + _.
+by move=>/allP/(_ y); rewrite mem_rcons inE eqxx last_rcons; apply.
+Qed.
+
+Lemma edge_below_from_point_order g1 g2 p:
+  below_alt g1 g2 -> valid_edge g1 p -> valid_edge g2 p ->
+  p >>= g1 -> p <<< g2 -> g1 <| g2.
+Proof.
+move=>[] //= g2g1 v1 v2 ab bel.
+have := order_edges_strict_viz_point' v2 v1 g2g1 bel.
+by rewrite (negbTE ab).
+Qed.
+
 Lemma in_new_cell_not_in_first_old e open fc cc lc le he:
   open_cells_decomposition open (point e) = (fc, cc, lc, le, he) ->
   cells_bottom_top open ->
@@ -6531,11 +6556,12 @@ Lemma in_new_cell_not_in_first_old e open fc cc lc le he:
   out_left_event e ->
   {in cell_edges open ++ outgoing e &, no_crossing} ->
   all open_cell_side_limit_ok open ->
+  {in [seq high c | c <- fc], forall g, p_x (point e) < p_x (right_pt g)} ->
   {in fc & opening_cells (point e) 
              (sort edge_below (outgoing e))
         le he, forall c1 c2, o_disjoint c1 c2}.
 Proof.
-move=> oe cbtom adj rfo sval inbox_e outs noc lok.
+move=> oe cbtom adj rfo sval inbox_e outs noc lok redges.
 have ocd := decomposition_preserve_cells oe.
 set result_open :=
    fc ++ opening_cells (point e) (sort edge_below (outgoing e)) le he ++ lc.
@@ -6652,11 +6678,33 @@ have lowc2in : low c2 = le \/ low c2 \in [seq high i | i <- new_cells].
   have /[swap] <- : low c2 \in tmp by rewrite mem_rcons inE map_f ?orbT.
   by rewrite inE -/new_cells=> /orP[/eqP -> // |];[left | right].
 case: lowc2in=> [lowc2le | lowc2hnc].
- (* can't use strict_above in this case. *) admit.
-(*should use strict_above in this case. *) admit.
-fail.
-
-     
+  move: (belhc1); rewrite strict_under_pvert_y // => belhc1'.
+  move: ablc2; rewrite under_pvert_y // lowc2le; case/negP.
+  have [/eqP c1lfc | c1nlfc] := boolP(c1 == lfc).
+    by apply/ltW/(lt_le_trans belhc1'); rewrite c1lfc lfceq lexx.
+  have c1fc' : c1 \in fc'.
+    by move: c1in; rewrite fceq mem_rcons inE (negbTE c1nlfc).
+  have : high c1 <| le.
+    have noc' : {in cell_edges open &, no_crossing}.
+    by move: noc; apply: sub_in2=> g gin; rewrite mem_cat gin.
+    have := high_in_first_cells_below oe cbtom adj inbox_e sval rfo noc' redges.
+    by apply; apply: map_f.
+  move/edge_below_pvert_y=>/(_ _ vc1); rewrite -lowc2le vc2=> /(_ isT) c1c2.
+  by apply/ltW/(lt_le_trans belhc1').
+move: (strict_above (high c1) (low c2)).
+rewrite -lfceq /s1 -map_rcons -fceq map_f //.
+have -> : g2 :: s2 = [seq high c | c <- new_cells ++ lc].
+  by move: ncn0; rewrite /g2 /s2; case : (new_cells).
+rewrite map_cat mem_cat lowc2hnc => /(_ isT isT); case/negP.
+apply: (edge_below_from_point_order _ vc2 vc1) => //; last first.
+  by rewrite (strict_nonAunder vc2) negb_and ablc2 ?orbT.
+apply: noc.
+  rewrite mem_cat.
+  have := opening_cells_subset c2in=> /andP[].
+  by rewrite inE mem_sort => /orP[/eqP -> | -> ]; rewrite ?leop ?orbT.
+rewrite !mem_cat map_f ?orbT //.
+by rewrite ocd mem_cat c1in.
+Qed.
 
 Lemma all_edges_opening_cells_above_first e open fc cc lc le he outg:
   open_cells_decomposition open (point e) = (fc, cc, lc, le, he) ->
