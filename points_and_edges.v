@@ -2469,4 +2469,75 @@ have := order_edges_viz_point' v1 v2 g1g2 bel.
 by rewrite (negbTE ab).
 Qed.
 
+Lemma transport_below_edge r p e e':
+  below_alt e e' ->
+  valid_edge e r -> valid_edge e' r ->
+  valid_edge e p -> valid_edge e' p ->
+  pvert_y r e < pvert_y r e' ->
+  p <<< e -> p <<< e'.
+Proof.
+move=> noc vr vr' vp vp' cmp pbelow.
+have ebe'0 := pvert_y_edge_below vr vr' cmp.
+have ebe' : e <| e' by case: noc ebe'0=> [// | -> ].
+by apply:(order_edges_strict_viz_point' vp vp').
+Qed.
+
+Lemma transport_above_edge r p e e':
+  below_alt e e' ->
+  valid_edge e r -> valid_edge e' r ->
+  valid_edge e p -> valid_edge e' p ->
+  pvert_y r e < pvert_y r e' ->
+  p >>> e' -> p >>> e.
+Proof.
+move=> noc vr vr' vp vp' cmp pabove.
+have ebe'0 := pvert_y_edge_below vr vr' cmp.
+have ebe' : e <| e' by case: noc ebe'0=> [// | -> ].
+apply/negP=> abs.
+by move: pabove; rewrite (order_edges_viz_point' vp vp').
+Qed.
+
+Lemma path_edge_below_pvert_y bottom s p :
+  all (valid_edge^~ p) (bottom :: s) ->
+  path edge_below bottom s -> path <=%R (pvert_y p bottom)
+  [seq pvert_y p e | e <- s].
+Proof.
+move=> aval.
+have hp : {in bottom :: s &,
+         {homo (pvert_y p) : u v / edge_below u v >-> u <= v}}.
+  move=> u v /(allP aval) vu /(allP aval) vv.
+    by apply: edge_below_pvert_y vu vv.
+by move/(homo_path_in hp)=> /(_ (allss (bottom :: s))).
+Qed.
+
+Lemma edge_below_hiatus bottom s s' le r p g g' : 
+{in bottom::rcons s le ++ s' &, no_crossing} ->
+all (valid_edge^~ r) (bottom :: rcons s le ++ s') ->
+path edge_below bottom (rcons s le ++ s') ->
+r >>> le -> r <<= g' ->
+g \in le :: s' ->
+valid_edge g p ->
+p >>> g' ->
+g' \in rcons s le ->
+valid_edge g' p -> p >>> g.
+Proof.
+move=> noc aval pth rabove rbelow gin vp pabove g'in vp'.
+have gin2 : g \in bottom :: rcons s le ++ s'.
+  by move: gin; rewrite !(inE, mem_rcons, mem_cat)=>/orP[] ->; rewrite ?orbT.
+have g'in2 : g' \in bottom :: rcons s le ++ s'.
+  by move: g'in; rewrite !(inE, mem_rcons, mem_cat)=>/orP[] ->; rewrite ?orbT.
+have vr : valid_edge g r by apply: (allP aval).
+have vr' : valid_edge g' r by apply: (allP aval).
+have noc' : below_alt g g' by apply: noc.
+apply: (transport_above_edge noc' vr) => //.
+move: (rbelow); rewrite under_pvert_y //; apply: lt_le_trans.
+have aval' : all (valid_edge^~ r) (bottom :: rcons s le).
+  apply/allP=> u uin; apply: (allP aval).
+  move: uin; rewrite !(inE, mem_cat, mem_rcons).
+  by move=> /orP[| /orP[]] ->; rewrite ?orbT.
+move: pth; rewrite cat_path => /andP[].
+rewrite -[path _ _ (rcons _ _)]/(sorted edge_below (rcons (bottom :: s) le)).
+move=> /= /path_edge_below_pvert_y => /(_ _ aval').
+
+rewrite sorted_rconsE.
+
 End working_context.
