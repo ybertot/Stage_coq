@@ -2565,7 +2565,7 @@ r <<< he -> r >>= g ->
 g \in rcons s he ->
 valid_edge g p ->
 p <<< g ->
-g \in s' ->
+g' \in s' ->
 valid_edge g' p -> p <<< g'.
 Proof.
 move=> noc aval pth rabove rbelow gin vp pabove g'in vp'.
@@ -2579,7 +2579,7 @@ have vl : valid_edge he r by apply: (allP aval).
 have vr : valid_edge g r by apply: (allP aval).
 have vr' : valid_edge g' r by apply: (allP aval).
 have noc' : below_alt g g' by apply: noc.
-apply: (transport_above_edge noc' vr) => //.
+apply: (transport_below_edge noc' vr) => //.
 have aval' : all (valid_edge^~ r) (bottom :: rcons s he).
   apply/allP=> u uin; apply: (allP aval).
   move: uin; rewrite !(inE, mem_cat, mem_rcons).
@@ -2590,19 +2590,16 @@ have aval'' : all (valid_edge^~ r) (he :: s').
   by move=> /orP[] ->; rewrite ?orbT.
 have tr : transitive (relpre (pvert_y r) <=%R).
   by move=> y x z; rewrite /=; apply: le_trans.
-have he_g' : pvert_y r he < pvert_y r g'.
-  have he_r : pvert_y r he < p_y r by rewrite ltNge -under_pvert_y.
-  have r_g' : p_y r <= pvert_y r g' by rewrite -under_pvert_y.
-  by apply: lt_le_trans he_r r_g'.
-have g_he : pvert_y r g <= pvert_y r he.
-  move: gin; rewrite mem_rcons inE=> /orP[/eqP -> |gin]; first by rewrite lexx.
-  have gin' : g \in (bottom :: s) by rewrite inE gin orbT.
-  move: pth; rewrite cat_path last_rcons => /andP[] + _.
-  move=> /= /path_edge_below_pvert_y => /(_ _ aval').
-  rewrite path_map.
-  rewrite -[path _ _ _]/(sorted _ (rcons (bottom :: s) he)).
-  by move=> /(sorted_rconsE tr)/allP/(_ _ gin') /=.
-by apply: le_lt_trans he_g'.
+have g_he : pvert_y r g < pvert_y r he.
+  have r_he : p_y r < pvert_y r he by rewrite -strict_under_pvert_y.
+  have g_r : pvert_y r g <= p_y r by rewrite leNgt -strict_under_pvert_y.
+  by apply: le_lt_trans g_r r_he.
+have he_g' : pvert_y r he <= pvert_y r g'.
+  move: pth; rewrite cat_path last_rcons => /andP[] _.
+  move=> /= /path_edge_below_pvert_y => /(_ _ aval'').
+  rewrite path_map /=.
+  by rewrite (path_sortedE tr) => /andP[] /allP/(_ _ g'in) /=.
+by apply: lt_le_trans he_g'.
 Qed.
 
 End working_context.
