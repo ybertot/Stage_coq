@@ -41,8 +41,9 @@ time-of-build-after.log
 time-of-build-before.log
 time-of-build-both.log
 time-of-build-pretty.log
+*.v~
 *.v#
-_CoqProject
-Make
+Makefile
 Makefile.coq
 Makefile.coq.conf
+Makefile.conf

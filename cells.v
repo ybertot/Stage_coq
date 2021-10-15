@@ -1,6 +1,7 @@
-
 From mathcomp Require Import all_ssreflect all_algebra.
 Require Export Field.
+Require Import math_comp_complements.
+Require Import points_and_edges.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -34,11 +35,15 @@ Qed.
 
 End transitivity_proof.
 
-Lemma allcons [T : predArgType]
-  (f : T -> bool) a q' : all f (a :: q') = f a && all f q'.
-Proof.  by []. Qed.
+Section working_environment.
 
-Record cell := Bcell  {left_pts : list pt; right_pts : list pt; low : edge; high : edge}.
+Variable R : realFieldType.
+
+Notation pt := (pt R).
+Notation edge := (edge R).
+
+Record cell := Bcell  {left_pts : list pt; right_pts : list pt;
+                        low : edge; high : edge}.
 
 Definition cell_eqb (ca cb : cell) : bool :=
   let: Bcell lptsa rptsa lowa higha := ca in
@@ -140,182 +145,6 @@ Fixpoint edges_to_events (s : seq edge) : seq event :=
     add_event (left_pt e) e false
       (add_event (right_pt e) e true (edges_to_events s'))
   end.
-
-
-(* returns true if p is under A B *)
-Definition pue_formula (p : pt) (a : pt) (b : pt) : rat :=
-  let: Bpt p_x p_y := p in
-  let: Bpt a_x a_y := a in
-  let: Bpt b_x b_y := b in
-     (b_x * p_y - p_x * b_y - (a_x * p_y - p_x * a_y) + a_x * b_y - b_x * a_y).
-
-
-(* returns true if p is under e *)
-Definition point_under_edge (p : pt) (e : edge) : bool :=
-  pue_formula p (left_pt e) (right_pt e) <= 0.
-
-  (* returns true if p is strictly under e *)
-Definition point_strictly_under_edge (p : pt) (e : edge) : bool :=
-  pue_formula p (left_pt e) (right_pt e) < 0.
-
-Notation "p '<<=' e" := (point_under_edge p e)( at level 70, no associativity).
-Notation "p '<<<' e" := (point_strictly_under_edge p e)(at level 70, no associativity).
-
-Notation "p '>>=' e" := (~~(point_strictly_under_edge p e))( at level 70, no associativity).
-Notation "p '>>>' e" := (~~(point_under_edge p e))(at level 70, no associativity).
-
-(*returns true if e1 is under e2*)
-
-Definition compare_incoming (e1 e2 : edge) : bool :=
-  let: Bedge a _ _ := e1 in
-   a <<= e2.
-
-(*returns true if e1 is under e2*)
-Definition compare_outgoing (e1 e2 : edge) : bool :=
-  let: Bedge _ b _ := e1 in
-   b <<= e2.
-
-(* Check @Bedge (Bpt 3%:Q 4%:Q) (Bpt 4%:Q 4%:Q) isT. *)
-
-(* Compute compare_incoming  (@Bedge  (Bpt 2%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT ). *)
-
-
-(* Compute compare_outgoing (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 1%:Q) isT ) (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT). *)
-
-Definition sort_incoming (inc : seq edge) : seq edge :=
-  sort compare_incoming inc.
-Definition sort_outgoing (out : seq edge) : seq edge :=
-  sort compare_outgoing out.
-
-
-Definition E1 : edge := (@Bedge  (Bpt 2%:Q 5%:Q) (Bpt 3%:Q 3%:Q) isT).
-Definition E2 : edge := (@Bedge  (Bpt (@Rat (7%:Z, 3%:Z) isT)  10%:Q) (Bpt 3%:Q 3%:Q) isT).
-Definition E3 : edge := (@Bedge  (Bpt 1%:Q 1%:Q) (Bpt 3%:Q 3%:Q) isT).
-
-Definition sorted_inc := map left_pt (sort_incoming [:: E1; E2; E3]).
-(* Eval lazy in sorted_inc. *)
-
-Definition E4 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 6%:Q) isT).
-Definition E5 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 5%:Q 3%:Q) isT).
-Definition E6 : edge := (@Bedge  (Bpt 2%:Q 3%:Q) (Bpt 4%:Q 3%:Q) isT).
-Definition sorted_out := map right_pt (sort_outgoing [:: E4; E5; E6]).
-(* Eval lazy in sorted_out. *)
-
-
-Section ring_sandbox.
-
-Variable R : numFieldType.
-Definition R' := (R : Type).
-
-Let mul : R' -> R' -> R' := @GRing.mul _.
-Let add : R' -> R' -> R' := @GRing.add _.
-Let sub : R' -> R' -> R' := (fun x y => x - y).
-Let opp : R' -> R' := @GRing.opp _.
-Let zero : R' := 0.
-Let one : R' := 1.
-
-
-Let R2_theory :=
-   @mk_rt R' zero one add mul sub opp
-    (@eq R')
-    (@add0r R) (@addrC R) (@addrA R) (@mul1r R) (@mulrC R)
-      (@mulrA R) (@mulrDl R) (fun x y : R' => erefl (x - y)) (@addrN R).
-
-Add Ring R2_Ring : R2_theory.
-
-Ltac mc_ring :=
-rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
-    -?[@GRing.mul _]/mul
-    -?[@GRing.opp _]/opp -?[1]/one -?[0]/zero;
-match goal with |- @eq ?X _ _ => change X with R' end;
-ring.
-
-Let inv : R' -> R' := @GRing.inv _.
-Let div : R' -> R' -> R' := fun x y => mul x (inv y).
-
-Definition R2_sft : field_theory zero one add mul sub opp div inv (@eq R').
-Proof.
-constructor.
-- exact R2_theory.
-- have // : one <> zero by apply/eqP; rewrite oner_eq0.
-- have // : forall p q : R', div p q = mul p (inv q) by [].
-- have // : forall p : R', p <> zero -> mul (inv p) p = one.
-  by move=> *; apply/mulVf/eqP.
-Qed.
-
-Add Field Qfield : R2_sft.
-
-Ltac mc_field :=
-rewrite ?mxE /= ?(expr0, exprS, mulrS, mulr0n) -?[@GRing.add _]/add
-    -?[@GRing.mul _]/mul -[@GRing.inv _]/inv
-    -?[@GRing.opp _]/opp -?[1]/one -?[0]/zero;
-match goal with |- @eq ?X _ _ => change X with R' end;
-field.
-
-Example field_playground (x y : R' ) : x != 0 -> y != 0 -> (x * y) / (x * y) = 1.
-Proof.
-move=> xn0 yn0; mc_field.
-by split; apply/eqP.
-Qed.
-
-(* returns true if p is under A B *)
-Definition pue_f (p_x p_y a_x a_y b_x b_y : R')  : R' :=
-     (b_x * p_y - p_x * b_y - (a_x * p_y - p_x * a_y) + a_x * b_y - b_x * a_y).
-
-Qed.
-
-End ring_sandbox.
-
-Lemma compare_outgoing_total p : {in [pred e | left_pt e == p] &, total compare_outgoing} .
-Proof.
-rewrite /total.
-move => ab cd /eqP lp /eqP lp2.
-have: left_pt ab = left_pt cd.
-  by rewrite lp lp2.
-move => h {lp lp2}.
-rewrite -implyNb.
-apply /implyP.
-rewrite /compare_outgoing /point_under_edge.
-move : ab cd h => [a b ab][c d cd] /= h.
-rewrite -ltNge h.
-rewrite pue_formula_opposite/=.
-rewrite oppr_gt0.
-apply ltW.
-Qed.
-
-Lemma compare_incoming_total p : {in [pred e | right_pt e == p] &, total compare_incoming} .
-Proof.
-
-rewrite /total.
-move => ab cd /eqP lp /eqP lp2.
-have: right_pt ab = right_pt cd.
-  by rewrite lp lp2.
-move => h {lp lp2}.
-rewrite -implyNb.
-apply /implyP.
-rewrite /compare_incoming /point_under_edge.
-move : ab cd h => [a b ab][c d cd] /= h.
-rewrite h -ltNge pue_formula_opposite -pue_formula_cycle.
-rewrite oppr_gt0.
-apply ltW.
-Qed.
-
-Lemma sort_out : forall p s, all [pred e | left_pt e == p] s ->
-  sorted compare_outgoing (sort compare_outgoing s).
-Proof.
-rewrite /=.
-move => p s.
-
-apply /sort_sorted_in /compare_outgoing_total.
-Qed.
-
-Lemma sort_inc : forall p s, all [pred e | right_pt e == p] s ->
-  sorted compare_incoming (sort compare_incoming s).
-Proof.
-rewrite /=.
-move => p s.
-apply /sort_sorted_in /compare_incoming_total.
-Qed.
 
 Definition valid_cell c x := (valid_edge (low c) x) /\ (valid_edge (high c) x).
 
