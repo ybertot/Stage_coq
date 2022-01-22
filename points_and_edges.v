@@ -2603,3 +2603,11 @@ by apply: lt_le_trans he_g'.
 Qed.
 
 End working_context.
+
+Notation "p '<<=' e" := (point_under_edge p e)( at level 70, no associativity).
+Notation "p '<<<' e" := (point_strictly_under_edge p e)(at level 70, no associativity).
+
+Notation "p '>>=' e" := (~~(point_strictly_under_edge p e))( at level 70, no associativity).
+Notation "p '>>>' e" := (~~(point_under_edge p e))(at level 70, no associativity).
+Notation "p '===' e" := (point_on_edge p e)( at level 70, no associativity).
+Notation "e1 '<|' e2" := (edge_below e1 e2)( at level 70, no associativity).
