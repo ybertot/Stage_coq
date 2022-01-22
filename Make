@@ -4,4 +4,6 @@ points_and_edges.v
 cells.v
 trials.v
 draw.v
-cells_box.v
+
+-arg -w -arg -ambiguous-paths
+-arg -w -arg -notation-overridden
