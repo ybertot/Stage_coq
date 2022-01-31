@@ -4535,11 +4535,29 @@ move: events => [// | ev' events] [] <- _ {open' closed'}
   inbox_e outs rfo cbtom adj sval cle clae lexev noc /allP partedge.
 have noco :  {in cell_edges open &, no_crossing R}.
   by move: noc; apply: sub_in2=> g gin; rewrite mem_cat gin.
-apply/allP => g /mapP[c + geq]; rewrite !mem_cat => /orP[].
+apply/allP => g /mapP[c + /[dup] geq ->]; rewrite !mem_cat => /orP[].
 - move=> cfc.
-  have fclow : c \in fc -> pvert_y (point ev) g <= p_y (point ev).
-    have probably_use :=
-        high_in_first_cells_below oe cbtom adj inbox_e sval rfo noco.
+  have cino : c \in open by rewrite ocd mem_cat cfc.
+  have [vce' | //] := boolP (valid_edge (high c) (point ev')).
+  have  vg : valid_edge (high c) (point ev).
+    by apply: (proj2 (andP (allP sval c _))).
+  move: (partedge (high c)); rewrite map_f // vg => /(_ isT).
+  have probably_use :=
+      high_in_first_cells_below oe cbtom adj inbox_e sval rfo noco.
+
+    have : {in [seq high i | i <- fc],
+              forall g, p_x (point ev) < p_x (right_pt g)}.
+      move=> g' /mapP [c' c'in ->].
+      have c'ino : c' \in open by rewrite ocd mem_cat c'in.
+      have  vg' : valid_edge (high c') (point ev).
+        by apply: (proj2 (andP (allP sval c' _))).
+    have := partedge (high c'); rewrite map_f // vg' => /(_ isT).
+
+    have valid_edge
+      
+
+  have fclow : pvert_y (point ev) g <= p_y (point ev).
+      
     admit.
   have : lexPtEv ev ev' by admit.
   move=> /orP[ xltx' | /andP[xs ys]]; move: (cfc)=> /fclow yev ; last first.
