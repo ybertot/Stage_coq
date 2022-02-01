@@ -211,19 +211,6 @@ Definition inspect [A : Type](a : A) : {x : A | a = x}.
 exists a; apply: erefl.  
 Defined.
 
-Fixpoint sum (n : nat) := match n with O => O | S p => (p + sum p)%N end.
-Check forall (P : nat -> nat -> Prop),
-  (P O O) -> (forall p, P p (sum p) -> P (S p) (p + sum p)%N) ->
-  forall n, P n (sum n).
-
-Fixpoint f_ind (P : nat -> nat -> Prop) 
-  (V1 : P O O) (V2 : forall p, P p (sum p) -> P (S p) (p + sum p)%N)
-  (n : nat) : P n (sum n) :=
-  match n return P n (sum n) with
-  | O => V1
-  | S p => V2 p (f_ind V1 V2 p)
-  end.
-
 Lemma closing_rest_ind
   (p : pt) (P : seq cell -> seq cell -> Prop) (rest : seq cell)
   (V1 : P nil nil)
@@ -2160,13 +2147,12 @@ have lein : le \in [seq low c | c <- open] ++ [seq high c | c <- open].
 have hein : he \in [seq low c | c <- open] ++ [seq high c | c <- open].
   by rewrite mem_cat; apply/orP; right; apply/mapP; exists hc'.
 have [// | abs_he_under_le ] :=  n_c le he lein hein.
-have [ e1 e2]:= l_h_above_under_strict cbtom adj insp valp r_f op_c_d_eq.
-have vl : valid_edge le p.
-  by move: valp; rewrite /seq_valid=>/allP/(_ _ lcin)/andP[]; rewrite le_eq.
-have vh : valid_edge he p.
-  by move: valp; rewrite /seq_valid=>/allP/(_ _ hcin)/andP[]; rewrite he_eq.
-case: e1; have := (order_edges_strict_viz_point' vh vl abs_he_under_le e2).
-by move/underW=> ->.
+have [e1 e2]:= l_h_above_under_strict cbtom adj insp valp r_f op_c_d_eq.
+case/negP: e1.
+have [vl vh]  : valid_edge le p /\ valid_edge he p.
+  by split; move: valp =>/[dup]/allP/(_ _ lcin)/andP[] + +
+             /allP/(_ _ hcin)/andP[]; rewrite le_eq he_eq.
+by have /underW := (order_edges_strict_viz_point' vh vl abs_he_under_le e2).
 Qed.
 
 Definition events_to_edges := flatten \o (map outgoing).
