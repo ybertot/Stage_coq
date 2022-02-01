@@ -680,61 +680,55 @@ by rewrite !inE !(perm_mem (permEl (perm_sort _ _))).
 Qed.
 
 
-Lemma opening_cells_right_form' (ctxt s : seq edge) (p : pt) low_e high_e :
+Lemma opening_cells_aux_right_form (ctxt s : seq edge) (p : pt) low_e high_e :
 p >>= low_e -> p <<< high_e -> valid_edge high_e p ->
 low_e \in ctxt -> high_e \in ctxt ->
 low_e <| high_e -> {in s, forall g, left_pt g == p} ->
 {in ctxt &, (@no_crossing R)} ->
 {subset s <= ctxt} ->
 path (@edge_below R) low_e s  ->
-forall new_open_cells,
-opening_cells_aux p s low_e high_e = new_open_cells ->
-s_right_form new_open_cells.
+s_right_form (opening_cells_aux p s low_e high_e).
 Proof.
 move=> + ph vh + hin + + noc + +.
 elim: s low_e => [ | g1 edges IH] low_e
   pabove lin lowhigh outs allin sorted_e /=.
-  case v_i_l_eq :
-   (vertical_intersection_point p low_e)=> [a1 | ]; last by move=> s <-.
-  case v_i_h_eq :
-   (vertical_intersection_point p high_e) => [a2 | ]; last by move=> s <-.
-  by case: ifP => [a2e | a2ne];
-    case: ifP => [a1e | a1ne] s <-; rewrite /= /= ?andbT.
+  case v_i_l_eq : (vertical_intersection_point p low_e)=> [a1 | ]; last by [].
+  case v_i_h_eq : (vertical_intersection_point p high_e) => [a2 | ]; last by [].
+  by case: ifP => [a2e | a2ne]; case: ifP => [a1e | a1ne]; rewrite /= ?andbT.
 case v_i_l_eq :
-   (vertical_intersection_point _ low_e)=> [a1 | ]; last by move=> s <-.
+   (vertical_intersection_point _ low_e)=> [a1 | ]; last by [].
 have outs' : {in edges, forall g, left_pt g == p}.
   by move=> g gin; apply outs; rewrite inE gin orbT.
 have allin' : {subset edges <= ctxt}.
   by move=> g gin; rewrite allin // inE gin orbT.
-have sorted_e' : path (@edge_below R) g1 edges by apply: (path_sorted sorted_e).
+have sorted_e' : path (@edge_below R) g1 edges.
+   by apply: (path_sorted sorted_e).
 have /eqP gl : left_pt g1 == p by rewrite outs // inE eqxx.
 have g1belowhigh : g1 <| high_e.
   have gin' : g1 \in ctxt by rewrite allin // inE eqxx.
   have/no_crossingE := noc g1 high_e gin' hin.
   by rewrite gl=>/(_ vh)=> -[]/(_ ph).
 have pong : p === g1 by rewrite -gl left_on_edge.
-have paboveg1 : p >>= g1 by rewrite strict_nonAunder ?pong //; case/andP: pong.
+have paboveg1 : p >>= g1
+   by rewrite strict_nonAunder ?pong //; case/andP: pong.
 move: (sorted_e) => /=/andP[] low_eg1 _.
 have g1in : g1 \in ctxt by rewrite allin // inE eqxx.
-by case: ifP => _ s <- /=; rewrite /= ?low_eg1 /=; apply: (IH g1).
+by rewrite low_eg1; apply: (IH g1).
 Qed.
 
-Lemma opening_cells_right_form e low_e high_e :
-valid_edge high_e (point e) ->
-point e >>= low_e -> point e <<< high_e ->
+Lemma opening_cells_right_form p s low_e high_e :
+valid_edge high_e p ->
+p >>= low_e -> p <<< high_e ->
 low_e <| high_e ->
-{in outgoing e, forall g, left_pt g == point e} ->
-{in outgoing e, forall g, low_e <| g} ->
-{in outgoing e, forall g, g <| high_e} ->
-{in outgoing e &, (@no_crossing R)} ->
-forall new_open_cells,
-opening_cells (point e) (outgoing e) low_e high_e = new_open_cells ->
-s_right_form new_open_cells.
-(*  && (head low_e [seq low c | c <- new_open_cells] == low_e). *)
+{in s, forall g, left_pt g == p} ->
+{in s, forall g, low_e <| g} ->
+{in s, forall g, g <| high_e} ->
+{in s &, (@no_crossing R)} ->
+s_right_form (opening_cells p s low_e high_e).
 Proof.
 set mainsort := fun l => (perm_mem (permEl (perm_sort (@edge_below R) l))).
-move=> vh pabove punder lowhigh outs alla allb noc new oe; apply/allP.
-have noc' : {in low_e :: high_e :: outgoing e &, (@no_crossing R)}.
+move=> vh pabove punder lowhigh outs alla allb noc; apply/allP.
+have noc' : {in low_e :: high_e :: s &, (@no_crossing R)}.
   move=> e1 e2; rewrite !inE !orbA =>/orP[e1lh |e1in ]/orP[e2lh |e2in].
     by apply/orP;move:e1lh e2lh=> /orP[]/eqP -> /orP[]/eqP ->;
       rewrite ?edge_below_refl ?lowhigh ?orbT.
@@ -743,8 +737,8 @@ have noc' : {in low_e :: high_e :: outgoing e &, (@no_crossing R)}.
     - by move: e2lh=> /orP[]/eqP ->; apply/orP;
          rewrite/below_alt ?alla ?allb ?orbT.
     by apply: noc.
-have sorted_e : sorted (@edge_below R) (sort (@edge_below R) (outgoing e)).
-  have /sort_sorted_in : {in low_e :: outgoing e &, total (@edge_below R)}.
+have sorted_e : sorted (@edge_below R) (sort (@edge_below R) s).
+  have /sort_sorted_in : {in low_e :: s &, total (@edge_below R)}.
     move=> e1 e2; rewrite !inE =>/orP[/eqP -> |e1in ]/orP[/eqP -> |e2in].
     - apply/orP; left; apply/orP; left; rewrite /point_under_edge.
       by rewrite (eqP (proj1 (pue_formula_two_points _ _)))
@@ -753,33 +747,23 @@ have sorted_e : sorted (@edge_below R) (sort (@edge_below R) (outgoing e)).
     - by rewrite alla ?orbT.
     - by apply/orP/noc.
   by apply; apply/allP=> x xin /=; apply/orP; right; exact: xin.
-have /sub_in1/= trsf : {subset sort (@edge_below R) (outgoing e) <= outgoing e}.
+have /sub_in1/= trsf : {subset sort (@edge_below R) s <= s}.
   by move=> x; rewrite mainsort.
 move/trsf:outs => {}outs.
-have [lin hin] : (low_e \in [:: low_e, high_e & outgoing e]) /\
-   (high_e \in [:: low_e, high_e & outgoing e]).
+have [lin hin] : (low_e \in [:: low_e, high_e & s]) /\
+   (high_e \in [:: low_e, high_e & s]).
   by split; rewrite !inE eqxx ?orbT.
-have slho : {subset (sort (@edge_below _) (outgoing e)) <=
-               [:: low_e, high_e & outgoing e]}.
+have slho : {subset (sort (@edge_below _) s) <=
+               [:: low_e, high_e & s]}.
   by move=> x; rewrite mainsort => xin; rewrite !inE xin ?orbT.
 move=> x xin.
-have srt : sorted (@edge_below R) (low_e :: sort (@edge_below R) (outgoing e)).
-  case sq : (sort (@edge_below R) (outgoing e)) => [// | a tl].
+have srt : sorted (@edge_below R) (low_e :: sort (@edge_below R) s).
+  case sq : (sort (@edge_below R) s) => [// | a tl].
     rewrite -[sorted _ _]/((low_e <| a) && sorted (@edge_below R) (a :: tl)).
     by rewrite -sq sorted_e andbT alla // -mainsort sq inE eqxx.
-have := (opening_cells_right_form' pabove punder vh lin hin lowhigh outs noc' slho srt oe).
-by move=>/allP; apply.
+have it := (opening_cells_aux_right_form _ _ _ lin hin lowhigh outs).
+by apply: (allP (it _ _ _ _ _ _) x xin).
 Qed.
-
-(*
-Lemma order_cells_viz_point (cells : seq cell) p :
-forall c, c \in cells ->
-valid_edge (low c) p -> valid_edge (high c) p ->
-right_form c ->
-p <<= (low c) ->  p <<= (high c).
-Proof.
-
-*)
 
 Definition seq_valid (s : seq cell) (p : pt) : bool :=
     all (fun c => (valid_edge (low c) p) && (valid_edge (high c) p)) s.
@@ -2265,24 +2249,26 @@ Proof.
 move=> cbtom adj inbox_e sval noc oute rfo; rewrite /step /=.
 case oe : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] le] he].
 move=> [] <- _.
-have ocd := decomposition_preserve_cells oe.
+have [c1 [c2 [cc' [ocd [le_eq [he_eq [cceq lceq]]]]]]] :=
+  lhc_dec cbtom adj inbox_e oe.
+have c1in : c1 \in open by rewrite ocd cceq !(mem_cat, inE, eqxx, orbT).
+have c2in : c2 \in open.
+  by rewrite ocd cceq !mem_cat lceq mem_last !orbT.
 have [lP hP] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
-have [c1 [c2 [c1in [c2in]]]] := l_h_in_open cbtom adj inbox_e.
-rewrite oe /= => [][le_eq he_eq].
 set bigs := cell_edges open ++ outgoing e.
-have lein : le \in bigs by rewrite !mem_cat -le_eq map_f ?orbT.
-have hein : he \in bigs by rewrite !mem_cat -he_eq map_f ?orbT.
-have obig : {subset (outgoing e) <= bigs}.
-  by move=> g gin; rewrite !mem_cat gin ?orbT.
+have lein : le \in bigs by rewrite -le_eq !mem_cat map_f.
+have hein : he \in bigs by rewrite -he_eq !mem_cat map_f ?orbT.
+have obig : {subset outgoing e <= bigs}.
+  by move=> g gin; rewrite !mem_cat gin orbT.
 have lev : valid_edge le (point e) by have [] := l_h_valid _ _ _ _ oe.
 have hev : valid_edge he (point e) by have [] := l_h_valid _ _ _ _ oe.
 have [edgesabove edgesbelow nocout] :=
    outgoing_conditions lP hP lein hein lev hev obig noc oute.
 have /allP rfn : s_right_form 
     (opening_cells (point e) (outgoing e) le he).
-  apply: (opening_cells_right_form hev (underWC lP) hP) => //.
-  apply: (open_cells_decomposition_low_under_high _ _ _ _ _ _ oe)=> //.
-  by move: noc; apply: sub_in2=> x xin; rewrite mem_cat xin.
+  apply: (opening_cells_right_form hev (underWC lP) hP _ oute) => //.
+  apply: (edge_below_from_point_under _ _ _ (underW hP) lP) => //.
+  by apply: noc; rewrite -?le_eq -?he_eq !mem_cat map_f ?orbT.
 apply/allP=> x; rewrite !mem_cat orbCA=> /orP[/rfn// | ].
 by move=> xin; apply: (allP rfo); rewrite ocd !mem_cat orbCA xin orbT.
 Qed.
@@ -3153,8 +3139,8 @@ have vhwq : valid_edge (high W) q.
   apply: valid_high_limits => //.
   by apply: cok; rewrite oc0q inE eqxx.
 have adj0 := adjacent_opening' p (og :: oe) le he.
-have rf0 := opening_cells_right_form' pl ph vh lein hein lowhigh leftg noc
-         oesub soe erefl.
+have rf0 := opening_cells_aux_right_form pl ph vh lein hein lowhigh leftg noc
+         oesub soe.
 have := seq_edge_below' adj0 rf0; rewrite oc0q [head _ _]/= => srt.
 have vog : valid_edge og q by move: vhwq; rewrite [high W]/=.
 case ocq : (opening_cells_aux p oe og he) => [| c0 q0].
