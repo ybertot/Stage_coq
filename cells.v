@@ -148,7 +148,7 @@ Fixpoint edges_to_events (s : seq edge) : seq event :=
 
 Definition valid_cell c x := valid_edge (low c) x /\ valid_edge (high c) x.
 
-Definition right_form (c : cell) : bool := low c <| high c.
+(* Definition right_form (c : cell) : bool := low c <| high c. *)
 
 Lemma order_edges_viz_point c p :
 valid_edge (low c) p -> valid_edge (high c) p ->
@@ -624,7 +624,7 @@ Definition bottom_edge_seq_below (s : seq cell) (p : pt) :=
 
 Lemma strict_under_cell (c : cell) (p : pt) :
   valid_cell c p ->
-  right_form c -> p <<= (low c) -> ~~ contains_point p c ->
+  low c <| high c -> p <<= (low c) -> ~~ contains_point p c ->
   p <<< (low c).
 Proof.
 move=> valcp rfc.
@@ -637,7 +637,7 @@ by rewrite under_onVstrict // ponl.
 Qed.
 
 Definition s_right_form (s : seq cell)  : bool :=
-  all (fun c => right_form c ) s.
+  all (fun c => low c <| high c ) s.
 
 Lemma opening_cells_seq_edge_shift p oe le he :
   {in oe, forall g, left_pt g == p} ->
@@ -699,7 +699,7 @@ elim: s low_e => [ | g1 edges IH] low_e
   case v_i_h_eq :
    (vertical_intersection_point p high_e) => [a2 | ]; last by move=> s <-.
   by case: ifP => [a2e | a2ne];
-    case: ifP => [a1e | a1ne] s <-; rewrite /=/right_form /= ?andbT.
+    case: ifP => [a1e | a1ne] s <-; rewrite /= /= ?andbT.
 case v_i_l_eq :
    (vertical_intersection_point _ low_e)=> [a1 | ]; last by move=> s <-.
 have outs' : {in edges, forall g, left_pt g == p}.
@@ -716,7 +716,7 @@ have pong : p === g1 by rewrite -gl left_on_edge.
 have paboveg1 : p >>= g1 by rewrite strict_nonAunder ?pong //; case/andP: pong.
 move: (sorted_e) => /=/andP[] low_eg1 _.
 have g1in : g1 \in ctxt by rewrite allin // inE eqxx.
-by case: ifP => _ s <- /=; rewrite /right_form /= ?low_eg1 /=; apply: (IH g1).
+by case: ifP => _ s <- /=; rewrite /= ?low_eg1 /=; apply: (IH g1).
 Qed.
 
 Lemma opening_cells_right_form e low_e high_e :
@@ -933,7 +933,7 @@ by have /= /eqP <- := (fix_preserve_cells h).
 Qed.
 
 Lemma close_imp_cont c e :
-right_form c ->
+low c <| high c ->
 valid_edge (low c) (point e) /\ valid_edge (high c) (point e) ->
 event_close_edge (low c) e \/  event_close_edge (high c) e->
 contains_point (point e) c.
@@ -944,18 +944,18 @@ move : rf val.
   rewrite /point_strictly_under_edge -rlc {rlc e}.
   have := (pue_formula_two_points (right_pt (low c)) (left_pt (low c))) => [][] _ [] /eqP -> _ .
   rewrite lt_irreflexive /=.
-  rewrite /right_form /edge_below.
+  rewrite /edge_below.
   move => /orP [] /andP [] //= => pablhlow pabrhlow [] _ validrlhigh.
   apply: not_strictly_above pablhlow pabrhlow validrlhigh.
   move : rf val.
 rewrite /point_under_edge -rhc {rhc}.
 have := (pue_formula_two_points (right_pt (high c)) (left_pt (high c))) => [] [] _ [] /eqP -> _ /=.
-rewrite le_refl /right_form /edge_below /= andbT=> /orP [] /andP [] //= => pablhlow pabrhlow [] valrhlow _ .
+rewrite le_refl /edge_below /= andbT=> /orP [] /andP [] //= => pablhlow pabrhlow [] valrhlow _ .
 apply : not_strictly_under pablhlow pabrhlow valrhlow.
 Qed.
 
 Lemma contrapositive_close_imp_cont c e :
-right_form c ->
+low c <| high c->
 valid_edge (low c) (point e) /\ valid_edge (high c) (point e) ->
 ~ contains_point (point e) c ->
 ~ event_close_edge (low c) e /\ ~ event_close_edge (high c) e.
@@ -1012,9 +1012,8 @@ rewrite -lc.
 move => c1.
 rewrite inE => /orP[ | c1inq].
   by move : notcontain => /negP notcontain /eqP  -> .
-have rfc1 : (right_form c1).
+have rfc1 : low c1 <| high c1.
   move : op_rf.
-  rewrite /s_right_form .
   move =>  /allP /= incq /=.
   have := (incq c1).
   by rewrite inE c1inq orbT => // /(_ isT).
@@ -1030,13 +1029,13 @@ by apply a.
 have [vallc valhc] : valid_edge (low c) p /\ valid_edge (high c) p.
   by move: opvalid => /allP /= /(_ c); rewrite inE eqxx => /(_ isT)=>/andP.
 have lowhigh : (low c) <| (high c).
-  by move: op_rf=> /allP /(_ c); rewrite inE eqxx /right_form => /(_ isT).
+  by move: op_rf=> /allP /(_ c); rewrite inE eqxx  => /(_ isT).
 have underhigh : p <<= (high_c).
   rewrite (_ : high_c = high c); last by rewrite ceq.
   by apply: order_edges_viz_point.
 have strictunder : p <<< (low c).
   by move: notcontain; rewrite ceq negb_and /= underhigh orbF negbK.
-rewrite /right_form /edge_below in rfc1.
+rewrite /edge_below in rfc1.
 move: notcontain; rewrite /contains_point negb_and negbK /==> notcontain.
 apply/negP; rewrite negb_and negbK.
 by rewrite (strict_under_seq adj_op opvalid op_rf strictunder).
@@ -1065,7 +1064,7 @@ set e2 := @Bedge R {|p_x := 0; p_y := 2%:R|} {|p_x := 1; p_y := 1|} ltr01.
 set p := {|p_x := (3%:R):R; p_y := 0|}.
 set c := Bcell [::] [::] e1 e2.
 have exrf : s_right_form [:: c].
-  rewrite /= /right_form /= /e1 /e2 /edge_below /= /point_under_edge /=.
+  rewrite /= /= /e1 /e2 /edge_below /= /point_under_edge /=.
   rewrite /point_strictly_under_edge  /=.
   rewrite !(mul0r, subrr, mul1r, subr0, add0r, addr0, oppr0, opprK).
   rewrite le_refl lt_irreflexive /= !andbT.
@@ -1561,7 +1560,7 @@ have vall': valid_edge (low c) p.
 have valh': valid_edge (high c) p.
   by rewrite c_eq.
 move : rf_open.
-rewrite /right_form /= => /andP [] linfh _.
+rewrite /= => /andP [] linfh _.
 have inf' : low c <| high c.
   by rewrite c_eq.
 have pinf : p <<= low c .
@@ -1661,7 +1660,7 @@ split.
   have := notc lfc; rewrite fceq mem_rcons inE eqxx => /(_ isT).
   rewrite /contains_point abs andbT=> /negP; rewrite negbK => abs' {abs}.
   case/negP: pale.
-  move: rfo => /allP /(_ lfc lfco); rewrite /right_form => lbh.
+  move: rfo => /allP /(_ lfc lfco) lbh.
   have [vall valh]:= andP (allP val lfc lfco).
   by rewrite -leq -A (order_edges_strict_viz_point vall valh).
 case lceq : lc => [ | hlc lc'].
@@ -1674,7 +1673,7 @@ move => /eqP /[dup] A ->.
 rewrite -(negbK (_ <<< _)); apply/negP=> abs.
 have := notc hlc; rewrite lceq inE eqxx orbT => /(_ isT).
 rewrite /contains_point abs /=; apply => {abs}.
-move: rfo => /allP /(_ hlc hlco); rewrite /right_form => lbh.
+move: rfo => /allP /(_ hlc hlco) => lbh.
 have [vall valh]:= andP (allP val hlc hlco).
 by rewrite (order_edges_viz_point vall valh) // -A.
 Qed.
@@ -3222,7 +3221,6 @@ Proof.
 apply closing_rest_ind=> //.
   move=> c p1 vip /=.
   move=> /(_ isT) elow /andP[] rf0 _ _ _ /andP[] lim0 _ /andP[] ct0 _.
-  move: rf0; rewrite /right_form => lowhigh.
   move: lim0=> /andP[] ln0 /andP[] lxs /andP[] ls /andP[] onh onl.
   have [onhr x1] := intersection_on_edge vip.
   case: ifP => [/eqP eisp1 | enp1];
@@ -3267,7 +3265,7 @@ case: cc => [ // | c0 [| c1 q]];
 move=> /andP[] rf0 rfr /andP[] /andP[] vl vh sv adj /andP[] lim0 limr /andP[]
   ct0 ctr.
   rewrite -/vip; move: rf0 lim0.
-  rewrite /right_form /open_cell_side_limit_ok => lowhigh /andP[] ln0.
+  rewrite /open_cell_side_limit_ok => lowhigh /andP[] ln0.
   move=> /andP[] lxs /andP[] ls /andP[] onh onl.
   rewrite /= -/vip; case vip1 : vip => [p1 | //]; case vip2: vip => [p2 /=| //];
   have [onlr x1] := intersection_on_edge vip1;
@@ -4512,7 +4510,7 @@ have lowvert : {in fc_edges, forall g, pvert_y (point ev) g < p_y (point ev)}.
     apply adjacent_right_form_sorted_le_y => //=.
       rewrite andbb; apply/andP; split=> //.
       by apply: inside_box_valid_bottom_top=> //; rewrite inE eqxx.
-    by rewrite /right_form edge_below_refl.
+    by rewrite edge_below_refl.
   rewrite /= => pathlt.
   move=> g /mapP[c cin gceq].
   have [s1 [s2 fceq]] : exists s1 s2, fc = s1 ++ c :: s2.
@@ -5026,7 +5024,7 @@ have : sorted (@lexPt R) [seq point x | x <- evs].
 have : cells_bottom_top bottom top op0.
   by rewrite /op0/cells_bottom_top/cells_low_e_top/= !eqxx.
 have : adjacent_cells op0 by [].
-have : s_right_form op0 by rewrite /=/right_form/= boxwf.
+have : s_right_form op0 by rewrite /= boxwf.
 have : close_alive_edges bottom top op0 evs.
   by rewrite /=/end_edge !inE !eqxx !orbT.
 have : {in cell_edges op0 ++ flatten [seq outgoing i | i <- evs] &,
