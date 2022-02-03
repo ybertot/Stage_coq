@@ -4457,8 +4457,7 @@ have [samex | diffx] := boolP (p_x (point ev) == p_x (point ev')).
   move: (outs (high c) ino) => leftptq.
   have vev : valid_edge (high c) (point ev).
     by rewrite valid_edge_extremities // leftptq.
-  have /eqP spy := same_pvert_y vev samex.
-  rewrite -spy.
+  have /eqP <- := same_pvert_y vev samex.
   have /on_pvert := left_on_edge (high c); rewrite (eqP leftptq) => ->.
   by move=> /ltW; rewrite leNgt yevev'.
 rewrite (eqP (outs (high c) ino)).
