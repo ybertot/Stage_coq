@@ -4188,7 +4188,57 @@ have c1c2 : high c1 <| low c2.
   (* use that sorted edge_below lc, plus transitivity in this subset. *)
     have : {in he :: [seq high i | i <- rcons s3 c2],
          forall g, p_x (left_pt g) < p_x (point e)}.
-      admit. 
+    have treblc : {in he :: [seq high i | i <- lc] & &,
+                  transitive (@edge_below R)}.
+      elim/last_ind : {-1} (cc) (erefl cc) ccn0 => [// | cc' ccl' _ cceq _].
+(* This should be a general hypothesis of the lemma, established as an
+   invariant. *)
+      have aesp : all (edge_side_prop e) [seq high c | c <- open].
+        admit.
+    have all_left :{in he :: [seq high i | i <- lc], forall g,
+           p_x (left_pt g) < p_x (point e)}.
+      have lelow := decomposition_under_low_lc oe cbtom adj inbox_e rfo sval.
+      have ccl'he : high ccl' = he by move: ohe; rewrite cceq last_rcons.
+      have adjlc' : adjacent_cells (ccl' :: lc).
+        move: adj; rewrite ocd cceq -cats1 -!catA /= => /adjacent_catW[] _.
+        by move=> /adjacent_catW[] _ /=.
+      have := seq_low_high_shift => /(_ (ccl' :: lc) isT adjlc') /= => - [] tmp.   move=> g; rewrite inE => /orP[/eqP -> | ].
+    have ccl'o : ccl' \in open.
+      by rewrite ocd cceq !(mem_cat, mem_rcons, inE) eqxx orbT.
+    have := allP aesp (high ccl') (map_f _ ccl'o); rewrite /edge_side_prop.
+    by rewrite ccl'he vhe ltNge le_eqVlt orbC lt1 /=.
+    move: tmp; set s5 := rcons _ _ => tmp gin.
+    have : g \in s5 by rewrite tmp inE gin orbT.
+    rewrite /s5 mem_rcons inE orbC=> /orP[/mapP[c' c'in gc'] | ].
+    have vc' : valid_edge (low c') (point e).
+     apply: (proj1 (andP (allP sval c' _))).
+     by rewrite ocd !mem_cat c'in !orbT.
+     have := lelow _ c'in; rewrite strict_under_pvert_y // => ga.
+     move: gin=> /mapP[c'' c''in gc''].
+     have c''o : c'' \in open by rewrite ocd !mem_cat c''in !orbT.
+     have := allP aesp (high c'') (map_f _ c''o); rewrite /edge_side_prop.
+       rewrite (proj2 (andP (allP sval _ c''o))).
+       by rewrite -gc'' gc' ltNge le_eqVlt ga orbT /=.
+    move: cbtom=> /andP[] _; rewrite ocd cceq -cats1 /= !last_cat /= => /eqP ->.
+move=> /eqP ->.
+  by move: inbox_e=> /andP[] _ /andP[] _ /andP[] + _.
+(* finished proving all_left *)
+have noc' : {in he :: [seq high i | i <- lc] &, no_crossing R}.
+ apply: sub_in2 noc.
+  move=> g; rewrite inE => /orP[/eqP -> // | gin].
+  by rewrite ocd !(mem_cat, map_cat) gin !orbT.
+  have sval' : {in he :: [seq high i | i <- lc], forall g, valid_edge g (point e)}.
+  move=> g; rewrite inE=> /orP[/eqP ->// | /mapP[c' c'in gc']].
+  by rewrite gc'; apply: (proj2 (andP (allP sval c' _))); rewrite ocd !mem_cat c'in !orbT.
+  by have := edge_below_trans (or_intror all_left) sval' noc'.
+
+    have := seq_edge_below' adj rfo; rewrite ocd cceq.
+    rewrite !(map_cat, map_rcons, cat_path, last_cat, last_rcons) /=.
+    move=> /andP[] _ /andP[] _.
+    move: ohe; rewrite cceq last_rcons => ->.
+    
+ rewrite path_sorted_inE; last first.
+ 
     admit.  
   have : below_alt (high c1) (low c2).
     apply: noc; rewrite mem_cat; first by rewrite hc1o orbT.
@@ -4215,12 +4265,23 @@ have c1c2 : high c1 <| low c2.
     by rewrite ocd !mem_cat c2in ?orbT.
   by rewrite abs => /(_ isT isT).
 move=> p; apply/negP=> /andP[] sio2 sio1.
+have lho_sub : {subset le :: he :: outgoing e <= cell_edges open ++ outgoing e}.
+  move=> g; rewrite !inE =>/orP[/eqP -> // | /orP[/eqP -> // | ]].
+  by rewrite mem_cat orbC => -> .
+have noc' : {in le :: he :: outgoing e &, no_crossing R}.
+  by apply: (sub_in2 lho_sub). 
+have [_ euh] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+have [eal _] := l_h_above_under cbtom adj inbox_e sval oe.
+have lebhe : le <| he.
+  have altlh : below_alt le he by apply: noc'; rewrite !inE eqxx ?orbT.
+  by apply: (edge_below_from_point_above altlh vle vhe).
 have vp1 : valid_edge (high c1) p.
   apply: (proj2 (andP (strict_inside_open_valid  _  sio1))).
-  admit.
+  by apply: (allP (opening_cells_side_limit vle vhe lebhe eal euh noc' outs)).
 have vp2 : valid_edge (low c2) p.
   apply: (proj1 (andP (strict_inside_open_valid  _  sio2))).
-  admit.
+  apply: (allP lok); rewrite ocd lceq'.
+  by rewrite !(mem_cat, mem_rcons, inE) eqxx ?orbT.
 have := edge_below_pvert_y vp1 vp2 c1c2; rewrite leNgt => /negP; apply.
 have lc2p : pvert_y p (low c2) < p_y p.
   move: (sio2) => /andP[] /andP[] _ + _.
