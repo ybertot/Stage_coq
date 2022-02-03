@@ -4104,6 +4104,12 @@ Lemma open_cells_decomposition_last_right e open fc cc lc le he:
   {in cell_edges lc, forall g, p_x (point e) < p_x (right_pt g)}.
 *)
 
+Lemma pred_of_seq_mem {T : eqType} (s : seq T) (x : T) :
+  (@pred_of_seq _ s x) = (x \in s).
+Proof.
+by [].
+Qed.
+
 Lemma in_new_cell_not_in_last_old e open fc cc lc le he:
   open_cells_decomposition open (point e) = (fc, cc, lc, le, he) ->
   cells_bottom_top open ->
@@ -4182,12 +4188,11 @@ have lein : le \in cell_edges open ++ outgoing e.
 have hein : he \in cell_edges open ++ outgoing e.
   rewrite 2!mem_cat; apply/orP/or_introl/orP/or_intror; apply/mapP.
   by exists che.
+
 have c1c2 : high c1 <| low c2.
   have /andP[_] := opening_cells_subset c1in.
   rewrite inE=> /orP[hc1he | hc1o].
   (* use that sorted edge_below lc, plus transitivity in this subset. *)
-    have : {in he :: [seq high i | i <- rcons s3 c2],
-         forall g, p_x (left_pt g) < p_x (point e)}.
     have treblc : {in he :: [seq high i | i <- lc] & &,
                   transitive (@edge_below R)}.
       elim/last_ind : {-1} (cc) (erefl cc) ccn0 => [// | cc' ccl' _ cceq _].
@@ -4232,14 +4237,24 @@ have noc' : {in he :: [seq high i | i <- lc] &, no_crossing R}.
   by rewrite gc'; apply: (proj2 (andP (allP sval c' _))); rewrite ocd !mem_cat c'in !orbT.
   by have := edge_below_trans (or_intror all_left) sval' noc'.
 
-    have := seq_edge_below' adj rfo; rewrite ocd cceq.
-    rewrite !(map_cat, map_rcons, cat_path, last_cat, last_rcons) /=.
-    move=> /andP[] _ /andP[] _.
-    move: ohe; rewrite cceq last_rcons => ->.
-    
- rewrite path_sorted_inE; last first.
- 
-    admit.  
+    have adj2 : adjacent_cells (last c1 s2 :: rcons s3 c2).
+      move: adj'; rewrite /result_open => /adjacent_catW[] _.
+      rewrite nceq' -catA /= => /adjacent_catW[] _.
+      by rewrite /= cat_path lceq' cat_path => /andP[] _ /andP[] +.
+      have := seq_edge_below' adj2 rf' => /= /andP[] _.
+      rewrite (path_sorted_inE treblc); last first.
+      apply/allP=> g; rewrite hs2 !inE => /orP[/eqP -> | ].
+      by rewrite pred_of_seq_mem inE eqxx.
+rewrite pred_of_seq_mem inE lceq' map_cat mem_cat=> ->.
+by rewrite orbT.
+move=> /andP[] + _ => /allP allofthem. 
+have [s3nil | s3nnil] := boolP (s3 == nil).
+  by rewrite (eqP hc1he) -lc2q (eqP s3nil) edge_below_refl.
+move: (allofthem (last he [seq high i | i <- s3])).
+   case: (s3) s3nnil lc2q => [ // | a tl] /= _; rewrite map_rcons -cats1.
+   rewrite -/((_ :: _) ++ _) mem_cat mem_last=> lc2q /(_ isT).
+   by rewrite lc2q hs2 (eqP hc1he).
+
   have : below_alt (high c1) (low c2).
     apply: noc; rewrite mem_cat; first by rewrite hc1o orbT.
     by rewrite ocd !(cell_edges_cat, mem_cat) (map_f _ c2in) !orbT.
