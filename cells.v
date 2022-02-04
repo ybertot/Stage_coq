@@ -4119,12 +4119,13 @@ Lemma in_new_cell_not_in_last_old e open fc cc lc le he:
   seq_valid open (point e) ->
   out_left_event e ->
   {in cell_edges open ++ outgoing e &, no_crossing R} ->
+  all (edge_side_prop e) [seq high c | c <- open] ->
   all open_cell_side_limit_ok open ->
-  {in [seq high c | c <- lc], forall g, p_x (left_pt g) < p_x (point e)} ->
-  {in lc & opening_cells (point e) (outgoing e) le he,
+(*  {in [seq high c | c <- lc], forall g, p_x (left_pt g) < p_x (point e)} -> *)
+  {in opening_cells (point e) (outgoing e) le he & lc,
      forall c1 c2, o_disjoint c1 c2}.
 Proof.
-move=> oe cbtom adj inbox_e rfo sval outs noc lok ledges.
+move=> oe cbtom adj inbox_e rfo sval outs noc aesp lok (* ledges *).
 have ocd := decomposition_preserve_cells oe.
 set new_cells := opening_cells _ _ _ _.
 set result_open := fc ++ new_cells ++ lc.
@@ -4142,7 +4143,7 @@ have [nle [nhe _]]:=
          vle vhe.
 have := open_not_nil (sort (@edge_below R) (outgoing e)) vle vhe.
 rewrite -[X in X != [::]]/new_cells => ncn0.
-move=> c2 c1 c2in c1in.
+move=> c1 c2 c1in c2in.
  have [s3 [s4 lceq]] : exists s3 s4, lc = s3 ++ c2 :: s4.
   by move:c2in=> /splitPr[s1 s2]; exists s1, s2.
 have lceq' : lc = rcons s3 c2 ++ s4 by rewrite -cats1 -catA.
@@ -4198,8 +4199,6 @@ have c1c2 : high c1 <| low c2.
       elim/last_ind : {-1} (cc) (erefl cc) ccn0 => [// | cc' ccl' _ cceq _].
 (* This should be a general hypothesis of the lemma, established as an
    invariant. *)
-      have aesp : all (edge_side_prop e) [seq high c | c <- open].
-        admit.
     have all_left :{in he :: [seq high i | i <- lc], forall g,
            p_x (left_pt g) < p_x (point e)}.
       have lelow := decomposition_under_low_lc oe cbtom adj inbox_e rfo sval.
@@ -4279,7 +4278,7 @@ move: (allofthem (last he [seq high i | i <- s3])).
   rewrite (proj1 (andP (allP sval c2 _))); last first.
     by rewrite ocd !mem_cat c2in ?orbT.
   by rewrite abs => /(_ isT isT).
-move=> p; apply/negP=> /andP[] sio2 sio1.
+move=> p; apply/negP=> /andP[] sio1 sio2.
 have lho_sub : {subset le :: he :: outgoing e <= cell_edges open ++ outgoing e}.
   move=> g; rewrite !inE =>/orP[/eqP -> // | /orP[/eqP -> // | ]].
   by rewrite mem_cat orbC => -> .
@@ -4305,7 +4304,7 @@ have phc1 : p_y p < pvert_y p (high c1).
   move: (sio1) => /andP[] /andP[] + _ _.
   by rewrite strict_under_pvert_y.
 by apply: lt_trans phc1.
-Admitted.
+Qed.
 
 (*
 set s1 := [seq high c | c <- fc'].
@@ -4551,13 +4550,14 @@ Lemma step_keeps_disjoint_open ev open closed open' closed' events :
   {in open &, disjoint_open_cells} ->
   out_left_event ev ->
   all open_cell_side_limit_ok open ->
+  edge_side (ev :: events) open ->
   close_alive_edges open (ev :: events) ->
   all (fun x => lexPtEv ev x) events ->
   step ev open closed = (open', closed') ->
   {in open' &, disjoint_open_cells}.
 Proof.
 move=> cbtom adj inbox_e sval rfo /[dup] noc /inter_at_ext_no_crossing noc'
-  disj outlefte cellsok clae lexev.
+  disj outlefte cellsok edge_side_open clae lexev.
 have noc4 : {in cell_edges open ++ outgoing ev &, no_crossing R}.
    by move=> g1 g2 g1in g2in; apply: noc'; rewrite catA.
 set ctxt := [seq low c | c <- open] ++ [seq high c | c <- open] ++ outgoing ev.
@@ -4710,6 +4710,8 @@ have fcopen : {subset fc <= open}.
 have valfc : {in fc_edges, forall g, valid_edge g (point ev)}.
   by move=> g; rewrite /fc_edges mem_cat => /orP[]/mapP[c cin ->];
     case: (andP (allP sval c _))=> //; rewrite ocd !mem_cat cin ?orbT.
+(* TODO : This easy proof indicates that edge_side_prop could be made
+  much easier, only the top part being important. *)
 have fcedgesright: {in fc_edges, forall g, p_x (point ev) < p_x (right_pt g)}.
   move=> g; rewrite mem_cat => gin.
   have /orP[bottop | ] : end_edge g events.
@@ -4788,11 +4790,8 @@ have lowfc : {in fc_edges, forall g, g <| le}.
   rewrite cat_cons cat_path => /andP[] _ /= => /andP[]/eqP + _.
   by rewrite last_cat last_rcons -lehcc => <-.
 have ocdisjlc : {in oc & lc, forall c1 c2, o_disjoint c1 c2}.
-  move=> c1 c2 c1in c2in p; apply/andP=> -[pino pinl].
-  have := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
-  move=> /[dup] ib [] ibl ibh.
-  move: (pino) => /andP[] /[dup] invert /andP[] inverth invertl _.
-  admit.
+  exact: (in_new_cell_not_in_last_old oe cbtom adj inbox_e rfo sval
+     outlefte noc4 edge_side_open cellsok).
 have ocdisjfc : {in oc & fc, forall c1 c2, o_disjoint c1 c2}.
   move=> c1 c2 c1in c2in p; apply/andP=> -[pino pinf].
   have := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
@@ -4818,7 +4817,7 @@ apply: add_new.
 
 move=> c1 c2 c1in c2in.
 by apply: disj; rewrite ocd !mem_cat orbCA -mem_cat; apply/orP; right.
-Admitted.
+Qed.
 
   
 End proof_environment.
@@ -5331,3 +5330,5 @@ have sortev' : sorted (@lexPt R) [seq point x | x <- evs'].
 by have := Ih _ _ cov' evsinr svalr btm_leftr clevr outer nocr claer rfor adjr
         cbtomr sortev' scaneq.
 Qed.
+
+End working_environment.
