@@ -4896,6 +4896,19 @@ Definition edge_covered (e : edge) (os : seq cell) (cs : seq cell) :=
     left_limit (head_cell pcc) = p_x (left_pt e) /\
     right_limit (last_cell pcc) = p_x (right_pt e)).
 
+Lemma left_limit_closing_cells (cc : seq cell) (p : pt) :
+  adjacent_cells cc -> seq_valid cc p ->
+  p >>> low (head_cell cc) -> p <<< high (last_cell cc) ->
+  all (contains_point p) cc ->
+  [seq left_limit i | i <- closing_cells p cc] = [seq left_limit i | i <- cc].
+Proof.
+move=> adj sval pale puhe allcont.
+rewrite closing_cells_single_map => //.
+rewrite -map_comp; rewrite -eq_in_map /close_cell => -[] ls rs lo hi cin /=.
+move: (allP sval _ cin) => /= /andP[] vlo vhi.
+by rewrite (pvertE vlo) (pvertE vhi).
+Qed.
+
 Lemma step_keeps_edge_covering e open closed open2 closed2 :
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -4958,16 +4971,37 @@ have [/eqP ghe | gnhe] := boolP(g == he).
     rewrite last_map -heceq /close_cell.
     by rewrite (pvertE vlhec) heq (pvertE vhe) /= ghe.
   split.
-    elim/last_ind : {-1} pcc1 (erefl pcc1) => [pcc1eq | pcc1' lpcc1 _ pcc1eq].
-      rewrite ncseq ccq /last_cell /= last_map /close_cell.
+      have last_conn : right_limit (last_cell new_closed_cells) =
+                 left_limit (last_cell new_cells).
+        rewrite ncseq /last_cell ccq /= last_map -heceq /close_cell.
+        rewrite (pvertE vlhec) heq (pvertE vhe) /=.
+        set rl := right_limit _.
+        have -> : rl = p_x (point e) by rewrite /rl; case: ifP; case: ifP=> //.
+        apply/esym => {rl}.
+        apply: (@opening_cells_left _ (outgoing e) le he).
+        move: (opening_cells_not_nil (outgoing e) vle vhe).
+        rewrite -/new_cells.
+        by case: (new_cells) => [ | a l ]; rewrite //= mem_last.
+      case pcc1q : pcc1 => [ | a l]; first by rewrite /= last_conn eqxx.
+      rewrite /= -cats1 cat_path last_rcons /= last_conn eqxx !andbT.
+      rewrite -cats1 cat_path.
+      move: cl; rewrite a.
+      move: 
+      rewrite /new_cells.
+      rewrite (@opening_cells_left (point e) (outgoing e) le he); last first.
+        move: (opening_cells_not_nil (outgoing e) vle vhe).
+        rewrite -/new_cells.
+        by case: (new_cells) => [ | a l ]; rewrite /last_cell //= mem_last.
+
+      rewrite ccq /last_cell /= last_map /close_cell.
       set rl := right_limit _.
       have -> : rl = p_x (point e).
         rewrite /rl -heceq (pvertE vlhec) heq (pvertE vhe) /=.
         by case: ifP => [latpointe | lnotpointe];
            case: ifP => [hatpointe | hnotpointe].
       rewrite eq_sym andbT; apply/eqP.
-      apply: (@opening_cells_left _ (outgoing e) le he).
-      
+
+
 End proof_environment.
 
 Lemma add_event_preserve_first p e inc ev evs :
