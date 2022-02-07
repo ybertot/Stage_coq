@@ -50,7 +50,6 @@ Definition cell_eqb (ca cb : cell) : bool :=
   let: Bcell lptsb rptsb lowb highb:= cb in
   (lptsa == lptsb) && (rptsa == rptsb) && (lowa == lowb) && (higha == highb).
 
-
 Lemma cell_eqP : Equality.axiom cell_eqb.
 Proof.
 rewrite /Equality.axiom.
@@ -166,6 +165,9 @@ Definition dummy_pt := Bpt (0:R) 0.
 Definition dummy_event := Bevent dummy_pt [::].
 Definition dummy_edge : edge := (@Bedge  _ dummy_pt (Bpt (1:R) 0) ltr01).
 Definition dummy_cell : cell := (@Bcell  (dummy_pt::[::]) (dummy_pt::[::]) dummy_edge dummy_edge).
+
+Definition head_cell (s : seq cell) := head dummy_cell s.
+Definition last_cell (s : seq cell) := last dummy_cell s.
 
 (* if a cell doesn't contain a point, then either both edges are strictly under p or strictly over p *)
 Definition contains_point (p : pt) (c : cell)  : bool :=
@@ -666,6 +668,37 @@ have:= opening_cells_aux_subset cin.
 by rewrite !inE !(perm_mem (permEl (perm_sort _ _))).
 Qed.
 
+Lemma opening_cells_aux_nnil p s le he :
+  valid_edge le p -> valid_edge he p ->
+  {in s, forall g, left_pt g == p} ->
+  opening_cells_aux p s le he != nil.
+Proof.
+by move=> + vhe; case: s => [ | g1 s] vle lsp; rewrite /= pvertE // ?pvertE.
+Qed.
+
+Lemma opening_cells_aux_high p s le he :
+  valid_edge le p -> valid_edge he p ->
+  {in s, forall g, left_pt g == p} ->
+  [seq high i | i <- opening_cells_aux p s le he] = rcons s he.
+Proof.
+move=> vle vhe lsp.
+elim: s le vle lsp => [ | g1 s Ih] le vle lsp.
+  by rewrite /= pvertE // pvertE.
+rewrite /= pvertE //= Ih //.
+  by rewrite -(eqP (lsp g1 _)) ?inE ?valid_edge_extremities ?eqxx.
+by move=> g2 g2in; apply: lsp; rewrite inE g2in orbT.
+Qed.
+
+Lemma opening_cells_high p s le he :
+  valid_edge le p -> valid_edge he p ->
+  {in s, forall g, left_pt g == p} ->
+  [seq high i | i <- opening_cells p s le he] =
+  rcons (sort (@edge_below R) s) he.
+Proof.
+move=> vle vhe lsp; rewrite /opening_cells.
+rewrite opening_cells_aux_high => //.
+by move=> g; rewrite mem_sort; apply: lsp.
+Qed.
 
 Lemma opening_cells_aux_right_form (ctxt s : seq edge) (p : pt) low_e high_e :
 p >>= low_e -> p <<< high_e -> valid_edge high_e p ->
@@ -4818,6 +4851,99 @@ apply: add_new.
 move=> c1 c2 c1in c2in.
 by apply: disj; rewrite ocd !mem_cat orbCA -mem_cat; apply/orP; right.
 Qed.
+
+Definition pt_at_end (p : pt) (e : edge) :=
+  p === e -> p \in [:: left_pt e; right_pt e].
+
+Definition connect_limits (s : seq cell) :=
+  sorted [rel c1 c2 | right_limit c1 == left_limit c2] s.
+     
+Definition edge_covered (e : edge) (os : seq cell) (cs : seq cell) :=
+  (exists (opc : cell) (pcc : seq cell), {subset pcc <= cs} /\
+    {in rcons pcc opc, forall c, high c = e} /\
+    connect_limits (rcons pcc opc) /\
+    opc \in os /\
+    left_limit (head_cell pcc) = p_x (left_pt e)) \/
+  (exists pcc, {subset pcc <= cs} /\
+    {in pcc, forall c, high c = e} /\
+    connect_limits pcc /\
+    left_limit (head_cell pcc) = p_x (left_pt e) /\
+    right_limit (last_cell pcc) = p_x (right_pt e)).
+
+Lemma step_keeps_edge_covering e open closed open2 closed2 :
+  cells_bottom_top open ->
+  adjacent_cells open ->
+  inside_box (point e) ->
+  seq_valid open (point e) ->
+  s_right_form open ->
+  out_left_event e ->
+  forall g,
+  edge_covered g open closed \/ g \in outgoing e ->
+  step e open closed = (open2, closed2) ->
+  edge_covered g open2 closed2.
+Proof.
+move=> cbtom adj inbox_e sval rfo out_e g; rewrite /step.
+case oe : open_cells_decomposition => [[[[fc cc] lc] le] he].
+have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
+  lhc_dec cbtom adj inbox_e oe.
+move=> ecgVgo [] <- <- {open2 closed2}.
+set new_cells := (X in fc ++ X ++ _).
+set new_closed_cells := closing_cells _ _.
+set open2 := (X in edge_covered _ X _).
+set closed2 := (X in edge_covered _ _ X).
+have [vle vhe] := l_h_valid cbtom adj inbox_e sval oe.
+have adjcc : adjacent_cells cc.
+  by move: adj; rewrite ocd => /adjacent_catW [] _ /adjacent_catW[].
+have svalcc : seq_valid cc (point e).
+  apply/allP=> c' c'in; apply: (allP sval); rewrite ocd !mem_cat c'in.
+  by rewrite orbT.
+have [lu ha] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+have cont := open_cells_decomposition_contains oe.
+have := closing_cells_single_map adjcc svalcc.
+rewrite ccq [low _]/= [high _]/= -heceq heq leq lu ha => /(_ isT isT).
+rewrite -ccq.
+have -> : all (contains_point (point e)) cc by apply/allP; exact: cont.
+rewrite -/new_closed_cells => /(_ isT) ncseq.
+have [/eqP ghe | gnhe] := boolP(g == he).
+  have gno : g \notin outgoing e.
+    apply/negP=> /(out_left_event_on out_e) abs.
+    have [ _ ] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+    by rewrite strict_nonAunder // -ghe abs.
+  case: ecgVgo; last by rewrite (negbTE gno).
+  move=> [ | [pcc [A B]]]; last first.
+    right; exists pcc; split;[ | exact B].
+    by rewrite /closed2; move=> g1 /A; rewrite mem_cat => ->.
+  move=> [hec1 [pcc1 [subp1 [ph [cl [oo ll]]]]]].
+  left; exists (last_cell new_cells), (rcons pcc1 (last_cell new_closed_cells)).
+  split.
+    move=> c; rewrite /closed2 !(mem_rcons, mem_cat, inE).
+    move=> /orP[/eqP -> | /subp1 -> //].
+    by rewrite ncseq ccq /last_cell /= mem_last orbT.
+  split.
+    move=> c; rewrite !(mem_rcons, inE) => /orP[/eqP |/orP[/eqP | inpcc1]];
+        last by apply: ph; rewrite mem_rcons inE inpcc1 orbT.
+      move=> ->; rewrite ghe.
+      by apply/eqP; apply: (higher_edge_new_cells out_e erefl vle vhe).
+    rewrite ncseq ccq /last_cell /= => ->.
+    rewrite last_map -heceq /close_cell.
+    have /pvertE -> : valid_edge (low hec) (point e).
+      have hecincc : hec \in cc by rewrite ccq heceq mem_last.
+      apply: (proj1 (andP (allP sval hec _))); rewrite ocd !mem_cat.
+      by rewrite hecincc !orbT.
+    by rewrite heq (pvertE vhe) /= ghe.
+
+
+    rewrite /new_closed_cells.
+  move: ecgVgo=> /orP. rewrite (negb
+have hec : edge_covered he open2 closed2.
+  have [lec [hec [cc' [ocd [leq [heq]]]]]] := lhc_dec cbtom adj inbox_e oe.
+  move=> [cceq heceq].
+  left; exists (last_cell new_cells).
+  
+
+case=> [ecg | go]; last first.
+  left.
+  have := opening_cells_high vle vhe out_e.
 
   
 End proof_environment.
