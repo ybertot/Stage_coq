@@ -310,6 +310,22 @@ end.
 Definition opening_cells p out :=
    opening_cells_aux p (sort (@edge_below R) out).
 
+Lemma opening_cells_left p out le he :
+  {in opening_cells p out le he, forall c, left_limit c = p_x p}.
+Proof.
+rewrite /opening_cells.
+elim: (sort _ _) le => [ | g1 gs Ih] le c.
+  rewrite /=.
+  case ple_eq : (vertical_intersection_point p le) => [ a | // ].
+  case phe_eq : (vertical_intersection_point p he) => //.
+  move: ple_eq=> /intersection_on_edge => -[] _ pxeq.
+  by case: ifP=> _; case: ifP => _; rewrite inE /left_limit => /eqP ->.
+rewrite /=.
+case ple_eq : (vertical_intersection_point p le) => [ a | // ].
+move: ple_eq=> /intersection_on_edge => -[] _ pxeq.
+by case: ifP => _ //; rewrite inE => /orP[/eqP -> | /Ih].
+Qed.
+
 Fixpoint open_cells_decomposition_contact open_cells pt contact high_e : seq cell * seq cell * edge :=
 match open_cells with
         | [::] => (contact, [::], high_e)
@@ -1265,6 +1281,15 @@ case validh : (vertical_intersection_point p high_e) => [ph |  /= ]; first last.
 by [].
 Qed.
 
+Lemma opening_cells_not_nil out le he p :
+  valid_edge le p -> valid_edge he p ->
+  opening_cells p out le he != [::].
+Proof.
+move=> vle vhe; apply: (open_not_nil _ vle vhe).
+(* Todo : report on strange error message if 
+  apply: (open_not_nil vle vhe) is used instead. *)
+Qed.
+
 Lemma last_seq2 (T : Type) (def a : T) (s : seq T) :
    s <> nil -> last def (a :: s) = last def s.
 Proof.
@@ -2089,7 +2114,7 @@ Definition no_crossing'  : Prop:=
 (left_pt e' <<< e  -> e' <| e)  /\
 (~ (left_pt e' <<= e)  -> e <| e').
 
-Lemma opening_cells_left e low_e high_e c :
+Lemma opening_cells_last_lexePt e low_e high_e c :
 out_left_event e ->
 ~~(point e <<< low_e) -> point e <<< high_e ->
 valid_edge low_e (point e)-> valid_edge high_e (point e) ->
@@ -2200,7 +2225,8 @@ adjacent_cells old_open -> cells_bottom_top old_open ->
 close_alive_edges old_open (e :: future_events) ->
 close_edges_from_events (e :: future_events) ->
 {in  all_edges old_open (e :: future_events) &, no_crossing R} ->
-(forall c, c \in old_open -> p_x (last dummy_pt (left_pts c)) <= p_x (point e)) ->
+(forall c, c \in old_open ->
+   p_x (last dummy_pt (left_pts c)) <= p_x (point e)) ->
 forall new_open new_closed closed,
 step e old_open closed  = (new_open, new_closed) ->
 (lexPt (point e) p) ->
@@ -2251,7 +2277,7 @@ have n_c' : {in rcons (low_e :: sort (@edge_below R) (outgoing e)) high_e &, no_
 have lowinfe' : ~~ (point e <<< low_e).
   move : lowinfe => lowinfe.
   apply (underWC lowinfe).
-have cinfe := (opening_cells_left outlefte lowinfe' einfhigh vallow valhigh n_c' linfh cin).
+have cinfe := (opening_cells_last_lexePt outlefte lowinfe' einfhigh vallow valhigh n_c' linfh cin).
 by apply/(le_trans (lexePt_xW cinfe))/lexePt_xW/lexPtW.
 Qed.
 
@@ -4904,6 +4930,10 @@ rewrite ccq [low _]/= [high _]/= -heceq heq leq lu ha => /(_ isT isT).
 rewrite -ccq.
 have -> : all (contains_point (point e)) cc by apply/allP; exact: cont.
 rewrite -/new_closed_cells => /(_ isT) ncseq.
+have vlhec : valid_edge (low hec) (point e).
+  have hecincc : hec \in cc by rewrite ccq heceq mem_last.
+  apply: (proj1 (andP (allP sval hec _))); rewrite ocd !mem_cat.
+  by rewrite hecincc !orbT.  
 have [/eqP ghe | gnhe] := boolP(g == he).
   have gno : g \notin outgoing e.
     apply/negP=> /(out_left_event_on out_e) abs.
@@ -4926,26 +4956,18 @@ have [/eqP ghe | gnhe] := boolP(g == he).
       by apply/eqP; apply: (higher_edge_new_cells out_e erefl vle vhe).
     rewrite ncseq ccq /last_cell /= => ->.
     rewrite last_map -heceq /close_cell.
-    have /pvertE -> : valid_edge (low hec) (point e).
-      have hecincc : hec \in cc by rewrite ccq heceq mem_last.
-      apply: (proj1 (andP (allP sval hec _))); rewrite ocd !mem_cat.
-      by rewrite hecincc !orbT.
-    by rewrite heq (pvertE vhe) /= ghe.
-
-
-    rewrite /new_closed_cells.
-  move: ecgVgo=> /orP. rewrite (negb
-have hec : edge_covered he open2 closed2.
-  have [lec [hec [cc' [ocd [leq [heq]]]]]] := lhc_dec cbtom adj inbox_e oe.
-  move=> [cceq heceq].
-  left; exists (last_cell new_cells).
-  
-
-case=> [ecg | go]; last first.
-  left.
-  have := opening_cells_high vle vhe out_e.
-
-  
+    by rewrite (pvertE vlhec) heq (pvertE vhe) /= ghe.
+  split.
+    elim/last_ind : {-1} pcc1 (erefl pcc1) => [pcc1eq | pcc1' lpcc1 _ pcc1eq].
+      rewrite ncseq ccq /last_cell /= last_map /close_cell.
+      set rl := right_limit _.
+      have -> : rl = p_x (point e).
+        rewrite /rl -heceq (pvertE vlhec) heq (pvertE vhe) /=.
+        by case: ifP => [latpointe | lnotpointe];
+           case: ifP => [hatpointe | hnotpointe].
+      rewrite eq_sym andbT; apply/eqP.
+      apply: (@opening_cells_left _ (outgoing e) le he).
+      
 End proof_environment.
 
 Lemma add_event_preserve_first p e inc ev evs :
