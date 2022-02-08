@@ -4916,15 +4916,18 @@ Lemma step_keeps_edge_covering e open closed open2 closed2 :
   seq_valid open (point e) ->
   s_right_form open ->
   out_left_event e ->
+  {in open &, injective high} ->
   forall g,
   edge_covered g open closed \/ g \in outgoing e ->
   step e open closed = (open2, closed2) ->
   edge_covered g open2 closed2.
 Proof.
-move=> cbtom adj inbox_e sval rfo out_e g; rewrite /step.
+move=> cbtom adj inbox_e sval rfo out_e inj_high g; rewrite /step.
 case oe : open_cells_decomposition => [[[[fc cc] lc] le] he].
 have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
   lhc_dec cbtom adj inbox_e oe.
+have hdcclo : low (head_cell cc) = le by rewrite ccq.
+have lcchi : high (last_cell cc) = he by rewrite ccq /last_cell /= -heceq.
 move=> ecgVgo [] <- <- {open2 closed2}.
 set new_cells := (X in fc ++ X ++ _).
 set new_closed_cells := closing_cells _ _.
@@ -4984,7 +4987,14 @@ have [/eqP ghe | gnhe] := boolP(g == he).
         by case: (new_cells) => [ | a l ]; rewrite //= mem_last.
       case pcc1q : pcc1 => [ | a l]; first by rewrite /= last_conn eqxx.
       rewrite /= -cats1 cat_path last_rcons /= last_conn eqxx !andbT.
-      rewrite -cats1 cat_path.
+      rewrite -cats1 cat_path /= andbT.
+      move: (cl); rewrite pcc1q /= -cats1 cat_path => /andP[] -> /=.
+      rewrite andbT => /eqP ->.
+      have := left_limit_closing_cells adjcc svalcc.
+      rewrite hdcclo lcchi => /(_ lu ha).
+      have -> : all (contains_point (point e)) cc by apply/allP; exact: cont.
+      move=> /(_ isT).
+
       move: cl; rewrite a.
       move: 
       rewrite /new_cells.
