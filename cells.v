@@ -3031,7 +3031,7 @@ have adj' : sorted (@edge_below R) (rcons sg g).
   rewrite sggq.
   apply: (sorted_filter_in e_trans).
     apply/allP=> g1 /mapP[c' + g'eq]. 
-    rewrite -[pred_of_seq _ g1]/(g1 \in map _ _) !mem_rcons !inE.
+    rewrite topredE !mem_rcons !inE.
     rewrite /g=>/orP[/eqP <- | c'in].
       by rewrite map_rcons mem_rcons inE g'eq eqxx.
     by rewrite map_rcons mem_rcons inE; apply/orP/or_intror/mapP; exists c'.
@@ -4163,12 +4163,6 @@ Lemma open_cells_decomposition_last_right e open fc cc lc le he:
   {in cell_edges lc, forall g, p_x (point e) < p_x (right_pt g)}.
 *)
 
-Lemma pred_of_seq_mem {T : eqType} (s : seq T) (x : T) :
-  (@pred_of_seq _ s x) = (x \in s).
-Proof.
-by [].
-Qed.
-
 Lemma in_new_cell_not_in_last_old e open fc cc lc le he:
   open_cells_decomposition open (point e) = (fc, cc, lc, le, he) ->
   cells_bottom_top open ->
@@ -4302,8 +4296,8 @@ have noc' : {in he :: [seq high i | i <- lc] &, no_crossing R}.
       have := seq_edge_below' adj2 rf' => /= /andP[] _.
       rewrite (path_sorted_inE treblc); last first.
       apply/allP=> g; rewrite hs2 !inE => /orP[/eqP -> | ].
-      by rewrite pred_of_seq_mem inE eqxx.
-rewrite pred_of_seq_mem inE lceq' map_cat mem_cat=> ->.
+      by rewrite topredE inE eqxx.
+rewrite topredE inE lceq' map_cat mem_cat=> ->.
 by rewrite orbT.
 move=> /andP[] + _ => /allP allofthem. 
 have [s3nil | s3nnil] := boolP (s3 == nil).
@@ -4909,6 +4903,23 @@ move: (allP sval _ cin) => /= /andP[] vlo vhi.
 by rewrite (pvertE vlo) (pvertE vhi).
 Qed.
 
+Lemma step_keeps_injective_high e open closed open2 closed2 :
+  cells_bottom_top open ->
+  adjacent_cells open ->
+  inside_box (point e) ->
+  seq_valid open (point e) ->
+  s_right_form open ->
+  out_left_event e ->
+  step e open closed = (open2, closed2) ->
+  {in open &, injective high} ->
+  {in open2 &, injective high}.
+Proof.
+move=> cbtom adj inbox_e sval rfo out_e + inj_high g; rewrite /step.
+case oe : open_cells_decomposition => [[[[fc cc] lc] le] he].
+have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
+  lhc_dec cbtom adj inbox_e oe.
+Admitted.
+
 Lemma step_keeps_edge_covering e open closed open2 closed2 :
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -4994,23 +5005,7 @@ have [/eqP ghe | gnhe] := boolP(g == he).
       rewrite hdcclo lcchi => /(_ lu ha).
       have -> : all (contains_point (point e)) cc by apply/allP; exact: cont.
       move=> /(_ isT).
-
-      move: cl; rewrite a.
-      move: 
-      rewrite /new_cells.
-      rewrite (@opening_cells_left (point e) (outgoing e) le he); last first.
-        move: (opening_cells_not_nil (outgoing e) vle vhe).
-        rewrite -/new_cells.
-        by case: (new_cells) => [ | a l ]; rewrite /last_cell //= mem_last.
-
-      rewrite ccq /last_cell /= last_map /close_cell.
-      set rl := right_limit _.
-      have -> : rl = p_x (point e).
-        rewrite /rl -heceq (pvertE vlhec) heq (pvertE vhe) /=.
-        by case: ifP => [latpointe | lnotpointe];
-           case: ifP => [hatpointe | hnotpointe].
-      rewrite eq_sym andbT; apply/eqP.
-
+Admitted.
 
 End proof_environment.
 
