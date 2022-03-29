@@ -4883,7 +4883,7 @@ Definition edge_covered (e : edge) (os : seq cell) (cs : seq cell) :=
     {in rcons pcc opc, forall c, high c = e} /\
     connect_limits (rcons pcc opc) /\
     opc \in os /\
-    left_limit (head_cell pcc) = p_x (left_pt e)) \/
+    left_limit (head_cell (rcons pcc opc)) = p_x (left_pt e)) \/
   (exists pcc, {subset pcc <= cs} /\
     {in pcc, forall c, high c = e} /\
     connect_limits pcc /\
@@ -4920,20 +4920,66 @@ have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
   lhc_dec cbtom adj inbox_e oe.
 Admitted.
 
+Lemma connect_limits_rcons (s : seq cell) (lc : cell) :
+  s != nil -> connect_limits (rcons s lc) =
+   connect_limits s && (right_limit (last dummy_cell s) == left_limit lc).
+Proof.
+Admitted.
+
+Lemma right_limit_close_cell p c :
+  valid_edge (low c) p -> valid_edge (high c) p ->
+  right_limit (close_cell SINGLE p c) = p_x p.
+Proof.
+Admitted.
+
+Lemma left_limit_close_cell p c : 
+   left_limit (close_cell SINGLE p c) = left_limit c.
+Proof.
+rewrite /close_cell.
+by do 2 (case: (vertical_intersection_point _ _) => //).
+Qed.
+
+Lemma outgoing_high_opening s p g le he:
+   valid_edge le p -> valid_edge he p ->
+   {in s, forall g', left_pt g' == p} ->
+   g \in s ->
+   exists c, c \in opening_cells p s le he /\ high c = g.
+Proof.
+move=> vle vhe lefts'.
+have {lefts'} lefts : {in sort (@edge_below _) s, forall g', left_pt g' == p}.
+  by move=> g' g'in; apply lefts'; move: g'in; rewrite mem_sort.
+rewrite -(mem_sort (@edge_below _)) /opening_cells.
+elim: (sort _ _) le vle lefts => [ // | g0 s' Ih] le vle lefts.
+rewrite inE=> /orP[/eqP <- /= |].
+  rewrite (pvertE vle).
+  eapply ex_intro; rewrite inE; split. 
+    apply/orP; left; apply/eqP; reflexivity.
+  by [].
+move=> gin.
+have : valid_edge g0 p.
+  have := (@valid_edge_extremities _ g0 p).
+  rewrite lefts ?eqxx //=; last by rewrite inE eqxx.
+  by apply.
+move=> {}/Ih [ | // | c [cin cP]].
+  by move=> g' g'in; apply: lefts; rewrite inE g'in orbT.
+exists c; rewrite /=. 
+  by rewrite (pvertE vle) inE cin orbT cP.
+Qed.
+
 Lemma step_keeps_edge_covering e open closed open2 closed2 :
+  {in open &, injective high} ->
   cells_bottom_top open ->
   adjacent_cells open ->
   inside_box (point e) ->
   seq_valid open (point e) ->
   s_right_form open ->
   out_left_event e ->
-  {in open &, injective high} ->
   forall g,
   edge_covered g open closed \/ g \in outgoing e ->
   step e open closed = (open2, closed2) ->
   edge_covered g open2 closed2.
 Proof.
-move=> cbtom adj inbox_e sval rfo out_e inj_high g; rewrite /step.
+move=> ihigh cbtom adj inbox_e sval rfo out_e g; rewrite /step.
 case oe : open_cells_decomposition => [[[[fc cc] lc] le] he].
 have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
   lhc_dec cbtom adj inbox_e oe.
@@ -4960,7 +5006,7 @@ rewrite -/new_closed_cells => /(_ isT) ncseq.
 have vlhec : valid_edge (low hec) (point e).
   have hecincc : hec \in cc by rewrite ccq heceq mem_last.
   apply: (proj1 (andP (allP sval hec _))); rewrite ocd !mem_cat.
-  by rewrite hecincc !orbT.  
+  by rewrite hecincc !orbT.
 have [/eqP ghe | gnhe] := boolP(g == he).
   have gno : g \notin outgoing e.
     apply/negP=> /(out_left_event_on out_e) abs.
@@ -4971,6 +5017,10 @@ have [/eqP ghe | gnhe] := boolP(g == he).
     right; exists pcc; split;[ | exact B].
     by rewrite /closed2; move=> g1 /A; rewrite mem_cat => ->.
   move=> [hec1 [pcc1 [subp1 [ph [cl [oo ll]]]]]].
+  have hec1q : hec1 = hec.
+    apply: ihigh=> //.
+      by rewrite ocd !mem_cat heceq ccq mem_last !orbT.
+    by rewrite heq ph // mem_rcons inE eqxx.
   left; exists (last_cell new_cells), (rcons pcc1 (last_cell new_closed_cells)).
   split.
     move=> c; rewrite /closed2 !(mem_rcons, mem_cat, inE).
@@ -4985,6 +5035,7 @@ have [/eqP ghe | gnhe] := boolP(g == he).
     rewrite last_map -heceq /close_cell.
     by rewrite (pvertE vlhec) heq (pvertE vhe) /= ghe.
   split.
+(* I don't know if this is used later. *)
       have last_conn : right_limit (last_cell new_closed_cells) =
                  left_limit (last_cell new_cells).
         rewrite ncseq /last_cell ccq /= last_map -heceq /close_cell.
@@ -4996,15 +5047,84 @@ have [/eqP ghe | gnhe] := boolP(g == he).
         move: (opening_cells_not_nil (outgoing e) vle vhe).
         rewrite -/new_cells.
         by case: (new_cells) => [ | a l ]; rewrite //= mem_last.
-      case pcc1q : pcc1 => [ | a l]; first by rewrite /= last_conn eqxx.
-      rewrite /= -cats1 cat_path last_rcons /= last_conn eqxx !andbT.
-      rewrite -cats1 cat_path /= andbT.
-      move: (cl); rewrite pcc1q /= -cats1 cat_path => /andP[] -> /=.
-      rewrite andbT => /eqP ->.
-      have := left_limit_closing_cells adjcc svalcc.
-      rewrite hdcclo lcchi => /(_ lu ha).
-      have -> : all (contains_point (point e)) cc by apply/allP; exact: cont.
-      move=> /(_ isT).
+(* End of fragment with unknown usage*)
+    elim/last_ind : {-1} pcc1 (erefl pcc1) => [pcc1eq | pcc1' lpcc1 _ pcc1eq].
+      rewrite ncseq ccq /last_cell /= last_map /close_cell.
+      set rl := right_limit _.
+      have -> : rl = p_x (point e).
+        rewrite /rl -heceq (pvertE vlhec) heq (pvertE vhe) /=.
+        by case: ifP => [latpointe | lnotpointe];
+           case: ifP => [hatpointe | hnotpointe].
+      rewrite eq_sym andbT; apply/eqP.
+      apply: (@opening_cells_left _ (outgoing e) le he).
+      by apply/last_in_not_nil/opening_cells_not_nil.
+    rewrite -pcc1eq connect_limits_rcons; last by apply/eqP/rcons_neq0.
+    apply/andP; split; last first.
+      rewrite last_rcons ncseq ccq [map _ _]/=.
+      rewrite /last_cell /= last_map.
+      rewrite right_limit_close_cell -?heceq // ?heq //.
+      rewrite (@opening_cells_left (point e) (outgoing e) le he) //.
+      by apply/last_in_not_nil/opening_cells_not_nil.
+    rewrite ncseq ccq /last_cell /= last_map -heceq.
+    move: cl; rewrite hec1q pcc1eq connect_limits_rcons; last first.
+      by apply/eqP/rcons_neq0.
+    rewrite (@connect_limits_rcons (rcons _ _)); last by apply/eqP/rcons_neq0.
+    move=> /andP[] -> /= /eqP ->.
+    by rewrite left_limit_close_cell eqxx.
+  split.
+    rewrite /open2 !mem_cat last_in_not_nil ?orbT //.
+    by apply: opening_cells_not_nil.
+  move: ll.
+  case pcc1q: pcc1 => [ | pcc0 pcc1']; last by [].
+  rewrite /head_cell /= ncseq /last_cell ccq /= last_map -heceq.
+  by rewrite left_limit_close_cell hec1q.
+case: ecgVgo=> [ecg |go ]; last first.
+  left.
+  case: (outgoing_high_opening vle vhe out_e go) => [c [cin cP]].
+  exists c, [::]; rewrite /=; split.
+    by move=> x xin.
+  split; first by move=> c'; rewrite inE => /eqP->.
+  split; first by [].
+  split; first by rewrite /open2 /new_cells !mem_cat cin ?orbT.
+  rewrite (opening_cells_left cin); apply/esym/eqP.
+  by rewrite (eqP (out_e g go)) eqxx.
+case: ecg => [| [pcc [subcl All_other]]]; last first.
+  right; exists pcc; split;[ | exact All_other].
+  by move=> c cin; rewrite /closed2 mem_cat subcl.
+move=> [opc [pcc [subcl [highs [conn [/[dup] opcopen + leftl]]]]]].
+rewrite ocd; rewrite !mem_cat orbCA => /orP[]; last first.
+  move=> inO.
+  left; exists opc, pcc.
+  split; first by move=> c cin; rewrite /closed2 mem_cat subcl.
+  split; first by [].
+  split; first by [].
+  split; first by rewrite /open2 /new_cells !mem_cat orbCA inO orbT.
+  by [].
+move=> opcc.
+right.
+have [_ [highopc leftopc]]:= close_cell_preserve_3sides SINGLE (point e) opc.
+exists (rcons pcc (close_cell SINGLE (point e) opc)).
+split.
+  move=> c; rewrite mem_rcons inE=> /orP[/eqP -> | ].
+    rewrite /closed2 mem_cat ncseq; apply/orP; right.
+    by apply/mapP; exists opc.
+  by move=> cin; rewrite /closed2 mem_cat subcl.
+split.
+  move=> c; rewrite mem_rcons inE => /orP[/eqP -> | inpcc]; last first.
+    by apply highs; rewrite mem_rcons inE inpcc orbT.
+  by rewrite highopc; apply highs; rewrite mem_rcons inE eqxx.
+split.
+  have [/eqP -> | pccn0] := boolP (pcc == [::]).
+    by [].
+  move: conn; rewrite !connect_limits_rcons // => /andP[] -> /eqP -> /=.
+  by rewrite /left_limit leftopc.
+split.
+  move: leftl; case pccq: pcc => [ | pcc0 pcc'] //=.
+  by rewrite /left_limit leftopc.
+rewrite /last_cell last_rcons right_limit_close_cell; last first.
+    by move/allP:sval => /(_ opc opcopen) /andP[].
+  by move/allP:sval => /(_ opc opcopen) /andP[].
+
 Admitted.
 
 End proof_environment.
