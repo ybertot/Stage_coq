@@ -1872,7 +1872,7 @@ adjacent_cells open ->
 seq_valid open (point e) ->
 close_alive_edges open (e::future_events) ->
 close_edges_from_events (e::future_events) ->
-(forall e', e' \in future_events -> lexePt p (point e')) ->
+{in future_events, forall e', lexePt p (point e')} ->
 forall open2 closed closed2,
 step e open closed = (open2, closed2) ->
 seq_valid open2 p.
@@ -3604,6 +3604,7 @@ Qed.
 Definition any_edge (b : bool) (c : cell) : edge :=
   if b then low c else high c.
 
+(* This is not used (yet?) *)
 Lemma fc_lc_right_pt s ev events :
   close_alive_edges s events ->
   inside_box (point ev) ->
@@ -4966,7 +4967,83 @@ exists c; rewrite /=.
   by rewrite (pvertE vle) inE cin orbT cP.
 Qed.
 
+Definition non_inner (g : edge) (p : pt) :=
+  p === g -> p = left_pt g \/ p = right_pt g.
+
+Definition open_non_inner_event (open : seq cell) (e : event) :=
+  {in open, forall c, non_inner (high c) (point e)}.
+
+Definition events_non_inner (evs : seq event) :=
+  {in evs &,
+    forall ev1 ev2,
+    {in outgoing ev1, forall g, non_inner g (point ev2)}}.
+
+Lemma open_cells_decomposition_point_on open p fc cc lc le he c:
+  cells_bottom_top open ->
+  adjacent_cells open ->
+  inside_box p ->
+  seq_valid open p ->
+  open_cells_decomposition open p = (fc, cc, lc, le, he) ->
+  c \in cc -> high c != he -> p === high c.
+Proof.
+move=> cbtom adj inbox_p sval oe ccc nhe.
+have [lec [hec [cc' [ocd [_ [hh [ccq lcc]]]]]]] :=
+  lhc_dec cbtom adj inbox_p oe.
+have cop : c \in open.
+  by rewrite (decomposition_preserve_cells oe) !mem_cat ccc ?orbT.
+have vhc : valid_edge (high c) p.
+  by move/allP: sval => /(_ c cop) /andP[].
+apply: under_above_on => //.
+  by have /andP[] := open_cells_decomposition_contains oe ccc.
+have [s1 [s2 cceq]] : exists s1 s2, cc = s1 ++ c :: s2.
+  by case/splitPr: ccc => s1 s2; exists s1, s2.
+case s2q : s2 => [ | c1 s2'].
+  case/negP: nhe.
+  have -> : c = hec.
+    rewrite lcc -[last _ _]/(last dummy_cell (lec :: cc')) -ccq cceq s2q.
+    by rewrite last_cat.
+  by rewrite hh.
+move: adj; rewrite ocd cceq s2q /adjacent_cells=> /sorted_catW /andP[] _.
+move=> /sorted_catW /andP[] /sorted_catW /andP[] _ /andP[] /eqP hl  _ _.
+have c1cc : c1 \in cc by rewrite cceq s2q mem_cat !inE eqxx !orbT.
+have /andP[] := open_cells_decomposition_contains oe c1cc.
+by rewrite hl.
+Qed.
+
+Lemma step_keeps_left_pt_open_lex e future_events open closed open2 closed2 :
+  sorted lexPtEv (e :: future_events) ->
+  cells_bottom_top open ->
+  adjacent_cells open ->
+  inside_box (point e) ->
+  seq_valid open (point e) ->
+  s_right_form open ->
+  out_left_event e ->
+  step e open closed = (open2, closed2) ->
+  {in open & (e :: future_events), forall c e',
+     lexPt (left_pt (high c)) (point e')} ->
+  {in open2 & future_events, forall c e',
+     lexPt (left_pt (high c)) (point e')}.
+Proof.
+move=> sevs cbtom adj inbox_e sval rfo out_e; rewrite /step.
+case oe : open_cells_decomposition => [[[[fc cc] lc] le] he].
+have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
+  lhc_dec cbtom adj inbox_e oe.
+move=> [<- _] lexp c e' + e'in.
+have e'in2 : e' \in e :: future_events by rewrite inE e'in orbT.
+rewrite !mem_cat orbCA=> /orP[]; last first.
+  move=> cin; apply: lexp; last by [].
+  by rewrite ocd !mem_cat orbCA cin orbT.
+move=> /opening_cells_subset /andP[] _; rewrite inE => /orP[/eqP -> | ].
+  rewrite -heq; apply: lexp; last by [].
+  by rewrite ocd ccq !mem_cat heceq mem_last orbT.
+move=> /out_e/eqP ->.
+move: (sevs); rewrite /= (path_sortedE lexPtEv_trans)=> /andP[] /allP + _.
+by apply.
+Qed.
+
 Lemma step_keeps_edge_covering e open closed open2 closed2 :
+  {in open, forall c, lexPt (left_pt (high c)) (point e)} ->
+  open_non_inner_event open e ->
   {in open &, injective high} ->
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -4979,7 +5056,7 @@ Lemma step_keeps_edge_covering e open closed open2 closed2 :
   step e open closed = (open2, closed2) ->
   edge_covered g open2 closed2.
 Proof.
-move=> ihigh cbtom adj inbox_e sval rfo out_e g; rewrite /step.
+move=> lexleft n_inner ihigh cbtom adj inbox_e sval rfo out_e g; rewrite /step.
 case oe : open_cells_decomposition => [[[[fc cc] lc] le] he].
 have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
   lhc_dec cbtom adj inbox_e oe.
@@ -5102,7 +5179,7 @@ rewrite ocd; rewrite !mem_cat orbCA => /orP[]; last first.
   by [].
 move=> opcc.
 right.
-have [_ [highopc leftopc]]:= close_cell_preserve_3sides SINGLE (point e) opc.
+have [_ highopc leftopc]:= close_cell_preserve_3sides SINGLE (point e) opc.
 exists (rcons pcc (close_cell SINGLE (point e) opc)).
 split.
   move=> c; rewrite mem_rcons inE=> /orP[/eqP -> | ].
@@ -5124,8 +5201,13 @@ split.
 rewrite /last_cell last_rcons right_limit_close_cell; last first.
     by move/allP:sval => /(_ opc opcopen) /andP[].
   by move/allP:sval => /(_ opc opcopen) /andP[].
-
-Admitted.
+have hopc : high opc = g by apply: highs; rewrite mem_rcons inE eqxx.
+have e_on : point e === high opc.
+  apply: (open_cells_decomposition_point_on cbtom adj inbox_e sval oe opcc).
+  by rewrite hopc.
+have [ abs | -> ] := n_inner _ opcopen e_on; last by rewrite hopc.
+by have := lexleft _ opcopen; rewrite abs lexPt_irrefl.
+Qed.
 
 End proof_environment.
 

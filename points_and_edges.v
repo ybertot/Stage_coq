@@ -1422,8 +1422,13 @@ apply/idP/idP.
 by move/orP=> [/eqP -> // | /ltW].
 Qed.
 
-Lemma lexePt_refl :
-reflexive lexePt.
+Lemma lexPt_irrefl : irreflexive lexPt.
+Proof.
+move=> x; apply/negP=> /[dup] abs.
+by rewrite lexPtNge lexePt_eqVlt abs orbT.
+Qed.
+
+Lemma lexePt_refl : reflexive lexePt.
 Proof.
 rewrite /reflexive /lexePt=> p.
 by rewrite eqxx le_refl /= orbT.
