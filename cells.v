@@ -4925,13 +4925,18 @@ Lemma connect_limits_rcons (s : seq cell) (lc : cell) :
   s != nil -> connect_limits (rcons s lc) =
    connect_limits s && (right_limit (last dummy_cell s) == left_limit lc).
 Proof.
-Admitted.
+elim: s => [// | c0 s Ih] _ /=.
+by rewrite rcons_path.
+Qed.
 
 Lemma right_limit_close_cell p c :
   valid_edge (low c) p -> valid_edge (high c) p ->
   right_limit (close_cell SINGLE p c) = p_x p.
 Proof.
-Admitted.
+move=> vlc vhc; rewrite /close_cell /right_limit.
+rewrite !pvertE //=.
+by case: ifP; case: ifP.
+Qed.
 
 Lemma left_limit_close_cell p c : 
    left_limit (close_cell SINGLE p c) = left_limit c.
