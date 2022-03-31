@@ -4904,6 +4904,16 @@ move: (allP sval _ cin) => /= /andP[] vlo vhi.
 by rewrite (pvertE vlo) (pvertE vhi).
 Qed.
 
+Lemma uniq_map_injective (T T' : eqType) (f : T -> T') (s : seq T) :
+  uniq [seq f x | x <- s] -> {in s &, injective f}.
+Proof.
+elim: s => [ // | a s Ih] /= /andP[fan uns].
+move=> e1 e2; rewrite !inE => /orP[/eqP -> | e1s ] /orP[/eqP -> | e2s] feq //.
+    by move: fan; rewrite feq; case/negP; apply/mapP; exists e2.
+  by move: fan; rewrite -feq; case/negP; apply/mapP; exists e1.
+by apply: Ih.
+Qed.
+
 Lemma step_keeps_injective_high e open closed open2 closed2 :
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -4911,15 +4921,82 @@ Lemma step_keeps_injective_high e open closed open2 closed2 :
   seq_valid open (point e) ->
   s_right_form open ->
   out_left_event e ->
+  uniq (outgoing e) ->
+  {in open, forall c, lexPt (left_pt (high c)) (point e)} ->
   step e open closed = (open2, closed2) ->
   {in open &, injective high} ->
   {in open2 &, injective high}.
 Proof.
-move=> cbtom adj inbox_e sval rfo out_e + inj_high g; rewrite /step.
+move=> cbtom adj inbox_e sval rfo out_e uout lexp + inj_high; rewrite /step.
 case oe : open_cells_decomposition => [[[[fc cc] lc] le] he].
 have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
   lhc_dec cbtom adj inbox_e oe.
-Admitted.
+have leco : lec \in open by rewrite ocd ccq !mem_cat !inE eqxx !orbT.
+have heco : hec \in open by rewrite ocd ccq heceq !mem_cat mem_last !orbT.
+have vle : valid_edge le (point e).
+  by have := proj1 (andP (allP sval _ leco)); rewrite leq.
+have vhe : valid_edge he (point e).
+  by have := proj2 (andP (allP sval _ heco)); rewrite heq.
+have dupcase c1 c2 : (c1 \in fc) || (c1 \in lc) ->
+   c2 \in opening_cells (point e) (outgoing e) le he ->
+   high c1 = high c2 -> c1 = c2.
+  move=> c1in c2in hc1c2.
+  have v1 : valid_edge (high c1) (point e).
+    move: sval=> /allP /(_ c1); rewrite ocd !mem_cat orbCA c1in orbT.
+    by move=> /(_ isT) /andP[].
+  have v2 : valid_edge (high c2) (point e).
+    have /andP[ _ ] := opening_cells_subset c2in.
+    rewrite inE=> /orP[/eqP -> // | ].
+    by have := opening_valid out_e vle vhe => /allP /(_ _ c2in) /andP[].
+  have : point e <<< high c1 \/ point e >>> high c1.
+    move: c1in=> /orP[] c1in.
+      right.
+      by have := decomposition_above_high_fc oe cbtom adj inbox_e rfo sval c1in.
+    left.
+    have [s1 [s2 lcq]] : exists s1 s2, lc = s1 ++ c1 :: s2.
+      by case/splitPr: c1in => s1 s2; exists s1, s2.
+    case s2q : s2 => [ | c1' s2'].
+      move: inbox_e=> /andP[] /andP[] _ + _.
+      suff -> : high c1 = top by [].
+      by move: cbtom=> /andP[] _ /eqP; rewrite ocd lcq s2q /= !last_cat /=.
+    have c1'in : c1' \in lc by rewrite lcq s2q mem_cat !inE eqxx !orbT.
+    have := decomposition_under_low_lc oe cbtom adj inbox_e rfo sval c1'in.
+    suff -> : high c1 = low c1' by [].
+    move: adj; rewrite /adjacent_cells ocd=> /sorted_catW /andP[] _.
+    move=> /sorted_catW /andP[] _; rewrite lcq s2q.
+    by move=> /sorted_catW /andP[] _ /= /andP[] /eqP.
+  have /andP[lows ] := opening_cells_subset c2in.
+  rewrite inE => /orP[/eqP hc1he | ]; last first.
+    rewrite hc1c2 => /out_e/eqP <-.
+    move=> [ | ].
+      rewrite strict_nonAunder; last first.
+        by apply valid_edge_extremities; rewrite eqxx ?orbT.
+      by rewrite left_on_edge.
+    rewrite under_onVstrict ?left_on_edge //.
+    by apply valid_edge_extremities; rewrite eqxx ?orbT.
+  have c1hec : c1 = hec.
+    apply: inj_high => //.
+      by rewrite ocd !mem_cat orbCA c1in orbT.
+    by rewrite hc1c2 hc1he.
+  have := decomposition_not_contain rfo sval adj 
+         (bottom_imp_seq_below cbtom inbox_e) oe c1in.
+  have heccc : hec \in cc by rewrite ccq heceq mem_last.
+  have := open_cells_decomposition_contains oe heccc.
+  by rewrite c1hec => ->.
+have henout : he \notin outgoing e.
+  apply/negP=> /out_e /eqP abs.
+  by have := lexp hec heco; rewrite heq abs lexPt_irrefl.
+move=> [<- _] c1 c2; rewrite !mem_cat orbCA=> /orP[] c1in; last first.
+  rewrite orbCA=> /orP[] c2in; last first.
+    by apply: inj_high; rewrite ocd !mem_cat orbCA ?c1in ?c2in orbT.
+  by apply: dupcase _ _ c1in c2in.
+rewrite orbCA=> /orP[] c2in; last first.
+  move/esym=> tmp; apply/esym; move: tmp.
+  by apply: dupcase _ _ c2in c1in.
+have : uniq (rcons (sort (@edge_below _) (outgoing e)) he).
+  by rewrite rcons_uniq mem_sort henout sort_uniq.
+by rewrite -(opening_cells_high vle vhe out_e) => /uniq_map_injective; apply.
+Qed.
 
 Lemma connect_limits_rcons (s : seq cell) (lc : cell) :
   s != nil -> connect_limits (rcons s lc) =
