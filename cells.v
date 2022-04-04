@@ -4573,12 +4573,11 @@ have fcedgesright: {in fc_edges, forall g, p_x (point ev) < p_x (right_pt g)}.
   move=> g; rewrite mem_cat => gin.
   have /orP[bottop | ] : end_edge g events.
       by move: gin=> /orP[] /mapP[c cin ->]; move: (allP clae' _ cin)=>/andP[].
-    move: inbox_e => /andP[] _ /andP[] /andP[] _ ltbot /andP[] _ lttop.
-    by move: bottop; rewrite /lexPt !inE;
-      move=> /orP[] /eqP ->; rewrite ?lttop ?ltbot.
+    move: inbox_e => /andP[] _ /andP[] /andP[] _ + /andP[] _.
+    by move: bottop; rewrite !inE=> /orP[] /eqP ->.
   move=> /hasP [e' e'in /eqP /[dup]geq ->].
   have : lexPt (point ev) (point e') by apply: (allP lexev).
-  move=>/orP[] // /andP[] /eqP xs ys.
+  move=>/orP[ // | ] /andP[] /eqP xs ys.
   suff /eqP abs : pvert_y (point ev) g == p_y (point e').
     have:= lowvert g; rewrite /fc_edges mem_cat gin abs => /(_ isT).
     by rewrite ltNge le_eqVlt ys orbT.
