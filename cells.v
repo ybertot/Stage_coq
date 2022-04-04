@@ -2569,8 +2569,8 @@ have [large | small] := boolP (1 < size cc)%N.
   rewrite (nth_map dummy_cell _ _ inmiddle'') [in RHS]ccdq /=.
   rewrite nth_rcons inmiddle'.
   set protected := nth _ _ _.
-  move: ccdq.
-  have := mem_nth dummy_cell inmiddle'=> /splitPr[s1 s2].
+  have [s1 [s2 ps1s2]]:= mem_seq_split (mem_nth dummy_cell inmiddle').
+  move: ccdq; rewrite ps1s2.
   rewrite -cats1 -2!(cat_cons (head _ cc)) -!catA (cat_cons (nth _ _ _)).
   rewrite -/protected => ccdq.
   have := contact_middle_at_point adj val ctps ccdq=> -[trick trick2].
@@ -3404,7 +3404,8 @@ have [large | small] := boolP (1 < size cc)%N.
     - by move: (allP val _ lin)=> /andP[].
     by apply: (allP oks).
   move=> /mapP[c' cin ->].
-  move: (cin) (ccdq); case/splitPr => s1 s2.
+  have [s1 [s2 Ps1s2]] := mem_seq_split cin.
+  move: ccdq; rewrite Ps1s2.
   rewrite -cats1 -2!(cat_cons (head _ _)) -catA (cat_cons c') cats1.
   set w1 := (head _ _ :: _); set w2 := (rcons _ _)=> ccdq'.
   have c'in2 : c' \in cc by rewrite ccdq' !(inE, mem_cat) eqxx ?orbT.
@@ -3728,8 +3729,7 @@ have vfc : {in [seq high i | i <- first_cells], forall g, valid_edge g p}.
   move=> g /mapP[c cin geq]; have := (allP sval c).
   by rewrite ocd !mem_cat cin geq => /(_ isT) => /andP[].
 move=> g /mapP[c cin geq].
-have [fc1 [fc2 fceq]] : exists fc1 fc2, first_cells = fc1 ++ c :: fc2.
-    by move: cin => /splitPr[ x y]; exists x, y.  
+have [fc1 [fc2 fceq]] := mem_seq_split cin.
 have cin' : c \in open by rewrite ocd !(mem_cat, inE) cin.
 have := seq_edge_below' adj rfo; rewrite ocd fceq -[c :: _]/([:: c] ++ _).
 set w := head _ _; rewrite -!catA (catA fc1) map_cat cat_path=> /andP[] _.
@@ -3886,7 +3886,8 @@ have [fceq | [fc' [lfc fceq]]] : fc = nil \/ exists fc' lfc, fc = rcons fc' lfc.
 have := last_first_cells_high cbtom adj inbox_e oe.
 rewrite fceq map_rcons last_rcons => <-.
 rewrite mem_rcons inE => /orP[/eqP c1lfc | c1o]; first  by rewrite c1lfc.
-move: c1o fceq=>/splitPr[a b]; rewrite -cats1 -catA /= => fceq.
+have [a [b pab]] := mem_seq_split c1o.
+move: fceq; rewrite pab -cats1 -catA /= => fceq.
 (* requirement for path_edge_below_pvert_y *)
 have req1 : all (valid_edge (R := _) ^~ (point e))
     [seq high i | i <- c1 :: b ++ [:: lfc]].
@@ -3929,11 +3930,11 @@ move: c1in; case lceq : lc => [ // | flc lc'] c1in.
 have := head_last_cells_low cbtom adj inbox_e oe.
 rewrite lceq /= => <-.
 move: c1in; rewrite inE => /orP[/eqP c1flc | c1o]; first by rewrite c1flc.
-move: c1o lceq=> /splitPr[a b]=> lceq.
+have [a [b Pab]] := mem_seq_split c1o.
 (* requirement for path_edge_below_pvert_y *)
 have req1 : all (@valid_edge R ^~ (point e)) [seq low i | i <- flc :: a ++ c1 :: b].
   apply/allP; apply: (sub_in1 _ (seq_valid_low sval)); apply: sub_map.
-  rewrite ocd lceq=> x; rewrite 2!mem_cat => ->.
+  rewrite ocd lceq Pab=> x; rewrite 2!mem_cat => ->.
   by rewrite !orbT.
 have req2 : path (@edge_below R) (low flc) [seq low i | i <- a ++ c1 :: b].
   have := seq_edge_below' adj rfo.
@@ -3946,7 +3947,8 @@ have req2 : path (@edge_below R) (low flc) [seq low i | i <- a ++ c1 :: b].
       by rewrite /= edge_below_refl.
   have  := seq_low_high_shift on0 adj; rewrite headq => <-.
   rewrite -cats1 cat_path => /andP[] + _.
-  by rewrite ocd lceq 2!map_cat 2!cat_path => /andP[]  _ /andP[] _ /= /andP[] _.
+  rewrite ocd lceq Pab.
+  by rewrite 2!map_cat 2!cat_path => /andP[]  _ /andP[] _ /= /andP[] _.
 have : path (<=%R) (pvert_y (point e) (low flc))
   [seq pvert_y (point e) (low i) | i <- a ++ c1 :: b].
   by have := path_edge_below_pvert_y req1 req2; rewrite -map_comp.
@@ -4147,11 +4149,9 @@ have [nle [nhe _]]:=
 have := open_not_nil (sort (@edge_below R) (outgoing e)) vle vhe.
 rewrite -[X in X != [::]]/new_cells => ncn0.
 move=> c1 c2 c1in c2in.
- have [s3 [s4 lceq]] : exists s3 s4, lc = s3 ++ c2 :: s4.
-  by move:c2in=> /splitPr[s1 s2]; exists s1, s2.
+ have [s3 [s4 lceq]] := mem_seq_split c2in.
 have lceq' : lc = rcons s3 c2 ++ s4 by rewrite -cats1 -catA.
-have [s1 [s2 nceq']] : exists s1 s2, new_cells = s1 ++ c1 :: s2.
-  by move:c1in=> /splitPr[s1 s2]; exists s1, s2.
+have [s1 [s2 nceq']] := mem_seq_split c1in.
 have hs2 : high (last c1 s2) = he.
   by move: nhe; rewrite ohe -/new_cells nceq' last_cat /=.
 have lt1 : p_y (point e) < pvert_y (point e) he.
@@ -4630,8 +4630,7 @@ have lowvert : {in fc_edges, forall g, pvert_y (point ev) g < p_y (point ev)}.
     by rewrite edge_below_refl.
   rewrite /= => pathlt.
   move=> g /mapP[c cin gceq].
-  have [s1 [s2 fceq]] : exists s1 s2, fc = s1 ++ c :: s2.
-    by move: cin => /splitPr[ x y]; exists x, y.  
+  have [s1 [s2 fceq]] := mem_seq_split cin.
   have vertle : pvert_y (point ev) le < p_y (point ev).
     have [+ _]:= l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
     rewrite under_pvert_y; last first.
@@ -4713,8 +4712,7 @@ have lowfc : {in fc_edges, forall g, g <| le}.
   have := seq_edge_below' adj rfo; rewrite [X in head _ (map _ X)]openeq /= lowbot.
   rewrite ocd map_cat cat_path=> /andP[] + _. (* tailcond. *)
   move: gin=> /mapP[c cin geq].
-  have [fch [fct ]] : exists fch fct, fc = fch ++ c :: fct.
-        by move: cin => /splitPr [x y]; exists x, y.
+  have [fch [fct ]] := mem_seq_split cin.
   rewrite -[_ :: _]/([:: _] ++ _) catA => fcteq.
   rewrite fcteq map_cat cat_path => /andP[] _.
   rewrite cats1 map_rcons last_rcons.
@@ -4797,16 +4795,6 @@ move: (allP sval _ cin) => /= /andP[] vlo vhi.
 by rewrite (pvertE vlo) (pvertE vhi).
 Qed.
 
-Lemma uniq_map_injective (T T' : eqType) (f : T -> T') (s : seq T) :
-  uniq [seq f x | x <- s] -> {in s &, injective f}.
-Proof.
-elim: s => [ // | a s Ih] /= /andP[fan uns].
-move=> e1 e2; rewrite !inE => /orP[/eqP -> | e1s ] /orP[/eqP -> | e2s] feq //.
-    by move: fan; rewrite feq; case/negP; apply/mapP; exists e2.
-  by move: fan; rewrite -feq; case/negP; apply/mapP; exists e1.
-by apply: Ih.
-Qed.
-
 Lemma step_keeps_injective_high e open closed open2 closed2 :
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -4846,8 +4834,7 @@ have dupcase c1 c2 : (c1 \in fc) || (c1 \in lc) ->
       right.
       by have := decomposition_above_high_fc oe cbtom adj inbox_e rfo sval c1in.
     left.
-    have [s1 [s2 lcq]] : exists s1 s2, lc = s1 ++ c1 :: s2.
-      by case/splitPr: c1in => s1 s2; exists s1, s2.
+    have [s1 [s2 lcq]] := mem_seq_split c1in.
     case s2q : s2 => [ | c1' s2'].
       move: inbox_e=> /andP[] /andP[] _ + _.
       suff -> : high c1 = top by [].
@@ -4970,8 +4957,7 @@ have vhc : valid_edge (high c) p.
   by move/allP: sval => /(_ c cop) /andP[].
 apply: under_above_on => //.
   by have /andP[] := open_cells_decomposition_contains oe ccc.
-have [s1 [s2 cceq]] : exists s1 s2, cc = s1 ++ c :: s2.
-  by case/splitPr: ccc => s1 s2; exists s1, s2.
+have [s1 [s2 cceq]] := mem_seq_split ccc.
 case s2q : s2 => [ | c1 s2'].
   case/negP: nhe.
   have -> : c = hec.

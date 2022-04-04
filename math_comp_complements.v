@@ -85,6 +85,22 @@ move=> tr; elim: s=> [ | init s Ih] //=.
 by rewrite (path_sortedE tr) all_rcons => /andP[] /andP[] -> _.
 Qed.
 
+Lemma uniq_map_injective (T T' : eqType) (f : T -> T') (s : seq T) :
+  uniq [seq f x | x <- s] -> {in s &, injective f}.
+Proof.
+elim: s => [ // | a s Ih] /= /andP[fan uns].
+move=> e1 e2; rewrite !inE => /orP[/eqP -> | e1s ] /orP[/eqP -> | e2s] feq //.
+    by move: fan; rewrite feq; case/negP; apply/mapP; exists e2.
+  by move: fan; rewrite -feq; case/negP; apply/mapP; exists e1.
+by apply: Ih.
+Qed.
+
+Lemma mem_seq_split (T : eqType) (x : T) (s : seq T) :
+  x \in s -> exists s1 s2, s = s1 ++ x :: s2.
+Proof.
+by move=> /splitPr [s1 s2]; exists s1, s2.
+Qed.
+
 Section transitivity_proof.
 
 Variables (T : eqType) (r : rel T) (s1 s2 : mem_pred T).
