@@ -4262,12 +4262,12 @@ have rpt_ev' : forall g,
   case: ifP => [ _ | //].
   have := on_pvert (right_on_edge g); rewrite (eqP gev') => ->.
   by rewrite !lt_irreflexive.
-have commondiff c : c \in hec :: fc ++ lc -> p_x (point ev) != p_x (point ev') ->
-  edge_side_prop ev' (high c).
+have commondiff c : c \in hec :: fc ++ lc ->
+  p_x (point ev) != p_x (point ev') -> edge_side_prop ev' (high c).
   move=> cin diffx; rewrite /edge_side_prop.
   have cino : c \in open.    
     by move: cin; rewrite ocd !(inE, mem_cat) => /orP[/eqP -> | /orP[] ->];
-    rewrite ?orbT // C D mem_last ?orbT.
+      rewrite ?orbT // C D mem_last ?orbT.
   have : end_edge (high c) (ev' :: events).
     move: cin; rewrite inE => /orP[/eqP -> | cin]; last first.
       apply: (proj2 (andP (allP clae c _))).
