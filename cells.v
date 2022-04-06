@@ -184,12 +184,33 @@ Definition inside_open_cell p c :=
 Definition inside_open' p c :=
   [&& inside_open_cell p c,  p >>> low c & left_limit c < p_x p] .
 
+Lemma inside_open'E p c :
+  inside_open' p c =
+  [&& p <<= high c, p >>> low c, left_limit c < p_x p &
+   p_x p <= open_limit c].
+Proof.
+rewrite /inside_open' /inside_open_cell /contains_point.
+rewrite /point_strictly_under_edge -leNgt !le_eqVlt.
+rewrite [in _ >>> low c]/point_under_edge -ltNge.
+by case: (0 < _); case: (_ < p_x p); rewrite ?andbF ?orbT ?andbT.
+Qed.
+
 Definition inside_closed_cell p c :=
   contains_point p c && (left_limit c <= p_x p <= right_limit c).
 
 Definition inside_closed' p c :=
   [&& inside_closed_cell p c, p >>> low c & left_limit c < p_x p].
 
+Lemma inside_closed'E p c :
+  inside_closed' p c =
+  [&& p <<= high c, p >>> low c, left_limit c < p_x p &
+     p_x p <= right_limit c].
+Proof.
+rewrite /inside_closed' /inside_closed_cell /contains_point.
+rewrite /point_strictly_under_edge -leNgt !le_eqVlt.
+rewrite [in _ >>> low c]/point_under_edge -ltNge.
+by case: (0 < _); case: (_ < p_x p); rewrite ?andbF ?orbT ?andbT.
+Qed.
 
 (* this function removes consecutives duplicates, meaning the seq needs
  to be sorted first if we want to remove all duplicates *)
@@ -3427,6 +3448,21 @@ rewrite vip1 vip2 /= => cok /andP[]/andP[] -> -> /andP[] -> rlim /=.
 by apply: (lt_le_trans rlim cok).
 Qed.
 
+Lemma close'_subset_contact v p q c :
+  valid_cell c p -> 
+  closed_cell_side_limit_ok (close_cell v p c) ->
+  inside_closed' q (close_cell v p c) -> inside_open' q c.
+Proof.
+move=>[] vl vh.
+move=>/closed_right_imp_open.
+rewrite inside_open'E // . inside_closed'E.
+/strict_inside_closed/strict_inside_open/close_cell.
+have [p1 vip1] := exists_point_valid vl.
+have [p2 vip2] := exists_point_valid vh.
+rewrite vip1 vip2 /= => cok /andP[]/andP[] -> -> /andP[] -> rlim /=.
+by apply: (lt_le_trans rlim cok).
+Qed.
+
 Section abstract_subsets_and_partition.
 
 Variable sub : cell -> cell -> Prop.
@@ -4703,6 +4739,58 @@ apply: add_new.
 move=> c1 c2 c1in c2in.
 by apply: disj; rewrite ocd !mem_cat orbCA -mem_cat; apply/orP; right.
 Qed.
+
+Definition oc_disjoint (c1 c2 : cell) :=
+  forall p, ~~ (inside_open' p c1 && inside_closed' p c2).
+
+Definition disjoint_open_closed_cells :=
+  forall c1 c2, oc_disjoint c1 c2.
+
+Definition c_disjoint (c1 c2 : cell) :=
+  forall p, ~~ (inside_closed' p c1 && inside_closed' p c2).
+
+Definition c_disjoint_e (c1 c2 : cell) :=
+  c1 = c2 \/ c_disjoint c1 c2.
+
+Definition disjoint_closed_cells :=
+  forall c1 c2, c_disjoint_e c1 c2.
+
+Lemma close_cell_subset_contact' v p q c :
+  valid_cell c p ->
+  closed_cell_side_limit_ok (close_cell v p c) ->
+  inside_closed' q (close_cell v p c) ->
+  inside_open' q c.
+Proof.
+move=> [vl vh] cok.
+rewrite /close_cell (pvertE vl) (pvertE vh).
+rewrite /inside_closed' /=.
+
+Lemma step_keeps_disjoint ev open closed open' closed' events :
+  cells_bottom_top open ->
+  adjacent_cells open ->
+  inside_box (point ev) ->
+  seq_valid open (point ev) ->
+  s_right_form open ->
+  {in [seq low c | c <- open] ++ [seq high c | c <- open] ++
+      outgoing ev &, forall e1 e2, inter_at_ext e1 e2} ->
+  {in open &, disjoint_open_cells} ->
+  {in closed &, disjoint_closed_cells} ->
+  {in open & closed, disjoint_open_closed_cells} ->
+  out_left_event ev ->
+  all open_cell_side_limit_ok open ->
+  edge_side (ev :: events) open ->
+  close_alive_edges open (ev :: events) ->
+  all (fun x => lexPtEv ev x) events ->
+  step ev open closed = (open', closed') ->
+  {in closed' &, disjoint_closed_cells} /\
+  {in open' & closed', disjoint_open_closed_cells}.
+Proof.
+move=> cbtom adj inbox_e sval rfo noc doc dcc docc out_e sok
+  edge_side_open clae lexev.
+rewrite /step.
+case oe : (open_cells_decomposition open (point ev)) =>
+   [[[[fc  cc] lc] le] he] [<- <-].
+split.
 
 Definition pt_at_end (p : pt) (e : edge) :=
   p === e -> p \in [:: left_pt e; right_pt e].
