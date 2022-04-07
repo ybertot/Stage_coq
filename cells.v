@@ -1089,20 +1089,37 @@ move=> c; rewrite -cats1 mem_cat inE=> /orP[cinfc | /eqP ->].
 by move : notcontains => /negP.
 Qed.
 
+Definition cells_low_e_top cells low_e : bool :=
+  (cells != nil) && (low (head dummy_cell cells) == low_e) && (high (last dummy_cell cells) == top).
+
+Definition cells_bottom_top cells : bool :=
+  cells_low_e_top cells bottom.
+
+Lemma bottom_imp_seq_below s p :
+cells_bottom_top s -> inside_box p -> bottom_edge_seq_below s p.
+Proof.
+case s=> [// | c q].
+rewrite /cells_bottom_top /cells_low_e_top => /andP []/andP [] _ /eqP /= loweq _.
+rewrite /bottom_edge_seq_below  /inside_box loweq => /andP [] /andP []  /negP nsab _ _ /=.
+by apply /underWC/negP.
+Qed.
+
 Lemma decomposition_not_contain open_cells p : 
 forall first_cells contact last_cells low_f high_f,
 s_right_form open_cells ->
 seq_valid open_cells p ->
 adjacent_cells open_cells ->
-bottom_edge_seq_below open_cells p ->
+cells_bottom_top open_cells ->
+inside_box p ->
 open_cells_decomposition open_cells p  = (first_cells, contact, last_cells, low_f, high_f) ->
 forall c, (c \in first_cells) || (c \in last_cells) -> ~ contains_point p c.
 Proof.
 move => fc c_c l_c low_f high_f.
 rewrite /open_cells_decomposition.
-case: open_cells => [ | c q] rfo valo adjo boto.
+case: open_cells => [ | c q] rfo valo adjo boto inbox_p.
   by move=>[] <- _ <- _ _ c.
-by move/fix_not_contain; apply.
+move/fix_not_contain; apply => //.
+by apply: bottom_imp_seq_below.
 Qed.
 
 Lemma decomposition_not_end open_cells e :
@@ -1110,12 +1127,14 @@ forall first_cells contact last_cells low_f high_f,
 s_right_form open_cells ->
 seq_valid open_cells (point e) ->
 adjacent_cells open_cells ->
-bottom_edge_seq_below open_cells (point e) ->
+cells_bottom_top open_cells ->
+inside_box (point e) ->
 open_cells_decomposition open_cells (point e)  = (first_cells, contact, last_cells, low_f, high_f) ->
 forall c, (c \in first_cells) || (c \in last_cells) -> ( ~ event_close_edge (low c) e) /\ ( ~ event_close_edge (high c) e).
 Proof.
-move => fc c_c l_c low_f high_f srf svalid adj bedbelow dec_eq c1 c1nfclc .
-have := (decomposition_not_contain srf svalid adj bedbelow dec_eq c1nfclc).
+move=> fc c_c l_c low_f high_f srf svalid adj cbtom inbox_p.
+move=> dec_eq c1 c1nfclc.
+have := (decomposition_not_contain srf svalid adj cbtom inbox_p dec_eq c1nfclc).
 have c1open : c1 \in open_cells.
     rewrite (decomposition_preserve_cells dec_eq).
     move : c1nfclc => /orP [].
@@ -1231,22 +1250,6 @@ move => /allP  /andP [/eqP lfteq /allP outleft].
 move=> ved vlow vhigh.
 rewrite last_seq2; last by apply/eqP/open_not_nil.
 by apply: IH.
-Qed.
-
-
-Definition cells_low_e_top cells low_e : bool :=
-  (cells != nil) && (low (head dummy_cell cells) == low_e) && (high (last dummy_cell cells) == top).
-
-Definition cells_bottom_top cells : bool :=
-  cells_low_e_top cells bottom.
-
-Lemma bottom_imp_seq_below s p :
-cells_bottom_top s -> inside_box p -> bottom_edge_seq_below s p.
-Proof.
-case s=> [// | c q].
-rewrite /cells_bottom_top /cells_low_e_top => /andP []/andP [] _ /eqP /= loweq _.
-rewrite /bottom_edge_seq_below  /inside_box loweq => /andP [] /andP []  /negP nsab _ _ /=.
-by apply /underWC/negP.
 Qed.
 
 Lemma exists_cell_aux low_e p open :
@@ -1539,8 +1542,7 @@ Proof.
 move => cbtom adj inbox_p val rfo  fc cc lc le he oe.
 have [lec [hec [cc' [ocd [leq [heq [ccq hecq]]]]]]]:=
       lhc_dec cbtom adj inbox_p oe.
-have sb := bottom_imp_seq_below cbtom inbox_p.
-have notc := decomposition_not_contain rfo val adj sb oe.
+have notc := decomposition_not_contain rfo val adj cbtom inbox_p oe.
 move: (inbox_p)=> /andP[] /andP[] pab plt _.
 have [pale puhe] := l_h_above_under cbtom adj inbox_p val oe.
 split.
@@ -1670,8 +1672,8 @@ rewrite /step.
 case op_dec : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] low_e] high_e] /=.
 move => [] <- _.
 rewrite /opening_cells.
-have beseqb := bottom_imp_seq_below cbtop insboxe.
-have dec_not_end := decomposition_not_end srf val_op_e adjop beseqb op_dec.
+have dec_not_end :=
+  decomposition_not_end srf val_op_e adjop cbtop insboxe op_dec.
 have open_eq := decomposition_preserve_cells op_dec.
 have := (l_h_valid cbtop adjop  insboxe val_op_e op_dec) => [][] lowv highv.
 rewrite open_eq in val_op_e.
@@ -1752,8 +1754,8 @@ have lhc := l_h_c_decomposition op_dec exi .
 rewrite /opening_cells => -[] open2eq _.
 rewrite -open2eq in close_all.
 rewrite -open2eq{open2eq}.
-have beseqb := bottom_imp_seq_below cbtop insboxe.
-have dec_not_end := decomposition_not_end srf val_op_e adjop beseqb op_dec.
+have dec_not_end :=
+   decomposition_not_end srf val_op_e adjop cbtop insboxe op_dec.
 have open_eq := decomposition_preserve_cells op_dec.
 
 have := (l_h_valid cbtop adjop  insboxe val_op_e op_dec) => [][] lowv highv.
@@ -4248,8 +4250,7 @@ have clae' : close_alive_edges fc events.
   move=> /andP[ab bel].
   have edgeo : any_edge true c <| any_edge false c.
     by move: rfo => /allP /(_ _ cin').
-  have := decomposition_not_contain rfo sval adj
-               (bottom_imp_seq_below cbtom inbox_e) oe.
+  have := decomposition_not_contain rfo sval adj cbtom inbox_e oe.
   move=> /(_ c); rewrite cin /contains_point /= => /(_ isT); case.
   case beq : b.
     have := order_edges_viz_point' vb vb'; rewrite beq => /(_ edgeo).
@@ -4564,9 +4565,7 @@ move: c2in=> /orP[c2old | ].
 rewrite closed_map=> /mapP[c2' c2'in c2eq] q; apply/negP=> /andP[] inc1 inc2.
 have c2'open : c2' \in open by rewrite ocd !mem_cat c2'in !orbT.
 have [c1eqc2 | disjc1c2] := doc _ _ c1open c2'open.
-  (* TODO : this should be a higher level theorem. *)
-  have sb := bottom_imp_seq_below cbtom inbox_e.
-  case: (decomposition_not_contain rfo sval adj sb oe c1old).
+  case: (decomposition_not_contain rfo sval adj cbtom inbox_e oe c1old).
   rewrite c1eqc2.
   by apply: (open_cells_decomposition_contains oe).
 move: (disjc1c2 q); rewrite inc1 //.
@@ -4670,8 +4669,7 @@ have dupcase c1 c2 : (c1 \in fc) || (c1 \in lc) ->
     apply: inj_high => //.
       by rewrite ocd !mem_cat orbCA c1in orbT.
     by rewrite hc1c2 hc1he.
-  have := decomposition_not_contain rfo sval adj 
-         (bottom_imp_seq_below cbtom inbox_e) oe c1in.
+  have := decomposition_not_contain rfo sval adj cbtom inbox_e oe c1in.
   have heccc : hec \in cc by rewrite ccq heceq mem_last.
   have := open_cells_decomposition_contains oe heccc.
   by rewrite c1hec => ->.
