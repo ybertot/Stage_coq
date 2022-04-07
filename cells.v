@@ -4705,6 +4705,22 @@ rewrite !pvertE //=.
 by case: ifP; case: ifP.
 Qed.
 
+Lemma step_keeps_closed_to_the_left ev open closed open' closed' :
+  adjacent_cells open ->
+  seq_valid open (point ev) ->
+  step ev open closed = (open', closed') ->
+  {in closed, forall c, right_limit c <= p_x (point ev)} ->
+  {in closed', forall c, right_limit c <= p_x (point ev)}.
+Proof.
+move=> adj sval.
+rewrite /step.
+case oe: (open_cells_decomposition open (point ev)) =>
+      [[[[fc cc] lc] le] he] [_ <-].
+move=> rtl c; rewrite mem_cat=> /orP[].
+  by apply: rtl.
+
+Qed.
+
 Lemma left_limit_close_cell p c : 
    left_limit (close_cell SINGLE p c) = left_limit c.
 Proof.
