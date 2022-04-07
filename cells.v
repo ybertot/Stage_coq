@@ -1,7 +1,6 @@
 From mathcomp Require Import all_ssreflect all_algebra.
 Require Export Field.
-Require Import math_comp_complements.
-Require Import points_and_edges.
+Require Import math_comp_complements points_and_edges events.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -41,6 +40,7 @@ Variable R : realFieldType.
 
 Notation pt := (pt R).
 Notation edge := (edge R).
+Notation event := (event R).
 
 Record cell := Bcell  {left_pts : list pt; right_pts : list pt;
                         low : edge; high : edge}.
@@ -66,84 +66,6 @@ by apply: ReflectF=> [][].
 Qed.
 
 Canonical cell_eqType := EqType cell (EqMixin cell_eqP).
-
-Record event := Bevent {point : pt; outgoing : seq edge}.
-
-Definition event_eqb (ea eb : event) : bool :=
-  let: Bevent pta outa := ea in
-  let: Bevent ptb outb := eb in
-  (pta == ptb) && (outa == outb).
-
-Lemma event_eqP : Equality.axiom event_eqb.
-Proof.
-rewrite /Equality.axiom.
-move => [pta outa] [ptb outb] /=.
-have [/eqP <-|/eqP anb] := boolP(pta == ptb).
-  have [/eqP <-|/eqP anb] := boolP(outa == outb).
-    by apply:ReflectT.
-  by apply : ReflectF => [][].
-by apply: ReflectF=> [][].
-Qed.
-
-Canonical event_eqType := EqType event (EqMixin event_eqP).
-
-(* As in insertion sort, the add_event function assumes that event are
-  sorted in evs (lexicographically, first coordinate, then second coordinate
-  of the point.  On the other hand, no effort is made to sort the various
-  edges in each list.  *)
-Fixpoint add_event (p : pt) (e : edge) (inc : bool) (evs : seq event) :
-  seq event :=
-  match evs with
-  | nil => if inc then [:: Bevent p [::]]
-           else [:: Bevent p [:: e]]
-  | ev1 :: evs' =>
-    let p1 := point ev1 in
-    if p == p1 then
-      if inc then Bevent p1 (outgoing ev1) :: evs'
-      else Bevent p1 (e :: outgoing ev1) :: evs' else
-    if p_x p < p_x p1 then
-      if inc then
-        Bevent p [::] :: evs else
-        Bevent p [:: e] :: evs
-    else if (p_x p == p_x p1) && (p_y p < p_y p1) then
-       if inc then
-         Bevent p [::] :: evs else
-         Bevent p [:: e] :: evs else
-    ev1 :: add_event p e inc evs'
-  end.
-
-Lemma add_event_step (p : pt) (e : edge) (inc : bool) (evs : seq event) :
-  add_event p e inc evs =
-  match evs with
-  | nil => if inc then [:: Bevent p [::]]
-           else [:: Bevent p [:: e]]
-  | ev1 :: evs' =>
-    let p1 := point ev1 in
-    if p == p1 then
-      if inc then Bevent p1 (outgoing ev1) :: evs'
-      else Bevent p1 (e :: outgoing ev1) :: evs' else
-    if p_x p < p_x p1 then
-      if inc then
-        Bevent p [::] :: evs else
-        Bevent p [:: e] :: evs
-    else if (p_x p == p_x p1) && (p_y p < p_y p1) then
-       if inc then
-         Bevent p [::] :: evs else
-         Bevent p [:: e] :: evs else
-    ev1 :: add_event p e inc evs'
-  end.
-Proof. by case: evs. Qed.
-
-(* We should be able to prove that the sequence of events produced by
-  edges to events is sorted lexicographically on the coordinates of
-  the points. *)
-Fixpoint edges_to_events (s : seq edge) : seq event :=
-  match s with
-  | nil => nil
-  | e :: s' =>
-    add_event (left_pt e) e false
-      (add_event (right_pt e) e true (edges_to_events s'))
-  end.
 
 Definition valid_cell c x := valid_edge (low c) x /\ valid_edge (high c) x.
 
@@ -433,8 +355,10 @@ Definition start (events : seq event) (bottom : edge) (top : edge) :
 Section proof_environment.
 Variable bottom top : edge.
 
-Definition lexPtEv (e1 e2 : event) : bool :=
-  lexPt (point e1) (point e2).
+Notation end_edge := (end_edge bottom top).
+Notation close_out_from_event := (close_out_from_event bottom top).
+Notation close_edges_from_events :=
+  (close_edges_from_events bottom top).
 
 Definition inside_box p :=
 (~~ (p <<= bottom)  && (p <<< top) ) &&
@@ -449,30 +373,8 @@ move=>/andP[] _ /andP[] /andP[] /ltW a /ltW b /andP[] /ltW c /ltW d.
 by rewrite /valid_edge !inE=> /orP[] /eqP ->; rewrite ?(a, b, c, d).
 Qed.
 
-Definition event_close_edge ed ev : bool :=
-right_pt ed == point ev.
-
-Definition end_edge edge events : bool :=
-(edge \in [:: bottom; top]) || has (event_close_edge edge) events.
-
 Definition close_alive_edges open future_events : bool :=
 all (fun c => (end_edge (low c) future_events) && (end_edge (high c) future_events)) open.
-
-Definition close_out_from_event ev future : bool :=
-  all (fun edge => end_edge edge future) (outgoing ev).
-
-Fixpoint close_edges_from_events events : bool :=
-  match events with
-  | [::] => true
-  | ev :: future_events => close_out_from_event ev future_events && close_edges_from_events future_events
-  end.
-
-Lemma close_edges_from_events_step events :
-  close_edges_from_events events = match events with
-  | [::] => true
-  | ev :: future_events => close_out_from_event ev future_events && close_edges_from_events future_events
-  end.
-Proof. by case: events. Qed.
 
 Lemma insert_opening_all (first_cells  new_open_cells last_cells : seq cell) p :
 all p first_cells  -> all p new_open_cells  ->
@@ -496,9 +398,6 @@ Proof.
 apply insert_opening_all.
 Qed.
 
-Lemma lexPtEv_trans : transitive lexPtEv.
-Proof. by move=> e2 e1 e3; rewrite /lexPtEv; apply: lexPt_trans. Qed.
-
 Lemma open_cells_decomposition_contact_eq open pt contact high_e:
 open_cells_decomposition_contact open pt contact high_e =
 match open with
@@ -510,11 +409,6 @@ match open with
         end.
 Proof.
   by case : open.
-Qed.
-
-Lemma rcons_neq0 (A : Type) (z : A) (s : seq A) : (rcons s z) <> nil.
-Proof.
-by case : s.
 Qed.
 
 Lemma h_c_contact open_cells pt high_e contact_cells :
@@ -632,21 +526,6 @@ rewrite /open_cells_decomposition .
 move => h.
 by have  := (l_h_c_fix h).
 Qed.
-
-Definition edge_above_vert (e1 : edge) (e2 : edge) : bool :=
-let: Bedge a1 b1 p1 := e1 in
-let: Bedge a2 b2 p2 := e2 in
-let maxleft := max (p_x a1) (p_x  a2) in
-let minright := min (p_x b1) (p_x  b2) in
-match vertical_intersection_point (Bpt maxleft 0) e1 with
- | None => false
- | Some(p) =>
-  match vertical_intersection_point (Bpt minright 0) e1 with
-    |None => false
-    | Some(p2) =>
-  (p <<= e2) && (p2 <<= e2)
-  end
-end.
 
 Definition bottom_edge_seq_above (s : seq cell) (p : pt) :=
   if s is c :: _ then (p) <<= (low c) else true.
@@ -858,9 +737,6 @@ rewrite /close_cell/build_right_pts/= => /andP[] /andP[] vl vh _.
 have [p1 p1q] := (exists_point_valid vl); rewrite p1q.
 by have [p2 p2q] := (exists_point_valid vh); rewrite p2q.
 Qed.
-
-Definition cutlast (T : Type) (s : seq T) :=
-match s with | a :: s => belast a s | [::] => [::] end.
 
 Lemma closing_rest_map dummy p s :
   (0 < size s)%N ->
@@ -1283,9 +1159,6 @@ move : valid.
 by rewrite /vertical_intersection_point validl.
 Qed.
 
-Definition out_left_event ev :=
-  {in outgoing ev, forall e, left_pt e == point(ev)}.
-
 Lemma open_not_nil out low_e high_e p :
 valid_edge low_e p -> valid_edge high_e p ->
 opening_cells_aux p out low_e high_e != [::].
@@ -1316,20 +1189,6 @@ Proof.
 move=> vle vhe; apply: (open_not_nil _ vle vhe).
 (* Todo : report on strange error message if 
   apply: (open_not_nil vle vhe) is used instead. *)
-Qed.
-
-Lemma last_seq2 (T : Type) (def a : T) (s : seq T) :
-   s <> nil -> last def (a :: s) = last def s.
-Proof.
-by case: s => [// | b s] _ /=.
-Qed.
-
-Lemma outleft_event_sort e :
-  out_left_event e ->
-  forall ed, ed \in sort (@edge_below R) (outgoing e) -> left_pt ed == point e.
-Proof.
-move=> outleft ed edin; apply: outleft.
-by have <- := perm_mem (permEl (perm_sort (@edge_below _) (outgoing e))).
 Qed.
 
 Lemma higher_edge_new_cells e low_e high_e:
@@ -1388,21 +1247,6 @@ case s=> [// | c q].
 rewrite /cells_bottom_top /cells_low_e_top => /andP []/andP [] _ /eqP /= loweq _.
 rewrite /bottom_edge_seq_below  /inside_box loweq => /andP [] /andP []  /negP nsab _ _ /=.
 by apply /underWC/negP.
-Qed.
-
-
-Lemma last_in_not_nil (A : eqType) (e : A) (s : seq A) :
-s != [::] -> last e s \in s.
-Proof.
-case : s  => [//= | c q  ]  /= _.
-by rewrite mem_last.
-Qed.
-
-Lemma head_in_not_nil (A : eqType) (e : A) (s : seq A) :
-s != [::] -> head e s \in s.
-Proof.
-case : s  => [//= | c q  ]  /= _.
-by rewrite inE eqxx.
 Qed.
 
 Lemma exists_cell_aux low_e p open :
@@ -1486,16 +1330,9 @@ split; first by rewrite B.
 by rewrite C.
 Qed.
 
-Lemma close_out_from_event_sort event future :
-  close_out_from_event event future ->
-  all (end_edge^~ future) (sort (@edge_below R) (outgoing event)).
-Proof.
-move/allP=> outP; apply/allP=> x xin; apply outP.
-by have <- := perm_mem (permEl (perm_sort (@edge_below R) (outgoing event))).
-Qed.
-
 Lemma opening_cells_close event low_e high_e future :
-end_edge low_e future -> end_edge high_e future -> close_out_from_event event future ->
+end_edge low_e future -> end_edge high_e future ->
+close_out_from_event event future ->
 close_alive_edges (opening_cells (point event) (outgoing event) low_e high_e)
    future.
 Proof.
@@ -2030,19 +1867,6 @@ rewrite openeq in adjopen.
 apply : (replacing_seq_adjacent c_nnil qlnnil l_eq h_eq adjopen adjnew).
 Qed.
 
-
-Lemma middle_seq_not_nil  (A : eqType) (a b c : seq A) :
-b != [::] ->
-a ++ b ++ c != [::].
-Proof.
-rewrite -size_eq0 => /negP sizebneq0 /=.
-apply  /negP.
-rewrite -size_eq0 !size_cat /= !addn_eq0 .
-apply  /negP /andP => [] /andP .
-move => /andP [] _ /andP [] sizebeq0.
-by rewrite sizebeq0 in sizebneq0.
-Qed.
-
 Lemma step_keeps_bottom open e  :
 inside_box (point e) ->
 seq_valid open (point e) ->
@@ -2113,12 +1937,6 @@ case : last_cells op_c_d op_dec newopnnil => [/= op_c_d |c1 q1 _ op_dec /=]  .
   by case  : contact_cells c_nnil h_eq op_c_d.
 by rewrite -opentop op_dec !last_cat /= last_cat.
 Qed.
-
-Definition no_crossing'  : Prop:=
- forall e e' : edge,
- valid_edge e (left_pt e') ->
-(left_pt e' <<< e  -> e' <| e)  /\
-(~ (left_pt e' <<= e)  -> e <| e').
 
 Lemma opening_cells_last_lexePt e low_e high_e c :
 out_left_event e ->
@@ -2218,8 +2036,6 @@ have [vl vh]  : valid_edge le p /\ valid_edge he p.
              /allP/(_ _ hcin)/andP[]; rewrite le_eq he_eq.
 by have /underW := (order_edges_strict_viz_point' vh vl abs_he_under_le e2).
 Qed.
-
-Definition events_to_edges := flatten \o (map outgoing).
 
 Definition all_edges cells events :=
   cell_edges cells ++ events_to_edges events.
@@ -2512,23 +2328,6 @@ have /eqP pp1 : p == p1 by rewrite pt_eqE (on_edge_same_point onl on1) x1 eqxx.
 have /eqP pp2 : p == p2 by rewrite pt_eqE (on_edge_same_point onh on2) x2 eqxx.
 by rewrite /= -pp1 -pp2 eqxx.
 Qed.
-
-Lemma behead_cutlasteq (T : Type) a (s : seq T) :
-  (1 < size s)%N -> s = head a s :: rcons (cutlast (behead s)) (last a s).
-Proof.
-by case: s => [ | b [ | c s]] //= _; congr (_ :: _); rewrite -lastI.
-Qed.
-
-Lemma cutlast_subset (T : eqType) (s : seq T) : {subset cutlast s <= s}.
-Proof.
-rewrite /cutlast; case: s => [// | a s].
-elim: s a => [ // | b s Ih /=] a e; rewrite inE=> /orP[/eqP -> | ein].
-  by rewrite inE eqxx.
-by rewrite inE Ih ?orbT.
-Qed.
-
-Lemma behead_subset (T : eqType) (s : seq T) : {subset behead s <= s}.
-Proof. by case: s => [ | a s] // e /=; rewrite inE orbC => ->. Qed.
 
 Lemma contact_middle_at_point p cc s1 s2 c :
   adjacent_cells cc ->
@@ -3463,99 +3262,6 @@ rewrite vip1 vip2 /= => cok /andP[]/andP[] -> -> /andP[] -> rlim /=.
 by apply: (lt_le_trans rlim cok).
 Qed.
 
-Section abstract_subsets_and_partition.
-
-Variable sub : cell -> cell -> Prop.
-Variable exclude : cell -> cell -> Prop.
-
-Variable close : cell -> cell.
-
-Hypothesis excludeC : forall c1 c2, exclude c1 c2 -> exclude c2 c1.
-Hypothesis exclude_sub : 
-  forall c1 c2 c3, exclude c1 c2 -> sub c3 c1 -> exclude c3 c2.
-
-Lemma add_map (s1 : pred cell) (s2 : seq cell) :
-    all (predC s1) s2 ->
-    {in s2, forall c, sub (close c) c} ->
-    {in predU s1 (mem s2) &, forall c1 c2, c1 = c2 \/ exclude c1 c2} ->
-  {in predU s1 (mem [seq close c | c <- s2]) &,
-    forall c1 c2, c1 = c2 \/ exclude c1 c2}.
-Proof.
-have symcase : forall (s : pred cell) (s' : seq cell),
-  all (predC s) s' -> 
-  {in s', forall c, sub (close c) c} ->
-  {in predU s (mem s') &, forall c1 c2, c1 = c2 \/ exclude c1 c2} ->
-  forall c1 c2, s c1 -> c2 \in s' -> exclude c1 (close c2).
-  move=> s s' dif clsub exc c1 c2 sc1 c2s'.
-  apply/excludeC/(exclude_sub _ (clsub _ _)); last by [].
-  have := exc c2 c1; rewrite 2!inE c2s' orbT inE sc1 => /(_ isT isT).
-  by move=> -[abs | //]; have := allP dif _ c2s'; rewrite inE abs sc1.
-move=> s1nots2 clsub oldx g1 g2.
-rewrite inE => /orP[g1old | /mapP[co1 co1in g1c]];
-  rewrite inE =>  /orP[g2old |/mapP[co2 co2in g2c ]].
-- by apply: oldx; rewrite inE ?g1old ?g2old.
-- by right; rewrite g2c; apply: (symcase _ _ s1nots2 clsub oldx).
-- by right; rewrite g1c; apply excludeC; apply: (symcase _ _ s1nots2 clsub oldx).
-have [/eqP co1co2 | co1nco2] := boolP(co1 == co2).
-  by left; rewrite g1c g2c co1co2.
-right; rewrite g1c; apply/(exclude_sub _ (clsub _ _)); last by [].
-rewrite g2c; apply/excludeC/(exclude_sub _ (clsub _ _)); last by [].
-have := oldx co2 co1; rewrite !inE co2in co1in !orbT=> /(_ isT isT).
-by case=> [abs | //]; case/negP: co1nco2; rewrite abs eqxx.
-Qed.
-
-Lemma add_new (s s2 : pred cell) :
-  {in s &, forall c1 c2, c1 = c2 \/ exclude c1 c2} ->
-  {in s & s2, forall c1 c2, exclude c1 c2} ->
-  {in s2 &, forall c1 c2, c1 = c2 \/ exclude c1 c2} ->
-  {in predU s s2 &, forall c1 c2, c1 = c2 \/ exclude c1 c2}.
-Proof.
-move=> oldx bipart newx c1 c2.
-rewrite inE=> /orP[c1old | c1new] /orP[c2old | c2new].
-- by apply: oldx.
-- by right; apply: bipart.
-- by right; apply/excludeC/bipart.
-by apply: newx.
-Qed.
-
-End abstract_subsets_and_partition.
-
-Lemma out_left_event_on e :
-  out_left_event e -> {in outgoing e, forall g, point e === g}.
-Proof.
-move=> outs g gin; rewrite -(eqP (outs _ gin)); apply: left_on_edge.
-Qed.
-
-Lemma sorted_outgoing le he e : 
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  point e >>> le ->
-  point e <<< he ->
-  out_left_event e ->
-  {in le :: he :: outgoing e &, no_crossing R} ->
-  sorted (@edge_below R) (le :: sort (@edge_below R) (outgoing e)).
-Proof.
- set ctxt := (le :: he :: _); move=> vl hl above under outs noc.
-have lein : le \in ctxt by rewrite /ctxt inE eqxx.
-have hein : he \in ctxt by rewrite /ctxt !inE eqxx ?orbT.
-have osub : {subset outgoing e <= ctxt}.
-  by move=> g gin; rewrite /ctxt !inE gin ?orbT.
-have [ls us noc''] :=
-   outgoing_conditions above under lein hein vl hl osub noc outs.
-have /sort_sorted_in tmp : {in le :: outgoing e &, total (@edge_below R)}.
-  move=> e1 e2; rewrite !inE =>/orP[/eqP -> |e1in ]/orP[/eqP -> |e2in].
-  - by rewrite edge_below_refl.
-  - by rewrite ls.
-  - by rewrite ls ?orbT.
-  by apply/orP/noc''.
-rewrite /=; case oeq : (sort (@edge_below R) (outgoing e)) => [// | g1 gs] /=.
-rewrite ls; last first.
-  have <- := perm_mem (permEl (perm_sort (@edge_below R) (outgoing e))).
-  by rewrite oeq inE eqxx.
-rewrite -[X in is_true X]/(sorted _ (g1 :: gs)) -oeq tmp //.
-by apply/allP=> x xin /=; apply/orP; right; exact: xin.
-Qed.
-
 Definition any_edge (b : bool) (c : cell) : edge :=
   if b then low c else high c.
 
@@ -3625,7 +3331,7 @@ rewrite (pvertE vl) (pvertE vh) => /(_ _ _ erefl erefl rfb) /= => -> /=.
 by move: Ih; rewrite s_eq; apply; rewrite -s_eq.
 Qed.
 
-Definition edge_side_prop ev g :=
+Definition edge_side_prop (ev : event) (g : edge) :=
         if valid_edge g (point ev) then
           if pvert_y (point ev) g < p_y (point ev) then
              p_x (point ev) < p_x (right_pt g)
@@ -4300,7 +4006,7 @@ Lemma step_keeps_edge_side ev open closed open' closed' events :
   seq_valid open (point ev) ->
   close_edges_from_events (ev :: events) ->
   close_alive_edges open' events ->
-  path lexPtEv ev events ->
+  path (@lexPtEv _) ev events ->
   {in cell_edges open ++ outgoing ev &, no_crossing R} ->
   edge_side (ev :: events) open ->
   edge_side events open'.
@@ -4963,11 +4669,6 @@ Definition non_inner (g : edge) (p : pt) :=
 Definition open_non_inner_event (open : seq cell) (e : event) :=
   {in open, forall c, non_inner (high c) (point e)}.
 
-Definition events_non_inner (evs : seq event) :=
-  {in evs &,
-    forall ev1 ev2,
-    {in outgoing ev1, forall g, non_inner g (point ev2)}}.
-
 Lemma open_cells_decomposition_point_on open p fc cc lc le he c:
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -5000,7 +4701,7 @@ by rewrite hl.
 Qed.
 
 Lemma step_keeps_left_pt_open_lex e future_events open closed open2 closed2 :
-  sorted lexPtEv (e :: future_events) ->
+  sorted (@lexPtEv _) (e :: future_events) ->
   cells_bottom_top open ->
   adjacent_cells open ->
   inside_box (point e) ->
@@ -5026,7 +4727,7 @@ move=> /opening_cells_subset /andP[] _; rewrite inE => /orP[/eqP -> | ].
   rewrite -heq; apply: lexp; last by [].
   by rewrite ocd ccq !mem_cat heceq mem_last orbT.
 move=> /out_e/eqP ->.
-move: (sevs); rewrite /= (path_sortedE lexPtEv_trans)=> /andP[] /allP + _.
+move: (sevs); rewrite /= (path_sortedE (@lexPtEv_trans _))=> /andP[] /allP + _.
 by apply.
 Qed.
 
@@ -5199,220 +4900,6 @@ Qed.
 
 End proof_environment.
 
-Lemma add_event_preserve_first p e inc ev evs :
-  (0 < size (add_event p e inc (ev :: evs)))%N /\
-  (point (head ev (add_event p e inc (ev :: evs))) = p \/
-   point (head ev (add_event p e inc (ev :: evs))) = point ev).
-Proof.
-rewrite /=.
-case: ev => [p1 o1].
-have [/eqP -> | /eqP pnp1] := boolP(p == p1).
-  by split; case: inc => //=; left.
-have [pltp1 /= | pnltp1] := boolP(p_x p < p_x p1).
-  split.
-    by case: inc.
-  by case:inc; left.
-have [/eqP pxqpx1 /= | pxnpx1 /=] := boolP (p_x p == p_x p1).
-  have [/eqP pyltpy1 /= | pynltpy1 /=] := boolP (p_y p < p_y p1).
-    by case:inc; (split;[ | left]).
-  by split;[ | right].
-by split;[ | right].
-Qed.
-
-Lemma add_event_sort p e inc evs : sorted lexPtEv evs ->
-  sorted lexPtEv (add_event p e inc evs).
-Proof.
-elim: evs => [ | ev1 evs Ih /=].
-  by case: inc.
-move=> path_evs.
-have [/eqP pp1 | /eqP pnp1] := boolP(p == point ev1).
-  case: inc Ih.
-    by case: evs path_evs => [ | ev2 evs'].
-  by case: evs path_evs => [ | ev2 evs'].
-move/path_sorted/Ih: (path_evs) {Ih} => Ih.
-have [ pltp1 | pnltp1] /= := boolP(p_x p < p_x (point ev1)).
-  by case: inc {Ih}=> /=; (apply/andP; split=> //); rewrite /lexPtEv /lexPt /= pltp1.
-have [/eqP pp1 | pnp1'] /= := boolP (p_x p == p_x (point ev1)).
-  have pyneq : p_y p != p_y (point ev1).
-    apply/eqP=> pp1'; case pnp1.
-    move: p (point ev1) {pnp1 Ih pnltp1} pp1 pp1'.
-    by move=> [a b][c d] /= -> ->.
-  have [ pltp1 | pnltp1'] /= := boolP(p_y p < p_y (point ev1)).
-    by case: (inc); rewrite /= path_evs andbT /lexPtEv /lexPt /= pp1 eqxx pltp1 orbT.
-  have p1ltp : p_y (point ev1) < p_y p.
-    by rewrite ltNge le_eqVlt negb_or pyneq pnltp1'.
-  case evseq : evs => [ | [p2 o2] evs2].
-    by case: (inc)=> /=; rewrite /lexPtEv /lexPt /= pp1 eqxx p1ltp orbT.
-  rewrite -evseq.
-  case aeq : (add_event p e inc evs) => [ | e' evs3].
-    have := add_event_preserve_first p e inc
-           {| point := p2; outgoing := o2 |} evs2.
-      by rewrite -evseq aeq => [[]].
-  case: (add_event_preserve_first p e inc
-         {| point := p2; outgoing := o2 |} evs2)=> _.
-  rewrite -evseq aeq /= => [] [eqp | eqp2].
-    apply/andP; split; last by move: Ih; rewrite aeq.
-    by rewrite /lexPtEv /lexPt eqp pp1 eqxx p1ltp orbT.
-  apply/andP; split; last by move: Ih; rewrite aeq.
-  move: path_evs; rewrite evseq /= andbC => /andP[] _.
-  by rewrite /lexPtEv /= eqp2.
-have p1ltp : p_x (point ev1) < p_x p.
-  by rewrite ltNge le_eqVlt negb_or pnp1' pnltp1.
-case evseq : evs => [ | [p2 o2] evs2].
-  by case: (inc)=> /=; rewrite /lexPtEv /lexPt /= p1ltp.
-case aeq : (add_event p e inc evs) => [ | e' evs3].
-  case: (add_event_preserve_first p e inc
-       {| point := p2; outgoing := o2 |} evs2).
-  by rewrite -evseq aeq.
-case: (add_event_preserve_first p e inc
-     {| point := p2; outgoing := o2 |} evs2) => _.
-have path_e'evs3 : path lexPtEv e' evs3 by move: Ih; rewrite aeq.
-rewrite -evseq aeq /= => [][e'p | e'p2]; rewrite path_e'evs3 andbT.
-  by rewrite /lexPtEv /lexPt e'p p1ltp.
-by move: path_evs; rewrite evseq /= andbC /lexPtEv e'p2=> /andP[].
-Qed.
-
-Lemma sorted_edges_to_events s :
-   sorted (@lexPt R) [seq point x | x <- edges_to_events s].
-Proof.
-have /mono_sorted -> : {mono point : x y / lexPtEv x y >-> lexPt x y} by [].
-by elim: s => [ | g s Ih] //=; do 2 apply: add_event_sort.
-Qed.
-
-Lemma add_event_preserve_ends bottom top p e inc evs ed :
-  end_edge bottom top ed evs ->
-  end_edge bottom top ed (add_event p e inc evs).
-Proof.
-have [excp | norm ] := boolP(ed \in [:: bottom; top]).
-  by rewrite /end_edge excp.
-rewrite /end_edge (negbTE norm) /=.
-elim: evs => [// | ev evs Ih] /= /orP[|];
-  repeat (case: ifP => _);
-   rewrite /=/event_close_edge /=; try (move=> -> //); rewrite ?orbT //.
-by move=> ?; rewrite Ih ?orbT.
-Qed.
-
-Lemma add_event_inc bottom top evs ed :
-  end_edge bottom top ed (add_event (right_pt ed) ed true evs).
-Proof.
-elim: evs => [ | ev evs Ih] /=.
-  by rewrite /end_edge /= /event_close_edge /= eqxx orbT.
-case: ifP=> [/eqP <- | ].
-  by rewrite /end_edge /= /event_close_edge /= eqxx orbT.
-repeat (case: ifP=> _); rewrite /end_edge/=/event_close_edge ?eqxx ?orbT //.
-move=> _; move: Ih; rewrite /end_edge/=/event_close_edge => /orP [] -> //.
-by rewrite !orbT.
-Qed.
-
-Lemma close_edges_from_events_inc bottom top evs p ed :
- close_edges_from_events bottom top evs ->
- close_edges_from_events bottom top (add_event p ed true evs).
-Proof.
-elim: evs => /= [ // | ev evs Ih /andP [clev clevs]].
-move: Ih=> /(_ clevs) Ih.
-case: ifP=> _ /=; first by rewrite clevs andbT; exact clev.
-case: ifP=> _ /=; first by rewrite clevs andbT; exact clev.
-case: ifP=> _ /=; first by rewrite clevs andbT; exact clev.
-rewrite Ih andbT.
-apply/allP=> ed' edin'.
-move: (allP clev ed' edin')=> /orP[]; first by rewrite /end_edge => ->.
-by move=> it; rewrite add_event_preserve_ends // /end_edge it ?orbT.
-Qed.
-
-Lemma add_edge_close_edges_from_events bottom top evs ed :
-  close_edges_from_events bottom top evs ->
-  close_edges_from_events bottom top
-    (add_event (left_pt ed) ed false (add_event (right_pt ed) ed true evs)).
-Proof.
-have no_eq : left_pt ed == right_pt ed = false.
-    by apply/negP=> /eqP abs_eq; have := edge_cond ed; rewrite abs_eq ltxx.
-elim: evs => [/= _ | ev evs Ih].
-  rewrite no_eq edge_cond /=.
-  by rewrite /close_out_from_event /= /end_edge/=/event_close_edge eqxx orbT.
-move=> tmp; rewrite /= in tmp; case/andP: tmp=> [clev clevs].
-move: Ih=> /(_ clevs) Ih.
-have : end_edge bottom top ed (add_event (right_pt ed) ed true (ev :: evs)).
-  by apply: add_event_inc.
-rewrite [add_event (right_pt _) _ _ _]add_event_step.
-lazy zeta.
-case: ifP=> [/eqP <- /= | cnd1].
-  rewrite no_eq edge_cond /=.
-  rewrite /close_out_from_event /= /end_edge/=/event_close_edge.
-  rewrite eqxx orbT /= clevs andbT=> _; exact: clev.
-case: ifP=> cnd2 /=.
-  rewrite no_eq edge_cond /=.
-  rewrite /close_out_from_event /= => -> /=; rewrite clevs andbT; exact: clev.
-case: ifP=> cnd3 ended /=.
-  rewrite no_eq edge_cond.
-  rewrite close_edges_from_events_step.
-  apply/andP; split; last by rewrite /= clev clevs.
-  by rewrite /close_out_from_event/= ended.
-case: ifP=> cnd4.
-  rewrite close_edges_from_events_step /close_out_from_event/=.
-  rewrite close_edges_from_events_inc ?andbT ?clevs //.
-  apply/andP; split; last first.
-    apply/allP=> x xin.
-    move/allP: clev=> /(_ x xin) closed.
-    by rewrite add_event_preserve_ends ?orbT.
-  by rewrite add_event_inc.
-case: ifP=> cnd5.
-  rewrite close_edges_from_events_step; apply/andP; split.
-    by rewrite /close_out_from_event /= ended.
-  rewrite close_edges_from_events_step; apply/andP; split.
-    apply/allP=> x xin; apply: add_event_preserve_ends.
-    by move/allP: clev=> /(_ x xin).
-  by apply: close_edges_from_events_inc.
-case: ifP=> cnd6.
-  rewrite close_edges_from_events_step; apply/andP; split.
-    by rewrite /close_out_from_event /= ended.
-  rewrite close_edges_from_events_step; apply/andP; split.
-    apply/allP=> x xin; apply: add_event_preserve_ends.
-    by move/allP: clev=> /(_ x xin).
-  by apply: close_edges_from_events_inc.
-rewrite close_edges_from_events_step; apply/andP; split.
-  rewrite /close_out_from_event.
-  apply/allP=> x xin.
-  do 2 apply:add_event_preserve_ends.
-  by move/allP: clev; apply.
-by apply: Ih.
-Qed.
-
-Lemma edges_to_events_wf (bottom top : edge)(s : seq edge) :
-  close_edges_from_events bottom top (edges_to_events s).
-Proof.
-elim : s => [ // | e s Ih /=].
-by apply: add_edge_close_edges_from_events.
-Qed.
-
-Lemma edges_to_events_no_loss (s : seq edge) :
-  perm_eq s (events_to_edges (edges_to_events s)).
-Proof.
-have add_inc evs p ed:
-  perm_eq (events_to_edges evs)
-    (events_to_edges (add_event p ed true evs)).
-  elim: evs => [/= | ev evs Ih]; first by apply: perm_refl.
-  rewrite /events_to_edges /=.
-  by repeat (case: ifP=> _ //=); rewrite perm_cat2l Ih.
-have add_out evs p ed:
-  perm_eq (ed :: events_to_edges evs)
-     (events_to_edges (add_event p ed false evs)).
-  elim: evs => [/= | ev evs]; first by apply: perm_refl.
-  rewrite /events_to_edges /= => Ih.
-  repeat (case: ifP => //=); move => ? ? ?.
-  rewrite -[ed :: outgoing ev ++ _]/([:: ed] ++ outgoing ev ++ _).
-  by rewrite perm_catCA perm_cat2l Ih.
-elim: s => /= [// | ed s Ih]; rewrite -(perm_cons ed) in Ih.
-apply/(perm_trans Ih)/(perm_trans _ (add_out _ (left_pt ed) _)).
-by rewrite perm_cons; apply: add_inc.
-Qed.
-
-Lemma edges_to_events_no_crossing s :
-  {in s &, no_crossing R} ->
-  {in events_to_edges (edges_to_events s) &, no_crossing R}.
-Proof.
-by apply: sub_in2=> x; rewrite (perm_mem (edges_to_events_no_loss s)).
-Qed.
-
 Lemma step_sub_open_edges bottom top open closed open' closed' ev:
   cells_bottom_top bottom top open ->
   adjacent_cells open ->
@@ -5451,84 +4938,6 @@ have:= opening_cells_aux_subset cin.
 rewrite !inE => /andP[] _ /orP[/eqP -> | +].
   by rewrite map_f ?orbT //.
 by rewrite (perm_mem (permEl (perm_sort _ _))) => ->; rewrite ?orbT.
-Qed.
-
-Lemma out_left_add_event p g b evs:
-    p = (if b then right_pt g else left_pt g) ->
-    {in evs, forall ev, out_left_event ev} ->
-    {in add_event p g b evs, forall ev, out_left_event ev}.
-Proof.
-move=> ->.
-elim: evs => [ | ev evs Ih] acc.
-  move=> /= ev; case:b; rewrite inE => /eqP -> e //=.
-  by rewrite inE => /eqP ->; rewrite eqxx.
-rewrite /=; case: ifP=> [/eqP pev | ] ev'.
-  case bval: (b); rewrite /= inE => /orP[/eqP ev'ev | ev'inevs].
-  - have -> : ev' = ev by rewrite ev'ev; case: (ev).
-    by apply: acc; rewrite inE eqxx.
-  - by apply: acc; rewrite inE ev'inevs orbT.
-  - move=> g2; rewrite ev'ev /= inE=> /orP[/eqP -> | ].
-    * by rewrite -pev bval eqxx.
-    by apply: acc; rewrite inE eqxx.
-  by apply: acc; rewrite inE ev'inevs orbT.
-case: ifP => [athead | later].
-  case bval: (b) => ev2; rewrite inE => /orP[].
-  - by move/eqP=> -> g2.
-  - by apply: acc.
-  - by move/eqP=> -> g2 /=; rewrite inE=> /eqP ->; rewrite eqxx.
-  by apply: acc.
-case: ifP => [athead' | later'].
-  case bval: (b) => ev2; rewrite inE => /orP[].
-  - by move/eqP=> -> g2.
-  - by apply: acc.
-  - by move/eqP=> -> g2 /=; rewrite inE=> /eqP ->; rewrite eqxx.
-  by apply: acc.
-move=> ev2; rewrite inE=> /orP[/eqP -> | ev2intl].
-  by apply: acc; rewrite inE eqxx.
-apply: Ih=> //.
-by move=> ev3 ev3in; apply: acc; rewrite inE ev3in orbT.
-Qed.
-
-Lemma out_left_edges_to_events s:
-  {in edges_to_events s, forall ev, out_left_event ev}.
-Proof.
-elim: s => [// | g s Ih] /=.
-have Ih' := @out_left_add_event (right_pt g) g true _ erefl Ih.
-by have Ih'' := @out_left_add_event (left_pt g) g false _ erefl Ih'.
-Qed.
-
-Lemma add_event_point_subset (s : mem_pred pt) p g b evs :
-  {subset [seq point ev | ev <- evs] <= s} ->
-  p \in s ->
-  {subset [seq point ev | ev <- add_event p g b evs] <= s}.
-Proof.
-elim: evs => [ | ev evs Ih].
-  by move=> _ pin /=; case: ifP => /= bval p'; rewrite inE=> /eqP ->.
-move=> cnd pin; have cnd' : {subset [seq point ev' | ev' <- evs] <= s}.
-  by move=> p' p'in; apply: cnd; rewrite inE p'in orbT.
-have Ih' := Ih cnd' pin; clear Ih.
-have evin : point ev \in s by apply: cnd; rewrite !inE eqxx.
-rewrite /=; (repeat (case: ifP=> _))=> p'; rewrite /= !inE;
-  (repeat(move=>/orP[])); try solve[move=> /eqP -> // | by apply: cnd'].
-apply: Ih'.
-Qed.
-
-Lemma edges_to_events_subset (s : mem_pred pt) (gs : seq edge) :
-  {subset [seq left_pt g | g <- gs] <= s} ->
-  {subset [seq right_pt g | g <- gs] <= s} ->
-  {subset [seq point ev | ev <- edges_to_events gs] <= s}.
-Proof.
-elim: gs => [// | g gs Ih].
-rewrite /=.
-move=> cndl cndr.
-have cndl' : {subset [seq left_pt g | g <- gs] <= s}.
-  by move=> x xin; apply: cndl; rewrite inE xin orbT.
-have cndr' : {subset [seq right_pt g | g <- gs] <= s}.
-  by move=> x xin; apply: cndr; rewrite inE xin orbT.
-have cndleft : left_pt g \in s by apply: cndl; rewrite inE eqxx.
-have cndright : right_pt g \in s by apply: cndr; rewrite inE eqxx.
-have Ih' := Ih cndl' cndr'; clear Ih.
-by apply: add_event_point_subset;[apply: add_event_point_subset | ].
 Qed.
 
 Lemma inside_box_left_ptsP bottom top p :
@@ -5657,7 +5066,7 @@ have svalr : evs' != [::] ->
     rewrite evs'eq => e'; rewrite inE => /orP[/eqP -> | e'q ].
       by rewrite lexePt_eqVlt eqxx.
     move: sortev=> /=; rewrite evs'eq=> /path_sorted/=; rewrite path_sortedE.
-      by move=>/andP[]/allP/(_ (point e') (map_f point e'q))/lexPtW.
+      by move=>/andP[]/allP/(_ (point e') (map_f (@point _) e'q))/lexPtW.
     exact: lexPt_trans.
   have := step_keeps_valid inbox_a inbox_e eva oute' rfo cbtom adj sval' clae
             clev limra stepeq.

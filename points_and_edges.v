@@ -589,6 +589,12 @@ Qed.
 
 Definition no_crossing := forall e1 e2, below_alt e1 e2.
 
+Definition no_crossing'  : Prop:=
+ forall e e' : edge,
+ valid_edge e (left_pt e') ->
+(left_pt e' <<< e  -> e' <| e)  /\
+(~ (left_pt e' <<= e)  -> e <| e').
+
 Lemma left_on_edge e :
 (left_pt e) === e.
 Proof.
@@ -2606,6 +2612,9 @@ have he_g' : pvert_y r he <= pvert_y r g'.
   by rewrite (path_sortedE tr) => /andP[] /allP/(_ _ g'in) /=.
 by apply: lt_le_trans he_g'.
 Qed.
+
+Definition non_inner (g : edge) (p : pt) :=
+  p === g -> p = left_pt g \/ p = right_pt g.
 
 End working_context.
 

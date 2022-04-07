@@ -1,9 +1,9 @@
 -R . cellDecomposition
+-arg -w -arg -ambiguous-paths
+-arg -w -arg -notation-overridden
 math_comp_complements.v
 points_and_edges.v
+events.v
 cells.v
 trials.v
 draw.v
-
--arg -w -arg -ambiguous-paths
--arg -w -arg -notation-overridden
