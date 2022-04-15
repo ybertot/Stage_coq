@@ -1479,6 +1479,19 @@ Proof.
 by rewrite /lexePt=> /orP[/ltW | /andP [/eqP -> _]].
 Qed.
 
+Lemma on_edge_lexePt_left_pt (p : pt) g :
+  p === g -> lexePt (left_pt g) p.
+Proof.
+move=> on.
+have : p_x (left_pt g) <= p_x p by move: on=> /andP[] _ /andP[].
+rewrite le_eqVlt=> /orP[/eqP/esym /[dup] samex' /eqP samex | xlt ].
+ have/eqP samey := on_edge_same_point on (left_on_edge _) samex.
+  have -> : p = left_pt g.
+    by apply/eqP; rewrite pt_eqE samex' samey !eqxx.
+  by apply: lexePt_refl.
+by rewrite /lexePt xlt.
+Qed.
+
 Lemma trans_edge_below_out p e1 e2 e3 :
   left_pt e1 = p -> left_pt e2 = p -> left_pt e3 = p ->
   e1 <| e2 -> e2 <| e3 -> e1 <| e3.
