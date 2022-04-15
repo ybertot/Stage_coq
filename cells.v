@@ -5907,6 +5907,9 @@ have : lexPtEv ev ev1 by exact: (allP lexv' _ ev1in).
 by move=>/orP[ | /andP[] + _]; rewrite ?le_eqVlt=> ->; rewrite ?orbT.
 Qed.
 
+Lemma two_arg_thm x y : odd x -> odd y -> ~~odd (x + y).
+Proof. by move=> ox oy; rewrite oddD ox oy. Qed.
+
 Lemma start_edge_covering bottom top s (evs : seq event) open closed :
   bottom <| top ->
   open_cell_side_limit_ok (start_open_cell bottom top) ->
@@ -6035,26 +6038,14 @@ have btm_left' : {in [seq point e | e <- evs], forall p, bottom_left_cells_lex o
     step_keeps_left_pts_inf inbox_e oute rfo sval adj cbtom clae clev
            noc1 btm_left_e stepeq.
   by move=> p /mapP [ev' ev'in ->]; apply/btm_left2/lexev.
-have ninnere : open_non_inner_event op e.
-  rewrite /open_non_inner_event.
-  move=> c cin; apply: nonin.
-    by apply: opsub; rewrite mem_cat map_f ?orbT.
-  by rewrite inE eqxx.
 have inj' : {in op'&, injective high}.
   have unie : uniq (outgoing e).
     by move: uni; rewrite /= cat_uniq => /andP[].
-  have hlex := bottom_left_lex_to_high cbtom adj rfo allok inbox_e btm_left_e.
-  by apply : (step_keeps_injective_high cbtom _ _ _ _ _ unie hlex stepeq inj).
-have {}Ih:= (Ih op' cl' cbtom' adj' rfo' clae' allin' sval' opok' evin' lexev1
-         evsub' out_evs' uni' clev' nonin' opsub' btm_left' inj' scaneq ).
-have step_edge_covering:=
-   (step_keeps_edge_covering allok btm_left_e ninnere inj cbtom adj inbox_e
-       sval rfo oute _ stepeq).
-move=> g [gc | gev].
-  by apply: Ih; left; apply: step_edge_covering; left.
-move: gev; rewrite mem_cat=> /orP[gout | gev].
-  by apply: Ih; left; apply: step_edge_covering; right.
-by apply: Ih; right.
-Qed.
+(* I I uncomment these two lines the bug disappears.
+have odd3 : odd 3 by [].
+  have := two_arg_thm odd3. *)
 
-End working_environment.
+  have := step_keeps_injective_high cbtom adj inbox_e sval rfo oute unie _
+    stepeq inj.
+(* the bug appears at the following line. *)
+have := bottom_left_lex_to_high cbtom adj rfo allok inbox_e btm_left_e.
