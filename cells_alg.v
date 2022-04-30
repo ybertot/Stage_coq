@@ -2246,59 +2246,19 @@ Lemma closing_cells_side_limit' e cc :
   adjacent_cells cc ->
   all open_cell_side_limit_ok cc ->
   all (contains_point e) cc ->
+  e >>> low (head dummy_cell cc) ->
+  e <<< high (last dummy_cell cc) ->
   all (@closed_cell_side_limit_ok _) (closing_cells e cc).
 Proof.
-move=> rf val adj oks ctps.
-have [large | small] := boolP (1 < size cc)%N.
-  have iq := closing_cells_map large val.
-  have ccdq := behead_cutlasteq dummy_cell large.
- have hin : head dummy_cell cc \in cc.
-   by apply/head_in_not_nil/eqP=> abs; move: large; rewrite abs.
- have lin : last dummy_cell cc \in cc.
-   by apply/last_in_not_nil/eqP=> abs; move: large; rewrite abs.
-  have ehh : e === high (head dummy_cell cc).
-    move: ccdq; set w := rcons _ _ => ccdq.
-    have wn0 : w != nil by rewrite /w; case: (cutlast _).
-    have := contact_middle_at_point adj val ctps=> /(_ nil w _ ccdq)[] _.
-    by apply.
-  have ell : e === low (last dummy_cell cc).
-    move:ccdq; rewrite -cats1 -cat_cons; set w := (X in X ++ _) => ccdq.
-    have := contact_middle_at_point adj val ctps=> /(_ w nil _ ccdq)[] + _.
-    by apply.
-  apply/allP=> c; rewrite iq inE=> /orP[/eqP cc0| ].
-    rewrite cc0; apply: close_cell_ok => //.
-    - by apply: (allP ctps).
-    - by move: (allP val _ hin)=> /andP[].
-    - by move: (allP val _ hin)=> /andP[].
-    by apply: (allP oks).
-  rewrite -cats1 mem_cat=> /orP[]; last first.
-    rewrite inE => /eqP ->; apply: close_cell_ok => //.
-    - by apply: (allP ctps).
-    - by move: (allP val _ lin)=> /andP[].
-    - by move: (allP val _ lin)=> /andP[].
-    by apply: (allP oks).
-  move=> /mapP[c' cin ->].
-  have [s1 [s2 Ps1s2]] := mem_seq_split cin.
-  move: ccdq; rewrite Ps1s2.
-  rewrite -cats1 -2!(cat_cons (head _ _)) -catA (cat_cons c') cats1.
-  set w1 := (head _ _ :: _); set w2 := (rcons _ _)=> ccdq'.
-  have c'in2 : c' \in cc by rewrite ccdq' !(inE, mem_cat) eqxx ?orbT.
-  have [w1n0 w2n0] : w1 != nil /\ w2 != nil by rewrite // /w2; case: (s2).
-  have [el' eh'] : e === low c' /\ e === high c'.
-    have := contact_middle_at_point adj val ctps ccdq'.
-    by move=> -[]/(_ w1n0) + /(_ w2n0).
-  apply: close_cell_ok => //.
-  - by apply: (allP ctps); rewrite behead_subset // cutlast_subset.
-  - by move: (allP val _ c'in2)=>/andP[].
-  - by move: (allP val _ c'in2)=>/andP[].
-  by apply: (allP oks); rewrite behead_subset // cutlast_subset.
-case sq : cc small => [ | c [ | ? ?]] // _.
-rewrite closing_cell1; last by rewrite -sq.
-rewrite allcons andbT; apply: close_cell_ok => //.
-- by move: ctps; rewrite sq /= andbT.
-- by move: val; rewrite sq /= andbT=>/andP[] .
-- by move: val; rewrite sq /= andbT=>/andP[] .
-by move: oks; rewrite sq /= andbT.
+move=> rf val adj oks ctps abovelow belowhigh.
+rewrite closing_cells_single_map //.
+rewrite all_map.
+apply/allP=> //= c cin.
+have vlc : valid_edge (low c) e by have := (allP val c cin) => /andP[].
+have vhc : valid_edge (high c) e by have := (allP val c cin) => /andP[].
+apply: close_cell_ok=> //.
+  by apply: (allP ctps).
+by apply: (allP oks).
 Qed.
 
 Lemma open_limit_close_cell v p c :
