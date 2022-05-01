@@ -543,6 +543,16 @@ by move => /orP [/eqP eq |/eqP eq ];
 rewrite -eq lexx ?andbT /= {eq} ltW // ; case : e0 .
 Qed.
 
+Lemma valid_edge_left g : valid_edge g (left_pt g).
+Proof.
+by apply: valid_edge_extremities; rewrite eqxx.
+Qed.
+
+Lemma valid_edge_right g : valid_edge g (right_pt g).
+Proof.
+by apply: valid_edge_extremities; rewrite eqxx orbT.
+Qed.
+
 Definition point_on_edge (p: pt) (e :edge) : bool :=
   (pue_formula p (left_pt e) (right_pt e) == 0) && (valid_edge e p).
 
