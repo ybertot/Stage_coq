@@ -1100,12 +1100,12 @@ rewrite open_eq in val_op_e.
 have exi := exists_cell cbtop adjop insboxe.
 move : cbtop.
 rewrite /cells_bottom_top /cells_low_e_top open_eq => /andP [] /andP [] _ /eqP openbottom /eqP opentop.
-have := (open_not_nil (sort (@edge_below R) (outgoing e)) lowv highv).
-case op_new : (opening_cells_aux (point e) _ low_e high_e)
-   => [//=| cnew q'' /=] _.
-have := higher_lower_equality outlefte op_dec op_new exi lowv highv .
-rewrite /= => [][] low_eq [] high_eq ccnnil.
-have lhc := l_h_c_decomposition op_dec exi .
+case oca_eq : (opening_cells_aux _ _ _ _) => [so co].
+have op_new : opening_cells (point e) (outgoing e) low_e high_e = rcons so co.
+  by rewrite /opening_cells oca_eq.
+have := higher_lower_equality outlefte op_dec op_new exi lowv highv.
+rewrite /= last_rcons => - [] low_eq [] high_eq ccnnil.
+have lhc := l_h_c_decomposition op_dec exi.
 case : cc op_dec open_eq val_op_e openbottom opentop low_eq high_eq ccnnil lhc => [//|c q  /=] op_dec open_eq val_op_e openbottom opentop low_eq high_eq ccnnil lhc.
 have close_fc: close_alive_edges fc future_events.
   suff/head_not_end : close_alive_edges fc (e :: future_events).
@@ -1116,12 +1116,12 @@ have close_lc: close_alive_edges lc future_events.
   suff/head_not_end : close_alive_edges lc (e :: future_events).
     by apply=> c0 cin; apply: dec_not_end; rewrite cin orbT.
   apply/allP=> c0 cin; apply (allP close_ed); rewrite open_eq.
-  by rewrite mem_cat -cat_cons mem_cat cin !orbT.
+  by rewrite mem_cat inE mem_cat cin !orbT.
 have endlowe: end_edge low_e future_events.
-  case : fc op_dec open_eq val_op_e openbottom opentop close_fc dec_not_end lhc  => [/=|c' q' ] op_dec open_eq val_op_e openbottom opentop close_fc dec_not_end .
-    rewrite /end_edge !inE openbottom => [][] /eqP <- _.
-    by rewrite eqxx.
-  move => [] /eqP <- _.
+  case : fc op_dec open_eq val_op_e openbottom opentop close_fc dec_not_end lhc
+    => [/=|c' q' ] op_dec open_eq val_op_e openbottom opentop close_fc
+       dec_not_end [] /eqP <- _.
+    by rewrite /end_edge !inE openbottom eqxx.
   move : adjop.
   rewrite open_eq -adjacent_cut //.
   rewrite low_eq.
@@ -1143,8 +1143,8 @@ have endhighe: end_edge high_e future_events.
   by move: (allP close_lc (c') cin) => /andP [].
 move : close_ev.
 rewrite /= => /andP [] cle _.
-have close_new:= opening_cells_close endlowe endhighe cle.
-rewrite /opening_cells op_new in close_new.
+have close_new:= opening_cells_close lowv highv outlefte endlowe endhighe cle.
+rewrite op_new in close_new.
 apply (insert_opening_closeness close_fc close_new close_lc).
 Qed.
 
@@ -1171,7 +1171,7 @@ rewrite /step.
 case op_dec : (open_cells_decomposition open (point e)) => [[[[fc cc] lc] low_e] high_e] /=.
 have exi := exists_cell cbtop adjop insboxe.
 have lhc := l_h_c_decomposition op_dec exi .
-rewrite /opening_cells => -[] open2eq _.
+move=> -[] open2eq _.
 rewrite -open2eq in close_all.
 rewrite -open2eq{open2eq}.
 have dec_not_end :=
@@ -1182,14 +1182,15 @@ have := (l_h_valid cbtop adjop  insboxe val_op_e op_dec) => [][] lowv highv.
 rewrite open_eq in val_op_e.
 move : cbtop.
 rewrite /cells_bottom_top /cells_low_e_top open_eq => /andP [] /andP [] _ /eqP openbottom /eqP opentop.
-have := (open_not_nil (sort (@edge_below R) (outgoing e)) lowv highv).
-case op_new : (opening_cells_aux (point e) _ low_e high_e)
-   => [//= | cnew q'' /=] _.
+rewrite /opening_cells.
+case oca_eq : (opening_cells_aux _ _ _ _) => [so co].
+have op_new : opening_cells (point e) (outgoing e) low_e high_e = rcons so co.
+  by rewrite /opening_cells oca_eq.
 have := higher_lower_equality outlefte op_dec op_new exi lowv highv .
-rewrite /= => [][] low_eq [] high_eq ccnnil.
+rewrite /= => - [] low_eq [] high_eq ccnnil.
 
 case : cc op_dec open_eq val_op_e openbottom opentop low_eq high_eq ccnnil lhc => [//|c q  /=] op_dec open_eq val_op_e openbottom opentop low_eq high_eq ccnnil lhc.
-have := opening_valid outlefte lowv highv; rewrite /opening_cells.
+have := opening_valid outlefte lowv highv.
 rewrite op_new => valnew.
 rewrite /seq_valid  all_cat -cat_cons all_cat in val_op_e.
 move : val_op_e => /andP [] valfc  /andP [] _ vallc.
@@ -1215,32 +1216,38 @@ Qed.
 
 *)
 
-Lemma adjacent_opening_aux' p s le he new :
-  opening_cells_aux p s le he = new -> 
-  adjacent_cells new /\ (new != nil -> low (head dummy_cell new) = le).
+Lemma adjacent_opening_aux' p s le he news newc :
+  valid_edge le p -> valid_edge he p ->
+  {in s, forall g, left_pt g == p} ->
+  opening_cells_aux p s le he = (news, newc) -> 
+  adjacent_cells (rcons news newc) /\
+   (low (head dummy_cell (rcons news newc)) = le).
 Proof.
-elim: s le new => [ | g s Ih] le new /=; set vip := vertical_intersection_point.
-  case vip1 : (vip R p le) => [p1 | ]; last by move=> <-.
-  case vip2 : (vip R p he) => [p2 | ]; last by move=> <-.
-  by case: ifP => _ <- //=.
-case: (vip R p le) => [p1 | ]; last by move=> <-.
-by case: ifP => testres <- //=;
-  (split; last by [];
-  move: (Ih g _ erefl) => []; case: (opening_cells_aux _ _ _ _) => //=;
-  move=> a l -> ->; rewrite // eqxx).
+move=> + vhe.
+elim: s le news newc => [ | g s Ih] le news newc /= vle oute.
+  by rewrite pvertE // pvertE // => - [] <- <- /=.
+have vg : valid_edge g p.
+  by rewrite -(eqP (oute g _)) ?valid_edge_left // inE eqxx.
+have oute' : {in s, forall g, left_pt g == p}.
+  by move=> g' gin; rewrite oute // inE gin orbT.
+case oca_eq: (opening_cells_aux _ _ _ _) => [s1 c1].
+have := Ih g s1 c1 vg oute' oca_eq => -[] Ih1 Ih2 {Ih}.
+  rewrite pvertE // => - [] <- <- /=; split;[ | done].
+case: (s1) Ih1 Ih2 => [ | a s'] /=.
+  by move=> _ ->; rewrite eqxx.
+by move=> -> ->; rewrite eqxx.
 Qed.
 
 Lemma adjacent_opening' p s le he:
-  adjacent_cells (opening_cells_aux p s le he).
+  valid_edge le p -> valid_edge he p ->
+  {in s, forall g, left_pt g == p} ->
+  adjacent_cells (opening_cells p s le he).
 Proof.
-case: s => [| g s ] /=; set vip := vertical_intersection_point.
-  case vip1 : (vip R p le) => [p1 | ]; last by [].
-  by case vip2 : (vip R p he) => [p2 | ].
-case: (vip R p le) => [p1 | ]; last by [].
-rewrite /=.
-move: (@adjacent_opening_aux' p s g he _ erefl).
-case: (opening_cells_aux _ _ _ _) => //=.
-by move=> a l [] -> ->; rewrite // eqxx.
+move=> vle vhe lefts.
+have lefts' : {in sort (@edge_below _) s, forall g, left_pt g == p}.
+  by move=> g; rewrite mem_sort; apply: lefts.
+rewrite /opening_cells; case oca_eq: (opening_cells_aux _ _ _ _) => [so co].
+by have [] := adjacent_opening_aux' vle vhe  lefts' oca_eq.
 Qed.
 
 Lemma step_keeps_adjacent open  e  :
@@ -1262,14 +1269,15 @@ have exi := (exists_cell cbtop adjopen insbox ).
 have openeq := decomposition_preserve_cells op_c_d.
 have := (l_h_valid cbtop adjopen  insbox validopen op_c_d).
 move => [] lowv highv.
-have := (open_not_nil (sort (@edge_below R) (outgoing e)) lowv highv).
-case op_new : (opening_cells_aux (point e) _ low_e high_e)
-  => [//= | q l ] qlnnil.
+case oca_eq : (opening_cells_aux _ _ _ _) => [so co].
+have op_new : opening_cells (point e) (outgoing e) low_e high_e = rcons so co.
+  by rewrite /opening_cells oca_eq.
 have := higher_lower_equality outleft op_c_d op_new exi lowv highv => [][] l_eq [] h_eq c_nnil.
-have adjnew : adjacent_cells (q :: l).
-  by rewrite -op_new; apply:adjacent_opening'.
+have adjnew : adjacent_cells (rcons so co).
+  by rewrite -op_new; apply: adjacent_opening'.
 rewrite openeq in adjopen.
-apply : (replacing_seq_adjacent c_nnil qlnnil l_eq h_eq adjopen adjnew).
+apply : (replacing_seq_adjacent c_nnil _ l_eq h_eq adjopen adjnew).
+by apply/eqP/rcons_neq0.
 Qed.
 
 Lemma step_keeps_bottom open e  :
@@ -1292,19 +1300,21 @@ move => [] lowv highv.
 have exi := (exists_cell cbtop adjopen insbox ).
 move : cbtop.
 rewrite /cells_bottom_top /cells_low_e_top => /andP [] /andP [] opnnil /eqP openbottom /eqP _.
-have newnnil := open_not_nil (sort (@edge_below R) (outgoing e)) lowv highv.
+have newnnil := opening_cells_not_nil (outgoing e) low_e high_e (point e).
 have newopnnil := (middle_seq_not_nil first_cells last_cells newnnil).
 rewrite newopnnil /=.
-case op_new : (opening_cells_aux (point e) _ low_e high_e) => [// | c q].
-  by rewrite op_new in newnnil.
-have := (lower_edge_new_cells op_new lowv highv) => /eqP /= low_new.
+case oca_eq : (opening_cells_aux _ _ _ _) => [so co].
+have op_new : opening_cells (point e) (outgoing e) low_e high_e = rcons so co.
+  by rewrite /opening_cells oca_eq.
+have := (lower_edge_new_cells lowv highv op_new lowv highv) => /eqP /= low_new.
 have := (l_h_c_decomposition op_c_d  exi).
 move => [] /eqP l_old [] /eqP _ c_nnil.
 rewrite -low_new in l_old.
-case : first_cells op_c_d op_dec newopnnil => [/= |c1 q1 /=] op_c_d op_dec newopnnil.
-  rewrite -l_old -openbottom op_dec /= .
-  by case c_c : contact_cells c_nnil l_old op_c_d op_dec => [// | c' q' /=] _  -> .
-by rewrite -openbottom op_dec /=.
+case : first_cells op_c_d op_dec newopnnil =>
+   [/= |c1 q1 /=] op_c_d op_dec newopnnil; last first.
+  by rewrite -openbottom op_dec /=.
+case: (so) l_old => [ | a s'] /= <-; rewrite -openbottom op_dec /=;
+by case : (contact_cells) c_nnil.
 Qed.
 
 Lemma step_keeps_bottom_top open e  :
