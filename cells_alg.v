@@ -133,14 +133,58 @@ Definition open_cells_decomposition (open_cells : seq cell) (p : pt) : seq cell 
     | _  => open_cells_decomposition_fix open_cells p [::]
   end.
 
-Definition step (e : event) (open_cells : seq cell) (closed_cells : seq cell) : (seq cell) * (seq cell) :=
+Record scan_state :=
+  Bscan {sc_open1 : seq cell;
+         lst_open : cell;
+         sc_open2 : seq cell;
+         sc_closed : seq cell;
+         lst_closed : cell;
+         lst_high : edge;
+         lst_x : R}.
+
+Parameter update_closed_cell : cell -> pt -> cell.
+  
+Parameter update_open_cell : cell -> event -> seq cell * cell.
+
+Definition step (e : event) (st : scan_state) : scan_state :=
    let p := point e in
-   let '(first_cells, contact_cells, last_cells, lower_edge, higher_edge) := open_cells_decomposition open_cells p in
-   let closed := closing_cells p contact_cells in
-   let closed_cells := closed_cells++closed in
-   let new_open_cells :=
-     opening_cells p (outgoing e) lower_edge higher_edge in
-   (first_cells++new_open_cells++last_cells, closed_cells).
+   let '(Bscan op1 lop op2 cls cl lhigh lx) := st in
+   if (p_x p != lx) then
+     let '(first_cells, contact_cells, last_cells, lower_edge, higher_edge) :=
+       open_cells_decomposition (op1 ++ lop :: op2) p in
+     let closed := closing_cells p contact_cells in
+     let closed_cells := cls++closed in
+     let (new_open_cells, newlastopen) :=
+       opening_cells_aux p (sort (@edge_below _) (outgoing e))
+            lower_edge higher_edge in
+     Bscan (first_cells ++ new_open_cells)
+           newlastopen last_cells closed_cells 
+           (* TODO: not cl *) cl higher_edge (p_x (point e))
+   else if p >>> lhigh then
+     let '(fc', contact_cells, last_cells, low_edge, higher_edge) :=
+       open_cells_decomposition op2 p in
+     let first_cells := op1 ++ rcons fc' lop in
+(* TODO code duplication (6 lines above) *)
+     let closed := closing_cells p contact_cells in
+     let closed_cells := cls++closed in
+     let (new_open_cells, newlastopen) :=
+       opening_cells_aux p (sort (@edge_below _) (outgoing e))
+            low_edge higher_edge in
+     Bscan (first_cells ++ new_open_cells)
+           newlastopen last_cells closed_cells (*TODO : not cl *) cl
+            higher_edge (p_x (point e))
+   else if p <<< lhigh then 
+     let new_closed := update_closed_cell cl (point e) in
+     let (new_opens, new_lopen) := update_open_cell lop e in
+     Bscan (op1 ++ new_opens) new_lopen op2 cls new_closed lhigh lx
+   else (* here p === lhigh *)
+     let '(fc', contact_cells, last_cells, lower_edge, higher_edge) :=
+       open_cells_decomposition (lop :: op2) p in
+     let closed := closing_cells p contact_cells in
+     let (new_opens, new_lopen) := update_open_cell lop e in
+     Bscan (op1 ++ fc' ++ new_opens) new_lopen last_cells
+          (cls ++ closed) (* TODO: not cl *) cl higher_edge lx.
+        
 
 Definition leftmost_points (bottom top : edge) :=
   if p_x (left_pt bottom) < p_x (left_pt top) then
@@ -172,11 +216,12 @@ Definition complete_last_open (bottom top : edge) (c : cell) :=
       Bcell lpts (rightmost_points bottom top) le he
   end.
 
-Fixpoint scan (events : seq event) (open_cells : seq cell)
-  (closed_cells : seq cell) : seq cell * seq cell :=
-  match events with
-     | [::] => (closed_cells, open_cells)
-     | e::q => let (open, closed) := (step e open_cells closed_cells) in  scan q open closed
+Fixpoint scan (events : seq event) (st : scan_state)
+  : seq cell * seq cell :=
+  match events, st with
+     | [::], Bscan op1 lop op2 cl lcl _ _ =>
+       (op1 ++ lop :: op2, lcl :: cl)
+     | e::q, _ => scan q (step e st)
   end.
 
 Definition start_open_cell (bottom top : edge) :=
@@ -184,7 +229,16 @@ Definition start_open_cell (bottom top : edge) :=
 
 Definition start (events : seq event) (bottom : edge) (top : edge) :
   seq cell * seq cell :=
-  scan events [:: start_open_cell bottom top] [::].
+  match events with
+  | nil => ([:: start_open_cell bottom top], nil)
+  | ev0 :: events =>
+    let (newcells, lastopen) :=
+      opening_cells_aux (point ev0) (sort (@edge_below _) (outgoing ev0))
+            bottom top in
+      scan events (Bscan newcells lastopen nil nil
+         (close_cell (point ev0) (start_open_cell bottom top))
+         top (p_x (point ev0)))
+  end.
 
 Section proof_environment.
 Variables bottom top : edge.
