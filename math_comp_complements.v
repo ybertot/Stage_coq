@@ -41,6 +41,10 @@ Proof.
 by case : s.
 Qed.
 
+Lemma head_rcons (A : Type) (d l : A) (s : seq A) :
+    head d (rcons s l) = head l s.
+Proof. by case: s. Qed.
+
 Lemma allcons [T : predArgType]
   (f : T -> bool) a q' : all f (a :: q') = f a && all f q'.
 Proof.  by []. Qed.
