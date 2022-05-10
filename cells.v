@@ -1056,6 +1056,7 @@ Hypothesis allnct : {in fc, forall c, ~~ contains_point p c}.
 Hypothesis allct : {in cc, forall c, contains_point p c}.
 Hypothesis lcc_ctn : contains_point p lcc.
 Hypothesis head_nct : lc != [::] -> ~~ contains_point p (head lcc lc).
+Hypothesis noc : {in cell_edges open &, no_crossing R}.
 
 Let le := low (head lcc cc).
 Let he := high lcc.
@@ -1070,6 +1071,12 @@ Proof. by have /andP[] := (allP sval _ headin). Qed.
 
 Let lccin : lcc \in open.
 Proof. by rewrite ocd !(mem_cat, inE) eqxx !orbT. Qed.
+
+Let lein : le \in cell_edges open.
+Proof. by rewrite mem_cat /le map_f // headin. Qed.
+
+Let hein : he \in cell_edges open.
+Proof. by rewrite mem_cat /he map_f ?orbT // lccin. Qed.
 
 Let vhe : valid_edge he p.
 Proof. by have /andP[] := (allP sval _ lccin). Qed.
@@ -1145,9 +1152,48 @@ have pulc : p <<< low c.
 by apply/negP; rewrite /contains_point pulc.
 Qed.
 
-Lemma fclc_not_end c :
+Lemma connect_properties :
+  [/\ p >>> le, p <<< he, valid_edge le p, valid_edge he p &
+    forall c, (c \in fc) || (c \in lc) -> ~~contains_point p c].
+Proof. by split; last exact fclc_not_contain. Qed.
+
+Lemma fclc_not_end_aux c e :
+  point e = p ->
   (c \in fc) || (c \in lc) -> 
-  (~ event_close_edge (low c) p) /\ (~ event_close_edge (high c) p).
+  (~ event_close_edge (low c) e) /\ (~ event_close_edge (high c) e).
+Proof.
+move=> pq /[dup] cin /fclc_not_contain/negP.
+have cino : c \in open.
+  by rewrite ocd !(mem_cat, inE); move:cin=> /orP[] ->; rewrite ?orbT.
+rewrite -pq=>/contrapositive_close_imp_cont; apply.
+  by apply: (allP rfo).
+by rewrite pq; apply/andP/(allP sval).
+Qed.
+
+Lemma low_under_high : le <| he.
+Proof.
+have [// | abs_he_under_le] := noc lein hein; case/negP: pal.
+by have /underW := (order_edges_strict_viz_point' vhe vle abs_he_under_le puh).
+Qed.
+
+Lemma in_cc_on_high c : c \in cc -> p === high c.
+Proof.
+move=> cin.
+have cino : c \in open by rewrite ocd !mem_cat cin !orbT.
+have vhc : valid_edge (high c) p by apply/(seq_valid_high sval)/map_f.
+apply: under_above_on => //; first by apply: (proj2 (andP (allct cin))).
+have [s1 [[ | c2 s2] cceq]] := mem_seq_split cin.
+  move: adj; rewrite ocd cceq -catA /= => /adjacent_catW[] _ /adjacent_catW[].
+  move=> _ /= /andP[] /eqP -> _.
+  by move: lcc_ctn=> /andP[].
+have c2in : c2 \in cc by rewrite cceq !(mem_cat, inE) eqxx !orbT.
+move: adj; rewrite ocd cceq -!catA; do 2 move => /adjacent_catW[] _.
+rewrite /= => /andP[] /eqP -> _.
+by apply: (proj1 (andP (allct c2in))).
+Qed.
+
+End open_cells_decomposition.
+
 End proof_environment.
 
 
