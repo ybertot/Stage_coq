@@ -1037,6 +1037,117 @@ have := lexePt_lexPt_trans (on_edge_lexePt_left_pt btmon) lexbtme.
 by rewrite cc'.
 Qed.
 
+
+Section open_cells_decomposition.
+
+Variables open fc cc : seq cell.
+Variable lcc : cell.
+Variable lc : seq cell.
+Variable p : pt.
+
+Hypothesis cbtom : cells_bottom_top open.
+Hypothesis adj : adjacent_cells open.
+Hypothesis rfo : s_right_form open.
+Hypothesis sval : seq_valid open p.
+Hypothesis inbox_p : inside_box p.
+
+Hypothesis ocd : open = fc ++ cc ++ lcc :: lc.
+Hypothesis allnct : {in fc, forall c, ~~ contains_point p c}.
+Hypothesis allct : {in cc, forall c, contains_point p c}.
+Hypothesis lcc_ctn : contains_point p lcc.
+Hypothesis head_nct : lc != [::] -> ~~ contains_point p (head lcc lc).
+
+Let le := low (head lcc cc).
+Let he := high lcc.
+
+Let headin : head lcc cc \in open.
+Proof.
+by rewrite ocd; case: cc => [ | a cc'] /=; rewrite !(mem_cat, inE) eqxx ?orbT.
+Qed.
+
+Let vle : valid_edge le p.  
+Proof. by have /andP[] := (allP sval _ headin). Qed.
+
+Let lccin : lcc \in open.
+Proof. by rewrite ocd !(mem_cat, inE) eqxx !orbT. Qed.
+
+Let vhe : valid_edge he p.
+Proof. by have /andP[] := (allP sval _ lccin). Qed.
+
+Let pal : p >>> le.
+Proof.
+elim/last_ind : {-1}(fc) (erefl fc) => [ | fc' c1 _] fc_eq.
+  suff -> : le = bottom.
+    by move: inbox_p=> /andP[] /andP[].
+  move: cbtom=> /andP[] /andP[] _ /eqP <- _; rewrite ocd fc_eq /le.
+  by case: (cc).
+have c1in : c1 \in open.
+  by rewrite ocd fc_eq !(mem_cat, mem_rcons, inE) eqxx.
+have /andP[vlc1 vhc1] : valid_edge (low c1) p && valid_edge (high c1) p.
+  by apply: (allP sval).
+have /order_edges_strict_viz_point' : low c1 <| high c1 by apply: (allP rfo).
+move=> /(_ _ vlc1 vhc1) oc1.
+have ctfc : contains_point p (head lcc cc).
+  case cc_eq : (cc) => [ // | c2 cc'].
+  by apply: allct; rewrite /= cc_eq inE eqxx.
+have hc1q : high c1 = low (head lcc cc).
+  move: adj; rewrite ocd fc_eq -cats1 -!catA=> /adjacent_catW[] _ /=.
+  by case: (cc) => [ | ? ?] /= /andP[] /eqP.
+have palc1 : p >>= low c1.
+  apply/negP=> /oc1 abs.  
+  by move: ctfc; rewrite /contains_point -hc1q abs.
+have nctc1 : ~~ contains_point p c1.
+  by apply: allnct; rewrite fc_eq mem_rcons inE eqxx.
+by move: nctc1; rewrite /contains_point palc1 /= hc1q.
+Qed.
+
+Let puh : p <<< he.
+Proof.
+case lc_eq : lc => [ | c1 lc'].
+  case/andP : inbox_p => /andP[] _ + _.
+  by case/andP : cbtom=> _; rewrite ocd lc_eq !last_cat /= /he => /eqP ->.
+have c1in : c1 \in open.
+  by rewrite ocd lc_eq /= !(mem_cat, inE) eqxx !orbT.
+have /andP[vlc1 vhc1] : valid_edge (low c1) p && valid_edge (high c1) p.
+  by apply: (allP sval).
+have /order_edges_viz_point' := allP rfo _ c1in => /(_ _ vlc1 vhc1) oc1.
+have hlcclc1 : high lcc = low c1.
+  move: adj; rewrite ocd lc_eq=> /adjacent_catW[] _ /adjacent_catW[] _.
+  by move=> /andP[] /eqP.
+have pulc1 : p <<= low c1.
+  by rewrite -hlcclc1; move: lcc_ctn => /andP[].
+move: head_nct; rewrite lc_eq /= negb_and (oc1 pulc1) orbF negbK -hlcclc1.
+by apply.
+Qed.
+
+Lemma fclc_not_contain c : (c \in fc) || (c \in lc) ->
+  ~~ contains_point p c.
+Proof.
+move=> /orP[ | cl]; first by apply: allnct.
+case lc_eq : lc => [ | c2 lc']; first by move: cl; rewrite lc_eq.
+have adjlc : adjacent_cells (lcc :: lc).
+  by move: adj; rewrite ocd => /adjacent_catW[] _ /adjacent_catW[].
+have adjlc' : adjacent_cells (c2 :: lc').
+  by move: adjlc; rewrite lc_eq=> /andP[] _.
+have sval' : seq_valid (c2 :: lc') p.
+  apply/allP=> x xin; apply: (allP sval); rewrite ocd !(mem_cat, inE).
+  by rewrite lc_eq xin !orbT.
+have lc2_eq : low c2 = he.
+  by move: adjlc; rewrite lc_eq /= /he => /andP[] /eqP ->.
+have rfolc : s_right_form (c2 :: lc').
+  apply/allP=> x xin; apply: (allP rfo).
+  by  rewrite ocd !mem_cat inE lc_eq xin ?orbT.
+have pulc2 : p <<< low c2 by rewrite lc2_eq.
+move: cl; rewrite lc_eq inE => /orP[/eqP -> | cinlc' ].
+  by apply/negP; rewrite /contains_point pulc2.
+have pulc : p <<< low c.
+  by apply: (strict_under_seq adjlc' sval' rfolc pulc2 cinlc').
+by apply/negP; rewrite /contains_point pulc.
+Qed.
+
+Lemma fclc_not_end c :
+  (c \in fc) || (c \in lc) -> 
+  (~ event_close_edge (low c) p) /\ (~ event_close_edge (high c) p).
 End proof_environment.
 
 
