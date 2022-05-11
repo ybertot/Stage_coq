@@ -259,9 +259,8 @@ Lemma open_cells_decomposition_contact_none open_cells p :
   open_cells != [::] -> ~~contains_point p (head dummy_cell open_cells).
 Proof.
 case : open_cells => [// | /= c0 q].
-case : ifP=> ctc0 //; case: (open_cells_decomposition_contact _ _).
-  by move=> [] [] [].
-by move=> [].
+by case : ifP=> ? //;
+  case: (open_cells_decomposition_contact _ _)=> // [] [] [] //.
 Qed.
 
 Lemma open_cells_decomposition_contact_main_properties open_cells p cc c' lc:
@@ -1399,10 +1398,84 @@ Hypothesis adj : adjacent_cells open.
 Hypothesis sval : seq_valid open (point e).
 Hypothesis cle : close_edges_from_events (e :: future_events).
 Hypothesis clae : close_alive_edges open (e :: future_events).
+Hypothesis lstheq : lsthe = high lsto.
+Hypothesis lstheqc : lsthe = high lstc.
+Hypothesis lstxq : lstx = left_limit lsto.
 
 Let exi : exists2 c, c \in open & contains_point' (point e) c.
 Proof. by apply: (exists_cell cbtom adj inbox_e). Qed.
 
+Let exi' : point e >>> lsthe ->
+  exists2 c, c \in lop & contains_point' (point e) c.
+Proof.
+rewrite lstheq; move=> pa.
+suff abf : {in fop, forall c, point e >>> high c}.
+have [wc wcin wcct] := exi; exists wc => //.
+  move: wcin; rewrite /open !(mem_cat, inE) => /orP[wf | /orP[/eqP wl | //]].
+    by move: wcct; rewrite /contains_point' (negbTE (abf _ wf)) andbF.
+  by move: wcct; rewrite /contains_point' wl (negbTE pa) andbF.
+have vfop : {in rcons fop lsto, forall c, valid_edge (high c) (point e)}.
+  move=> c cin.
+  have cin' : high c \in [seq high i | i <- open].
+    by apply: map_f; rewrite /open -cat_rcons mem_cat cin.
+  by apply: (seq_valid_high sval cin').
+have rfop : s_right_form (rcons fop lsto).
+  apply/allP=> x xin; apply: (allP rfo x).
+  by rewrite /open -cat_rcons mem_cat xin.
+have afop : adjacent_cells (rcons fop lsto).
+  by move: adj; rewrite /open -cat_rcons => /adjacent_catW [].
+have vh : valid_edge (low (head lsto fop)) (point e).
+  by move: sval; rewrite /open; case: (fop) => [ | ? ?] /= /andP[] /andP[].
+suff [] : point e >>> low (head lsto fop) /\
+       {in fop, forall c, point e >>> high c} by [].
+elim : (fop) vfop rfop afop vh => [ // | c0 fop' Ih] vfop rfop afop /= vh.
+  split=> //.
+  move: rfop; rewrite /= andbT => llstbhlst.
+  rewrite under_pvert_y // -ltNge.
+  apply: (le_lt_trans (edge_below_pvert_y vh _ llstbhlst)).
+    by apply: vfop; rewrite /= inE.
+  by rewrite ltNge -under_pvert_y // vfop //= inE eqxx.
+  move=> c; rewrite inE.
+  have right_part : point e >>> low c0.
+  have /andP[vl0 vho] : 
+    valid_edge (low c0) (point e) && valid_edge (high c0) (point e).
+    by rewrite vh (vfop c0) // inE eqxx.
+  have lbh : low c0 <| high c0 by apply: (allP rfop); rewrite inE eqxx.
+  rewrite under_pvert_y // -ltNge.
+  apply: (le_lt_trans (edge_below_pvert_y vl0 vho lbh)).
+  have -> : high c0 = low (head lsto fop').
+    by move: afop; case: (fop') => [ | ? ?] /andP[] /eqP.
+  rewrite ltNge -under_pvert_y.
+
+
+ => /orP[/eqP -> | intl]; last first.
+  have vfop' : {in rcons fop' lsto, forall c, valid_edge (high c) (point e)}.
+    by move=> x xin; apply: vfop; rewrite /= inE xin orbT.
+  have afop' : adjacent_cells (rcons fop' lsto).
+    by move: afop; rewrite /= => /path_sorted.
+  have rfop' : s_right_form (rcons fop' lsto) by move: rfop => /= /andP[].
+  have vh' : valid_edge (low (head lsto fop')) (point e).
+    have : valid_edge (high c0) (point e) by apply: vfop; rewrite inE eqxx.
+    by move: afop; case: (fop') => [ | ? ?] /andP[] /eqP ->.
+  have Ih' := Ih vfop' rfop' afop' vh'.
+  have [cP hP] := Ih' _ intl.
+  split=> //=.
+    
+  by apply: Ih.
+have : high c0 = low (head lsto fop').
+  by move: afop; case: (fop') => [ | ? ?] /= /andP[] /eqP -> _.
+ha
+case oe : (open_cells_decomposition open (point e)) =>
+       [[[[[fc cc] lcc] lc] le] he].
+have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
+  open_cells_decomposition_main_properties oe exi.
+have [pal puh vxe vye nct'] :=
+    decomposition_connect_properties rfo sval adj cbtom inbox_e oe.
+have [wc wcin wcct] := exi; exists wc => //.
+    have wch : wc = head lcc cc.  by admit.
+    have lstof : lsto \in fc. by admit.
+
+Qed.
 Lemma step_keeps_closeness fop' lsto' lop' cls' lstc' lsthe' lstx':
   step e (Bscan fop lsto lop cls lstc lsthe lstx) =
   (Bscan fop' lsto' lop' cls' lstc' lsthe' lstx') ->
@@ -1449,6 +1522,24 @@ case: ifP=> [pxaway | pxhere].
   by rewrite /opening_cells oca_eq -cats1 -!catA.
 case: ifP=> [eabove | ebelow].
   have exi' : exists2 c, c \in lop & contains_point' (point e) c.
+    case oe : (open_cells_decomposition open (point e)) =>
+       [[[[[fc cc] lcc] lc] le] he].
+    have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
+    open_cells_decomposition_main_properties oe exi.
+    have [pal puh vxe vye nct'] :=
+         decomposition_connect_properties rfo sval adj cbtom inbox_e oe.
+    have [wc wcin wcct] := exi; exists wc => //.
+    have wch : wc = head lcc cc.  by admit.
+    have lstof : lsto \in fc. by admit.
+    move: ocd; rewrite /open.
+      elim : (lop) (cc) wch => [ | a l Ih].
+        move=> [ | b cc']; rewrite /=.
+    move: wcin; rewrite /open !(mem_cat, inE) => /orP[wf | /orP[ | //]].
+      have abs := decomposition_above_high_fc oe cbtom adj inbox_e rfo sval wf.
+      by move: wcct; rewrite /contains_point' (negbTE abs) andbF.
+    move=>/orP[wcc | ].
+      move: 
+
     fail.
   case oe: (open_cells_decomposition _ _) => [[[[[fc cc ] lcc] lc] le] he].
   have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
