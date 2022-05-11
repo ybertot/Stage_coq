@@ -1413,7 +1413,9 @@ case: ifP=> [pxaway | pxhere].
   case oe: (open_cells_decomposition _ _) => [[[[[fc cc ] lcc] lc] le] he].
   have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
     open_cells_decomposition_main_properties oe exi.
-  case:(opening_cells_aux _ _ _ _) => [ncs nlsto] [] <- <- <- _ _ _ _.
+  have [pal puh vle vhe ncont] :=
+    decomposition_connect_properties rfo sval adj cbtom inbox_e oe.
+  case oca_eq:(opening_cells_aux _ _ _ _) => [ncs nlsto] [] <- <- <- _ _ _ _.
   have dec_not_end :=
     decomposition_not_end rfo sval adj cbtom inbox_e oe.
   have close_fc : close_alive_edges fc future_events.
@@ -1428,8 +1430,63 @@ case: ifP=> [pxaway | pxhere].
   have endle : end_edge le future_events.
     suff  : end_edge le (e :: future_events).
       rewrite /end_edge; move=> /orP[-> // | ] /= /orP[ | ->]; last first.
-      by rewrite orbT.
-  
+        by rewrite orbT.
+      by move: pal=> /[swap] /eqP <-; rewrite right_pt_below.
+    have := (proj1 (andP (allP clae (head lcc cc) _))); rewrite leq; apply.
+    by rewrite ocd; case : (cc) => [ | ? ?]; rewrite !(mem_cat, inE) eqxx ?orbT.
+  have endhe : end_edge he future_events.
+    suff  : end_edge he (e :: future_events).
+      rewrite /end_edge; move=> /orP[-> // | ] /= /orP[ | ->]; last first.
+        by rewrite orbT.
+      move: puh=> /[swap] /eqP <-; rewrite strict_nonAunder; last first.
+        by apply: valid_edge_right.
+      by rewrite right_on_edge.
+    have := (proj2 (andP (allP clae lcc _))); rewrite ?heq; apply.
+    by rewrite ocd; case : (cc) => [ | ? ?]; rewrite !(mem_cat, inE) eqxx ?orbT.
+  move: cle => /= /andP[] cloe _.
+  have clan := opening_cells_close vle vhe oute endle endhe cloe.
+  have := (insert_opening_closeness close_fc clan close_lc).
+  by rewrite /opening_cells oca_eq -cats1 -!catA.
+case: ifP=> [eabove | ebelow].
+  have exi' : exists2 c, c \in lop & contains_point' (point e) c.
+    fail.
+  case oe: (open_cells_decomposition _ _) => [[[[[fc cc ] lcc] lc] le] he].
+  have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
+    open_cells_decomposition_main_properties oe exi.
+  have [pal puh vle vhe ncont] :=
+    decomposition_connect_properties rfo sval adj cbtom inbox_e oe.
+  case oca_eq:(opening_cells_aux _ _ _ _) => [ncs nlsto] [] <- <- <- _ _ _ _.
+  have dec_not_end :=
+    decomposition_not_end rfo sval adj cbtom inbox_e oe.
+  have close_fc : close_alive_edges fc future_events.
+    suff/head_not_end : close_alive_edges fc (e :: future_events).
+      by apply=> c0 cin; apply: dec_not_end; rewrite cin.
+    by apply/allP=> c0 cin; apply: (allP clae); rewrite ocd mem_cat cin.
+  have close_lc : close_alive_edges lc future_events.
+    suff/head_not_end : close_alive_edges lc (e :: future_events).
+      by apply=> c0 cin; apply: dec_not_end; rewrite cin orbT.
+    apply/allP=> c0 cin; apply: (allP clae).
+    by rewrite ocd !(mem_cat, inE) cin !orbT.
+  have endle : end_edge le future_events.
+    suff  : end_edge le (e :: future_events).
+      rewrite /end_edge; move=> /orP[-> // | ] /= /orP[ | ->]; last first.
+        by rewrite orbT.
+      by move: pal=> /[swap] /eqP <-; rewrite right_pt_below.
+    have := (proj1 (andP (allP clae (head lcc cc) _))); rewrite leq; apply.
+    by rewrite ocd; case : (cc) => [ | ? ?]; rewrite !(mem_cat, inE) eqxx ?orbT.
+  have endhe : end_edge he future_events.
+    suff  : end_edge he (e :: future_events).
+      rewrite /end_edge; move=> /orP[-> // | ] /= /orP[ | ->]; last first.
+        by rewrite orbT.
+      move: puh=> /[swap] /eqP <-; rewrite strict_nonAunder; last first.
+        by apply: valid_edge_right.
+      by rewrite right_on_edge.
+    have := (proj2 (andP (allP clae lcc _))); rewrite ?heq; apply.
+    by rewrite ocd; case : (cc) => [ | ? ?]; rewrite !(mem_cat, inE) eqxx ?orbT.
+  move: cle => /= /andP[] cloe _.
+  have clan := opening_cells_close vle vhe oute endle endhe cloe.
+  have := (insert_opening_closeness close_fc clan close_lc).
+  by rewrite /opening_cells oca_eq -cats1 -!catA.
 
 (* TODO: RECOVER!
 Lemma step_keeps_closeness open  e (future_events : seq event) :
