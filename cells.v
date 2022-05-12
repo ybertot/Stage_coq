@@ -132,10 +132,16 @@ Notation close_out_from_event := (close_out_from_event bottom top).
 Notation close_edges_from_events :=
   (close_edges_from_events bottom top).
 
+Definition between_edges (l h : edge) (p : pt) :=
+  (p >>> l) && (p <<< h).
+
 Definition inside_box p :=
 (~~ (p <<= bottom)  && (p <<< top) ) &&
   ((p_x (left_pt bottom) < p_x p < p_x (right_pt bottom)) &&
   (p_x (left_pt top) < p_x p < p_x (right_pt top))).
+
+Lemma inside_box_between p : inside_box p -> between_edges bottom top p.
+Proof.  by move=> /andP[]. Qed.
 
 Lemma inside_box_valid_bottom_top p g :
   inside_box p ->
@@ -404,11 +410,11 @@ Qed.
 
 Lemma exists_cell  p open :
 cells_bottom_top open -> adjacent_cells open  ->
-inside_box p ->
+between_edges bottom top p ->
 exists2 c : cell, c \in open & contains_point' p c.
 Proof.
-move=> cbtom adj /[dup] inbox_e /andP[] /andP[] pa pu _.
- by apply:  (exists_cell_aux cbtom adj).
+move=> cbtom adj /[dup] inbox_e /andP[] pa pu.
+by apply:  (exists_cell_aux cbtom adj).
 Qed.
 
 Definition cell_edges cells := map low cells ++ map high cells.
@@ -1037,7 +1043,6 @@ have := lexePt_lexPt_trans (on_edge_lexePt_left_pt btmon) lexbtme.
 by rewrite cc'.
 Qed.
 
-
 Section open_cells_decomposition.
 
 Variables open fc cc : seq cell.
@@ -1049,7 +1054,7 @@ Hypothesis cbtom : cells_bottom_top open.
 Hypothesis adj : adjacent_cells open.
 Hypothesis rfo : s_right_form open.
 Hypothesis sval : seq_valid open p.
-Hypothesis inbox_p : inside_box p.
+Hypothesis inbox_p : between_edges bottom top p.
 
 Hypothesis ocd : open = fc ++ cc ++ lcc :: lc.
 Hypothesis allnct : {in fc, forall c, ~~ contains_point p c}.
@@ -1085,7 +1090,7 @@ Let pal : p >>> le.
 Proof.
 elim/last_ind : {-1}(fc) (erefl fc) => [ | fc' c1 _] fc_eq.
   suff -> : le = bottom.
-    by move: inbox_p=> /andP[] /andP[].
+    by move: inbox_p=> /andP[].
   move: cbtom=> /andP[] /andP[] _ /eqP <- _; rewrite ocd fc_eq /le.
   by case: (cc).
 have c1in : c1 \in open.
@@ -1111,7 +1116,7 @@ Qed.
 Let puh : p <<< he.
 Proof.
 case lc_eq : lc => [ | c1 lc'].
-  case/andP : inbox_p => /andP[] _ + _.
+  move: inbox_p => /andP[] _ +.
   by case/andP : cbtom=> _; rewrite ocd lc_eq !last_cat /= /he => /eqP ->.
 have c1in : c1 \in open.
   by rewrite ocd lc_eq /= !(mem_cat, inE) eqxx !orbT.

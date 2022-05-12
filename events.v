@@ -128,6 +128,9 @@ Proof. by case: events. Qed.
 Lemma lexPtEv_trans : transitive lexPtEv.
 Proof. by move=> e2 e1 e3; rewrite /lexPtEv; apply: lexPt_trans. Qed.
 
+Lemma event_close_edge_on g e:
+  event_close_edge g e -> (point e) === g.
+Proof.  by move=> /eqP <-; apply: right_on_edge. Qed.
 
 Definition out_left_event ev :=
   {in outgoing ev, forall e, left_pt e == point(ev)}.
