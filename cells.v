@@ -1157,6 +1157,55 @@ have pulc : p <<< low c.
 by apply/negP; rewrite /contains_point pulc.
 Qed.
 
+Lemma above_all_cells (s : seq cell) :
+  seq_valid s p ->
+  adjacent_cells s ->
+  s_right_form s ->
+  p >>> high (last dummy_cell s) ->
+  p >>> low (head dummy_cell s) /\ {in s, forall c, p >>> high c}.
+Proof.
+elim: s => [ | c0 s Ih]; first by move=> _ _ _ ->.
+move=> /= /andP[] /andP[] vl0 vh0 svals adjs /andP[] lbh rfos pah.
+have pal0 : p >>> high c0 -> p >>> low c0.
+  move=> {}pah.
+  rewrite under_pvert_y // -ltNge.
+  apply: (le_lt_trans (edge_below_pvert_y vl0 vh0 lbh)).
+  by rewrite ltNge -under_pvert_y.
+elim/last_ind : {-1}s (erefl s) svals adjs rfos pah => [ | s' c1 _]
+  /= s_eq svals adjs rfos pah.
+  split; last by move=> x; rewrite inE => /eqP ->.
+  by apply: pal0.
+have adjs1 : adjacent_cells (rcons s' c1) by apply: (path_sorted adjs).
+rewrite last_rcons in pah.
+rewrite s_eq last_rcons in Ih; have := Ih svals adjs1 rfos pah.
+move=> [] palh {}Ih.
+have hc0q : high c0 = low (head dummy_cell (rcons s' c1)).
+  by move: adjs; case: (s') => [ | ? ?] /= /andP[] /eqP.
+split; first by apply pal0; rewrite hc0q.
+move=> x; rewrite inE=> /orP[ /eqP -> |]; last by apply: Ih.
+by rewrite hc0q.
+Qed.
+
+Lemma below_all_cells (s : seq cell) :
+  seq_valid s p ->
+  adjacent_cells s ->
+  s_right_form s ->
+  p <<< low (head dummy_cell s) -> {in s, forall c, p <<< high c}.
+Proof.
+elim: s => [ | c0 s Ih]; first by [].
+move=> /= /andP[] /andP[] vl0 vh0 svals adjs /andP[] lbh rfos pah.
+have puh0 : p <<< low c0 -> p <<< high c0.
+  move=> {}pul.
+  rewrite strict_under_pvert_y //.
+  apply: (lt_le_trans _ (edge_below_pvert_y vl0 vh0 lbh)).
+  by rewrite -strict_under_pvert_y.
+have adjs1 : adjacent_cells s by apply: (path_sorted adjs).
+move=> x; rewrite inE => /orP[/eqP -> | ]; first by apply: puh0.
+case s_eq: s => [ // | c1 s'].
+have h0lc1 : high c0 = low c1 by move: adjs; rewrite s_eq /= => /andP[] /eqP.
+by rewrite -s_eq; apply: (Ih) => //; rewrite s_eq /= -h0lc1 (puh0 pah).
+Qed.
+
 Lemma connect_properties :
   [/\ p >>> le, p <<< he, valid_edge le p, valid_edge he p &
     forall c, (c \in fc) || (c \in lc) -> ~~contains_point p c].
