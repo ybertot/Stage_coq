@@ -158,7 +158,7 @@ Definition step (e : event) (st : scan_state) : scan_state :=
      let '(fc', contact_cells, last_contact, last_cells,
            low_edge, higher_edge) :=
        open_cells_decomposition op2 p in
-     let first_cells := op1 ++ rcons fc' lop in
+     let first_cells := op1 ++ lop :: fc' in
 (* TODO code duplication (6 lines above) *)
      let closed := closing_cells p contact_cells in
      let last_closed := close_cell p last_contact in
@@ -1414,6 +1414,9 @@ have [wc wcin wcct] := exi; exists wc => //.
   move: wcin; rewrite /open !(mem_cat, inE) => /orP[wf | /orP[/eqP wl | //]].
     by move: wcct; rewrite /contains_point' (negbTE (abf _ wf)) andbF.
   by move: wcct; rewrite /contains_point' wl (negbTE pa) andbF.
+have vfop1 : seq_valid (rcons fop lsto) (point e).
+  apply/allP=> x xin; apply: (allP sval).
+  by  rewrite /open -cat_rcons mem_cat xin.
 have vfop : {in rcons fop lsto, forall c, valid_edge (high c) (point e)}.
   move=> c cin.
   have cin' : high c \in [seq high i | i <- open].
@@ -1428,33 +1431,11 @@ have vh : valid_edge (low (head lsto fop)) (point e).
   by move: sval; rewrite /open; case: (fop) => [ | ? ?] /= /andP[] /andP[].
 suff [] : point e >>> low (head lsto fop) /\
        {in fop, forall c, point e >>> high c} by [].
-elim : (fop) vfop rfop afop vh => [ // | c0 fop' Ih] vfop rfop afop /= vh.
-  split=> //.
-  move: rfop; rewrite /= andbT => llstbhlst.
-  rewrite under_pvert_y // -ltNge.
-  apply: (le_lt_trans (edge_below_pvert_y vh _ llstbhlst)).
-    by apply: vfop; rewrite /= inE.
-  by rewrite ltNge -under_pvert_y // vfop //= inE eqxx.
-have vfop' : {in rcons fop' lsto, forall c, valid_edge (high c) (point e)}.
-  by move=> x xin; apply: vfop; rewrite /= inE xin orbT.
-have afop' : adjacent_cells (rcons fop' lsto).
-  by move: afop; rewrite /= => /path_sorted.
-have rfop' : s_right_form (rcons fop' lsto) by move: rfop => /= /andP[].
-have vh' : valid_edge (low (head lsto fop')) (point e).
-  have : valid_edge (high c0) (point e) by apply: vfop; rewrite inE eqxx.
-  by move: afop; case: (fop') => [ | ? ?] /andP[] /eqP ->.
-have [lP Ih'] := Ih vfop' rfop' afop' vh'.
-have hc0q : high c0 = low (head lsto fop').
-  by move: afop; case: (fop') => [ | ? ?] /= /andP[] /eqP.
-have pahc0 : point e >>> high c0 by rewrite hc0q.
-split; last first.
-  move=> c; rewrite inE=> /orP[/eqP -> // | ]; by apply: Ih'.
-move: rfop => /andP[] lbh _.
-rewrite under_pvert_y // -ltNge.
-have vhc : valid_edge (high c0) (point e).
-  by apply: vfop; rewrite /= inE eqxx.  
-apply: (le_lt_trans (edge_below_pvert_y vh vhc lbh)).
-by rewrite ltNge -under_pvert_y.
+have := above_all_cells vfop1 afop rfop; rewrite last_rcons=> /(_ pa).
+have hq : head dummy_cell (rcons fop lsto) = head lsto fop.
+  by case: (fop) => [ | ? ?].
+rewrite hq => -[-> others]; split=> // x xin.
+by apply: others; rewrite mem_rcons inE xin orbT.
 Qed.
 
 Lemma step_keeps_closeness fop' lsto' lop' cls' lstc' lsthe' lstx':
@@ -1503,7 +1484,19 @@ case: ifP=> [pxaway | pxhere].
   have clan := opening_cells_close vle vhe oute endle endhe cloe.
   have := (insert_opening_closeness close_fc clan close_lc).
   by rewrite /opening_cells oca_eq -cats1 -!catA.
+have infop1 : {subset rcons fop lsto <= open}.
+  by move=> x xin; rewrite /open -cat_rcons mem_cat xin.
+have sval1 : seq_valid (rcons fop lsto) (point e).
+  by apply/allP=> x xin; apply: (allP sval); apply: infop1.
+have rfo1 : s_right_form (rcons fop lsto).
+  by apply/allP=> x xin; apply: (allP rfo); apply: infop1.
+have adj1 : adjacent_cells (rcons fop lsto).
+  by move: adj; rewrite /open -cat_rcons=> /adjacent_catW[].
 case: ifP=> [eabove | ebelow].
+  have allnct1 : {in rcons fop lsto, forall c, ~contains_point (point e) c}.
+    have := above_all_cells sval1 adj1 rfo1; rewrite last_rcons -lstheq.
+    move=> /(_ eabove) [] _ main.
+    by move=> x xin; rewrite /contains_point (negbTE (main x xin)) andbF.
   case oe: (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
   have [ocd' [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
     open_cells_decomposition_main_properties oe (exi' eabove).
@@ -1536,35 +1529,52 @@ case: ifP=> [eabove | ebelow].
   have dec_not_end :=
     fclc_not_end_aux cbtom' adj' rfo' sval' bet' ocd' allnct lcc_ctn
     flcnct erefl.
-  have close_fc : close_alive_edges fc future_events.
-    suff/head_not_end : close_alive_edges fc (e :: future_events).
-      by apply=> c0 cin; apply: dec_not_end; rewrite cin.
-    by apply/allP=> c0 cin; apply: (allP clae); rewrite ocd mem_cat cin.
+  have close_fc : close_alive_edges (fop ++ lsto :: fc') future_events.
+    suff/head_not_end : close_alive_edges (fop ++ lsto :: fc')
+                               (e :: future_events).
+      apply=> c0; rewrite mem_cat => /orP[infop | ].
+        apply: contrapositive_close_imp_cont.
+        - by apply: (allP rfo); rewrite /open mem_cat infop.
+        - by apply/andP; apply: (allP sval); rewrite /open mem_cat infop.
+        by apply: allnct1; rewrite mem_rcons inE infop orbT.
+      rewrite inE => /orP[/eqP -> | ].
+        apply: contrapositive_close_imp_cont.
+        - by apply: (allP rfo); rewrite /open mem_cat inE eqxx orbT.
+        - apply/andP; apply: (allP sval).
+          by rewrite /open mem_cat inE eqxx orbT.
+        by apply: allnct1; rewrite mem_rcons inE eqxx.
+      by move=> cin; apply: dec_not_end; rewrite cin.
+    apply/allP=> c0 cin; apply: (allP clae).
+    move: cin; rewrite /open ocd' !(mem_cat, inE).
+    by move=> /orP[-> | /orP[/eqP -> | -> ]]; rewrite ?eqxx ?orbT.
   have close_lc : close_alive_edges lc future_events.
     suff/head_not_end : close_alive_edges lc (e :: future_events).
       by apply=> c0 cin; apply: dec_not_end; rewrite cin orbT.
     apply/allP=> c0 cin; apply: (allP clae).
-    by rewrite ocd !(mem_cat, inE) cin !orbT.
+    by rewrite /open ocd' !(mem_cat, inE) cin !orbT.
   have endle : end_edge le future_events.
     suff  : end_edge le (e :: future_events).
-      rewrite /end_edge; move=> /orP[-> // | ] /= /orP[ | ->]; last first.
+      rewrite /end_edge leq; move=> /orP[-> // | ] /= /orP[ | ->]; last first.
         by rewrite orbT.
       by move: pal=> /[swap] /eqP <-; rewrite right_pt_below.
     have := (proj1 (andP (allP clae (head lcc cc) _))); rewrite leq; apply.
-    by rewrite ocd; case : (cc) => [ | ? ?]; rewrite !(mem_cat, inE) eqxx ?orbT.
+    rewrite /open ocd'.
+    by case : (cc) => [ | ? ?]; rewrite !(mem_cat, inE) eqxx ?orbT.
   have endhe : end_edge he future_events.
     suff  : end_edge he (e :: future_events).
-      rewrite /end_edge; move=> /orP[-> // | ] /= /orP[ | ->]; last first.
+      rewrite /end_edge heq; move=> /orP[-> // | ] /= /orP[ | ->]; last first.
         by rewrite orbT.
       move: puh=> /[swap] /eqP <-; rewrite strict_nonAunder; last first.
         by apply: valid_edge_right.
       by rewrite right_on_edge.
     have := (proj2 (andP (allP clae lcc _))); rewrite ?heq; apply.
-    by rewrite ocd; case : (cc) => [ | ? ?]; rewrite !(mem_cat, inE) eqxx ?orbT.
+    rewrite /open ocd'.
+    by case : (cc) => [ | ? ?]; rewrite !(mem_cat, inE) eqxx ?orbT.
   move: cle => /= /andP[] cloe _.
+  move: endle endhe; rewrite leq heq => endle endhe.
   have clan := opening_cells_close vle vhe oute endle endhe cloe.
   have := (insert_opening_closeness close_fc clan close_lc).
-  by rewrite /opening_cells oca_eq -cats1 -!catA.
+  by rewrite /opening_cells -leq -heq oca_eq -cats1 -!catA.
 
 (* TODO: RECOVER!
 Lemma step_keeps_closeness open  e (future_events : seq event) :
