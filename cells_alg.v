@@ -1616,7 +1616,12 @@ case: ifP => [ebelow_st | eonlsthe].
       move: adj; rewrite /open lop_eq s1_eq /= => /adjacent_catW[] _.
       rewrite /= cat_path last_rcons /= => /andP[] _ /andP[] /eqP <- _.
       by apply: strulop; rewrite lop_eq s1_eq !(mem_cat, mem_rcons, inE) eqxx.
-fail.
+    have nlo : ~ event_close_edge (low x) e.
+      move: blx => /[swap] /eqP <-.
+      by rewrite -(negbK (_ <<< _)) right_pt_above.
+    have nhi // : ~ event_close_edge (high x) e.
+    move: (strulop _ xin) => /[swap] /eqP <-.
+    by rewrite -(negbK (_ <<< _)) right_pt_above.
   case uoc_eq : (update_open_cell _ _) =>
     [new_op new_lsto] [] <- <- <- _ _ _ _.
   apply/allP=> x; rewrite !(mem_cat, inE) -!orbA.
@@ -1652,7 +1657,7 @@ fail.
     have := opening_cells_close vlstl vlsth oute lowlsto_end highlsto_end cloe.
     move/allP=>/(_ new_lsto); rewrite /opening_cells oca_eq mem_rcons inE eqxx.
     by apply.
-  move=> xin; apply: (allP (head_not_end lopclae _) x xin).
+  by move=> xin; apply: (allP (head_not_end lopclae _) x xin).
 fail.
 (* TODO: RECOVER!
 Lemma step_keeps_closeness open  e (future_events : seq event) :
