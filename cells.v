@@ -457,7 +457,7 @@ by move=> ->; rewrite orbT.
 Qed.
 
 Lemma valid_between_events g e p future :
-lexPt e p ->
+lexePt e p ->
 (forall e', e' \in future -> lexePt p (point e')) ->
 valid_edge g e -> inside_box p -> end_edge g future ->
 valid_edge g p.
