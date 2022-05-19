@@ -1552,7 +1552,8 @@ Definition state_open_seq (s : scan_state) :=
 
 Definition invariant1 (s : scan_state) :=
   close_alive_edges (state_open_seq s) future_events /\
-  seq_valid (state_open_seq s) p.
+  seq_valid (state_open_seq s) p /\
+  adjacent_cells (state_open_seq s).
 
 Let val_between g (h : valid_edge g (point e)) := 
   valid_between_events elexp plexfut h inbox_p.
@@ -1617,23 +1618,63 @@ split.
 have subfc : {subset fc <= open} by move=> x xin; rewrite ocd mem_cat xin.
 have sublc : {subset lc <= open}.
   by move=> x xin; rewrite ocd !(mem_cat, inE) xin !orbT.
-suff : seq_valid ((fc ++ nos) ++ nlsto :: lc) p by [].
-apply/allP=> x; rewrite !(mem_cat, inE) -orbA => /orP[xf | ].
-  have /andP [vlx vhx] := allP sval x (subfc _ xf).
-  have := (allP main x); rewrite mem_cat xf => /(_ isT) /andP claex.
-  by rewrite (val_between vlx) ?(val_between vhx); case: claex.
-rewrite orbA=> /orP[ | xl]; last first.
-  have /andP [vlx vhx] := allP sval x (sublc _ xl).
-  move: elexp;rewrite lexePt_eqVlt => /orP[/eqP <- | elexp'].
-    by rewrite vlx vhx.
-  have := (allP main x).
-  rewrite 2!mem_cat xl !orbT => /(_ isT) /andP claex.
-  by rewrite (val_between vlx) ?(val_between vhx); case: claex.
-move=> xin; have xin' : x \in opening_cells (point e) (outgoing e) le he.
-  by rewrite /opening_cells oca_eq mem_rcons inE orbC.
-have [vlx vhx] := andP (allP (opening_valid oute vle vhe) _ xin').
-have [eelx eehx] := andP (allP clan _ xin').
-by rewrite (val_between vlx) ?(val_between vhx).
+have svaln : seq_valid ((fc ++ nos) ++ nlsto :: lc) p.
+  apply/allP=> x; rewrite !(mem_cat, inE) -orbA => /orP[xf | ].
+    have /andP [vlx vhx] := allP sval x (subfc _ xf).
+    have := (allP main x); rewrite mem_cat xf => /(_ isT) /andP claex.
+    by rewrite (val_between vlx) ?(val_between vhx); case: claex.
+  rewrite orbA=> /orP[ | xl]; last first.
+    have /andP [vlx vhx] := allP sval x (sublc _ xl).
+    move: elexp;rewrite lexePt_eqVlt => /orP[/eqP <- | elexp'].
+      by rewrite vlx vhx.
+    have := (allP main x).
+    rewrite 2!mem_cat xl !orbT => /(_ isT) /andP claex.
+    by rewrite (val_between vlx) ?(val_between vhx); case: claex.
+  move=> xin; have xin' : x \in opening_cells (point e) (outgoing e) le he.
+    by rewrite /opening_cells oca_eq mem_rcons inE orbC.
+  have [vlx vhx] := andP (allP (opening_valid oute vle vhe) _ xin').
+  have [eelx eehx] := andP (allP clan _ xin').
+  by rewrite (val_between vlx) ?(val_between vhx).
+split.
+  by exact: svaln.
+suff : adjacent_cells ((fc ++ nos) ++ nlsto :: lc) by [].
+rewrite -catA.
+have oldnnil : rcons cc lcc != nil.
+  by apply/eqP/rcons_neq0.
+have oute' :
+   {in sort (@edge_below _) (outgoing e), forall g, left_pt g == (point e)}.
+  by move=> x; rewrite mem_sort; apply: oute.
+have [adjnew lownew] := adjacent_opening_aux' vle vhe oute' oca_eq.
+rewrite -cat_rcons; apply: (replacing_seq_adjacent oldnnil).
+- by apply/eqP/rcons_neq0.
+- by apply/esym; rewrite lownew; move: leq; case: (cc) => [ | ? ?].
+- rewrite !last_rcons.
+  by have := opening_cells_aux_high_last vle vhe oute'; rewrite oca_eq heq.
+- by move: adj; rewrite ocd cat_rcons.
+by apply: adjnew.
+Qed.
+
+Let oute' : {in sort (@edge_below _) (outgoing e),
+    forall g, left_pt g == (point e)}.
+Proof. by move=> x; rewrite mem_sort; apply: oute. Qed.
+
+Lemma adjacent_update_open_cell new_op new_lsto:
+  update_open_cell lsto e = (new_op, new_lsto) ->
+  low lsto = low (head dummy_cell (rcons new_op new_lsto)) /\
+  high lsto = high (last dummy_cell (rcons new_op new_lsto)) /\
+  adjacent_cells (rcons new_op new_lsto).
+Proof.
+rewrite /update_open_cell.
+case o_eq : (outgoing e) => [ | g os].
+  by move=> [] <- <- /=.
+rewrite -o_eq.
+move=> oca_eq.
+have [vlo vho] : valid_edge (low lsto) (point e) /\
+       valid_edge (high lsto) (point e).
+  by apply/andP/(allP sval); rewrite lstoin.
+have [-> ->] := adjacent_opening_aux' vlo vho oute' oca_eq.
+have := opening_cells_aux_high_last vlo vho oute'.
+by rewrite oca_eq last_rcons /= => ->.
 Qed.
 
 Lemma step_keeps_invariant1 :
@@ -1767,31 +1808,44 @@ case: ifP => [ebelow_st | eonlsthe].
     by move=> xin; apply: (allP (head_not_end lopclae _) x xin).
   split=> //.
   rewrite -cat_rcons -cats1 -(catA _ _ [:: new_lsto]) cats1.
-  apply/allP=> x; rewrite 2!mem_cat (orbC (_ \in fop)) -orbA=> /orP[] xin.
-    have /andP[eelx eehx] : end_edge (low x) future_events &&
+  split.
+    apply/allP=> x; rewrite 2!mem_cat (orbC (_ \in fop)) -orbA=> /orP[] xin.
+      have /andP[eelx eehx] : end_edge (low x) future_events &&
                           end_edge (high x) future_events.
-      apply: (allP clae_part); rewrite -cat_rcons -cats1 -(catA fop).
-      by rewrite cats1 2!mem_cat xin orbT.
-    have [vlo vho] : valid_cell lsto (point e).
-       by apply/andP; apply: (allP sval lsto).
-    have [vlxe vhxe] : valid_cell x (point e).
-      move: uoc_eq; rewrite /update_open_cell.
-      case o_eq : (outgoing e) xin => [ | g s].
-        by move=> /[swap] -[] <- <-; rewrite /valid_cell inE=> /eqP ->.
-      move=> xin.
-      have := allP (opening_valid oute vlo vho); rewrite /opening_cells=>/[swap].
-      rewrite -o_eq; case: (opening_cells_aux _ _ _ _) => a b [] -> -> /(_ _ xin).
-      by move/andP.
-    by rewrite !val_bet.
-  have /andP[vlx vhx] :
+        apply: (allP clae_part); rewrite -cat_rcons -cats1 -(catA fop).
+        by rewrite cats1 2!mem_cat xin orbT.
+      have [vlo vho] : valid_cell lsto (point e).
+         by apply/andP; apply: (allP sval lsto).
+      have [vlxe vhxe] : valid_cell x (point e).
+        move: uoc_eq; rewrite /update_open_cell.
+        case o_eq : (outgoing e) xin => [ | g s].
+          by move=> /[swap] -[] <- <-; rewrite /valid_cell inE=> /eqP ->.
+        move=> xin.
+        have := allP (opening_valid oute vlo vho); rewrite /opening_cells=>/[swap].
+        rewrite -o_eq; case: (opening_cells_aux _ _ _ _) => a b [] -> -> /(_ _ xin).
+        by move/andP.
+      by rewrite !val_bet.
+    have /andP[vlx vhx] :
     valid_edge (low x) (point e) && valid_edge (high x) (point e).
-    apply: (allP sval); rewrite /open !(mem_cat, inE).
-    by move: xin=> /orP[] ->; rewrite ?orbT.
-  have /andP[eex eehx] :
+      apply: (allP sval); rewrite /open !(mem_cat, inE).
+      by move: xin=> /orP[] ->; rewrite ?orbT.
+    have /andP[eex eehx] :
      end_edge (low x) future_events && end_edge (high x) future_events.
-    apply: (allP clae_part x); rewrite !(mem_cat, inE).
-    by move: xin=> /orP[] ->; rewrite ?orbT.
-  by rewrite !val_bet.
+      apply: (allP clae_part x); rewrite !(mem_cat, inE).
+      by move: xin=> /orP[] ->; rewrite ?orbT.
+    by rewrite !val_bet.
+  rewrite -catA.
+  have lstonnil : [:: lsto] != nil by [].
+  have [vllsto vhlsto] : valid_edge (low lsto) (point e) /\
+                         valid_edge (high lsto) (point e).
+    by apply/andP/(allP sval); rewrite mem_cat inE eqxx orbT.
+  have [lq [hq adjnew]] := adjacent_update_open_cell uoc_eq.
+  apply: (replacing_seq_adjacent lstonnil).
+  - by apply/eqP/rcons_neq0.
+  - by rewrite /= lq.
+  - by rewrite /= hq.
+  - by rewrite /= adj.
+  by apply: adjnew.
 have lsto_ctn : contains_point'(point e) lsto.
   by rewrite /contains_point' -lstheq (negbFE ebelow) abovelstle.
 have exi2 : exists2 c, c \in (lsto :: lop) & contains_point' (point e) c.
