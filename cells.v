@@ -499,6 +499,22 @@ rewrite cat_path /= cat_path; rewrite pfc -a1a2 jfca1 pl2.
 by move: plc; case: lc => [// | a3 l3 /=]; rewrite -l1l2.
 Qed.
 
+Lemma replacing_seq_cells_bottom_top l1 l2 fc lc :
+  l1 != nil -> l2 != nil ->
+  low (head dummy_cell l1) = low (head dummy_cell l2) ->
+  high (last dummy_cell l1) = high (last dummy_cell l2) ->
+  cells_bottom_top (fc ++ l1 ++ lc) = cells_bottom_top (fc ++ l2 ++ lc).
+Proof.
+move=> l1n0 l2n0 hds tls.
+case: fc => [ | c1 fc]; case: lc => [ | c2 lc];
+   rewrite /cells_bottom_top /cells_low_e_top /= ?cats0.
+-  by rewrite l1n0 l2n0 hds tls.
+-  case : l1 l1n0 hds tls => [ // | c1 l1] _; case: l2 l2n0 => [ | c3 l2] //= _.
+   by move=> -> lts; rewrite !last_cat /=.
+- case: l1 l1n0 tls {hds} => [ | c1' l1] //= _; case: l2 l2n0 => [ | c2' l2] //.
+  by move=> _ /=; rewrite !last_cat /= => ->.
+by rewrite !last_cat /=.
+Qed.
 
 Definition all_edges cells events :=
   cell_edges cells ++ events_to_edges events.
