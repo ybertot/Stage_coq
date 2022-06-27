@@ -112,6 +112,13 @@ Definition open_cells_decomposition (open_cells : seq cell) (p : pt) :
 let '(fc, cc, c', lc) := open_cells_decomposition_rec open_cells p in
 (fc, cc, c', lc, low (head c' cc), high c').
 
+(* invariants:
+1. adjacent_cells (rcons sc_open1 lst_open ++ sc_open2)
+2. high lst_open = lst_high ("high edge")
+3. lst_x == 1st coordinate of the point in the event treated last
+4. "rcons sc_closed" lst_closed must cover all the space at the left of then
+   sweeping line that is not covered by open cells
+*)
 Record scan_state :=
   Bscan {sc_open1 : seq cell;
          lst_open : cell;
