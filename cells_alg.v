@@ -2686,6 +2686,7 @@ Lemma step_keeps_edge_side_default ncs lnc lh lx:
     let '(nos, lno) :=
       opening_cells_aux (point e)
        (sort (@edge_below _) (outgoing e)) le he in
+  close_alive_edges (fc ++ nos ++ lno :: lc) future_events ->
   edge_side future_events
     (state_open_seq {| sc_open1 := fc ++ nos;
        lst_open := lno;
@@ -2698,6 +2699,7 @@ Proof.
 case oe : (open_cells_decomposition open (point e)) =>
   [[[[[fc cc] lcc] lc] le] he].
 case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+move=> clae'.
 rewrite /state_open_seq /=.
 case futq : future_events => [ // | e' events] /=.
 have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]]
@@ -2736,27 +2738,110 @@ have commondiff c : c \in lcc :: fc ++ lc ->
     by move: cin; rewrite ocd !(inE, mem_cat) => /orP[/eqP -> | /orP[] ->];
       rewrite ?eqxx ?orbT.
   have : end_edge (high c) (e' :: events).
+    rewrite -futq.
     move: cin; rewrite inE => /orP[/eqP -> | cin]; last first.
-      apply: (proj2 (andP (allP clae c _))).
-      by move: cin; rewrite !mem_cat => /orP[] ->; rewrite ?orbT.
-    move: (allP clae hec'); rewrite !mem_cat hec'in ?orbT.
-    by move=> /(_ isT) /andP[]; rewrite B -E.
+      apply: (proj2 (andP (allP clae' c _))).
+      by move: cin; rewrite !mem_cat inE => /orP[] ->; rewrite ?orbT.
+    rewrite -heq -highlnoq.
+    move: (allP clae' lno).
+    by rewrite !mem_cat inE eqxx ?orbT=> /(_ isT) /andP[].
   rewrite /end_edge /event_close_edge /= orbA.
   move => /orP[rpt_easy | /hasP [ev2 ev2in /eqP rhc]].
     by apply: (rpt_ev' _ rpt_easy).
   case:ifP=> [vev' | //]; case:ifP=> [cbev' | _]; [ | case:ifP=> [caev' | // ]].
     rewrite rhc.
-    have /orP[-> // | /andP[samex2 cmp2]] : lexPt (point ev') (point ev2).
-      move: lexev; rewrite /= => /andP[] _; rewrite path_sortedE; last first.
+    have /orP[-> // | /andP[samex2 cmp2]] : lexPt (point e') (point ev2).
+      move: sort_evs; rewrite futq /= => /andP[] _.
+      rewrite path_sortedE; last first.
         exact: lexPtEv_trans.
       by move=> /andP[] /allP /(_ ev2 ev2in).
     have := on_pvert (right_on_edge (high c)); rewrite rhc =>samey.
     have /eqP samey' := same_pvert_y vev' samex2.
     by move: cmp2; rewrite -samey -samey' ltNge le_eqVlt cbev' orbT.
   apply: (le_lt_trans (lef _ cino)).
-  by move: evev'; rewrite /lexPt lt_neqAle (negbTE diffx) orbF.
-
-
+  by move: ee'; rewrite /lexPt lt_neqAle (negbTE diffx) orbF.
+apply/allP => g /mapP[c + /[dup] geq ->]; rewrite !mem_cat inE.
+  rewrite -orbA (orbA (c \in nos)) orbCA orbC /edge_side_prop.
+  move=> /orP[ /orP[] | ].
+- move=> cfc.
+  have cino : c \in open by rewrite ocd mem_cat cfc.
+  have vev : valid_edge (high c) (point e).
+    by apply/(seq_valid_high sval)/map_f.
+  have evafc : pvert_y (point e) (high c) < p_y (point e).
+    have := decomposition_above_high_fc oe cbtom adj
+              (inside_box_between inbox_e) rfo sval cfc.
+    by rewrite under_pvert_y // -ltNge.
+  have [samex | diffx] := boolP(p_x (point e) == p_x (point e')); last first.
+    by apply: commondiff=> //; rewrite inE mem_cat cfc ?orbT.
+  case: ifP=> [vev' | //].
+  have higher : p_y (point e) < p_y (point e').
+    move: sort_evs; rewrite futq /= /lexPtEv /lexPt => /andP[].
+    by rewrite lt_neqAle samex /=.
+  rewrite (le_lt_trans _ higher); last first.
+    by rewrite -(eqP (same_pvert_y vev samex)) le_eqVlt evafc orbT.
+  rewrite -(eqP samex).
+  have := allP gs (high c); rewrite /edge_side_prop map_f // vev => /(_ isT).
+  by rewrite evafc.
+- move=> clc.
+  have cino : c \in open by rewrite ocd !mem_cat inE clc !orbT.
+  have vev : valid_edge (high c) (point e).
+    by apply/(seq_valid_high sval)/map_f.
+  have [samex | diffx] :=
+         boolP(p_x (point e) == p_x (point e')); last first.
+    by apply: commondiff => //; rewrite inE mem_cat clc !orbT.
+  have yevev' : p_y (point e) < p_y (point e').
+    move: sort_evs; rewrite futq /= /lexPtEv/lexPt lt_neqAle eq_sym.
+    move=> /andP[] + _.
+    by rewrite eq_sym samex.
+  move: (allP clae' c); rewrite !mem_cat inE clc ?orbT=> /(_ isT) /andP[] _.
+  rewrite /end_edge futq /= orbA.
+  move => /orP[rpt_easy | /hasP[ev2 ev2in /eqP rhc]].
+    by apply: rpt_ev' rpt_easy.
+  case: ifP => [vce' | //]; case: ifP => [cbev' | _]; last first.
+    case: ifP => [caev' | //].
+    have := allP gs (high c).
+    rewrite /edge_side_prop map_f ?cino // vev => /(_ isT).
+    suff caev : p_y (point e) < pvert_y (point e) (high c).
+      rewrite caev ltNge le_eqVlt caev orbT /=.
+      by rewrite (eqP samex).
+    by move: caev'; rewrite (eqP (same_pvert_y vev samex)); apply: lt_trans.
+  rewrite rhc.
+  have /orP[// | /andP[samex2 cmp2] ] : lexPt (point e') (point ev2).
+    move: sort_evs; rewrite futq /= => /andP[] _.
+    rewrite path_sortedE; last first.
+      exact: lexPtEv_trans.
+    by move=> /andP[] /allP /(_ ev2 ev2in).
+  have := on_pvert (right_on_edge (high c)); rewrite rhc =>samey.
+  have /eqP samey' := same_pvert_y vce' samex2.
+  by move: cmp2; rewrite -samey -samey' ltNge le_eqVlt cbev' orbT.
+move=> cinn.
+have := opening_cells_aux_subset vle vhe (outleft_event_sort oute) oca_eq.
+move=> /(_ c); rewrite mem_rcons inE orbC cinn=> /(_ isT) /andP[] _.
+rewrite inE=> /orP[/eqP ishe | ].
+- have heino : lcc \in open by rewrite ocd !mem_cat inE eqxx ?orbT.
+  have := allP clae' lno; rewrite !mem_cat inE eqxx ?orbT=> /(_ isT)/andP[] _.
+  rewrite /end_edge futq /= orbA =>/orP[rpt_easy| /hasP[ev2 ev2in /eqP rhc]].
+    by rewrite ishe -highlnoq; apply: rpt_ev' rpt_easy.
+  have [_ heaev] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+  move: heaev; rewrite strict_under_pvert_y // => heaev.
+  have [samex | diffx] := boolP(p_x (point ev) == p_x (point ev')); last first.
+    rewrite ishe -B.
+    by apply: commondiff => //; rewrite inE eqxx.
+  have samey := same_pvert_y vhe samex.
+  case: ifP => [vce' | //].
+  rewrite ishe.
+  have := partedge he; rewrite -B map_f /edge_side_prop; last first.
+    by rewrite ocd C D !mem_cat mem_last !orbT.
+  rewrite B vhe heaev ltNge le_eqVlt heaev orbT /= (eqP samex) => /(_ isT) ->.
+  have : lexPt (point ev') (point ev2).
+    move: lexev; rewrite /= => /andP[] _; rewrite path_sortedE; last first.
+      exact: lexPtEv_trans.
+    by move=> /andP[] /allP /(_ ev2 ev2in).
+  move=> /orP[ | /andP[samex2 cmp2] ].
+    by rewrite rhc => -> ; case: ifP=> //; case: ifP=> //.
+  have := same_pvert_y vce' samex2; rewrite ishe -(eqP samey) => /eqP ->.
+  have := on_pvert (right_on_edge he); rewrite rhc => ->.
+  by rewrite ltNge le_eqVlt cmp2 orbT /=.
 Lemma step_keeps_edge_side :
   edge_side future_events 
        (state_open_seq (step e (Bscan fop lsto lop cls lstc lsthe lstx))).
@@ -2765,84 +2850,6 @@ remember (step _ _) as new_state eqn: new_stateq.
 rewrite new_stateq /=.
 Proof.
 (* 
-rewrite /step.
-have rpt_ev' : forall g, 
-have commondiff c : c \in hec :: fc ++ lc ->
-  p_x (point ev) != p_x (point ev') -> edge_side_prop ev' (high c).
-  move=> cin diffx; rewrite /edge_side_prop.
-  have cino : c \in open.
-    by move: cin; rewrite ocd !(inE, mem_cat) => /orP[/eqP -> | /orP[] ->];
-      rewrite ?orbT // C D mem_last ?orbT.
-  have : end_edge (high c) (ev' :: events).
-    move: cin; rewrite inE => /orP[/eqP -> | cin]; last first.
-      apply: (proj2 (andP (allP clae c _))).
-      by move: cin; rewrite !mem_cat => /orP[] ->; rewrite ?orbT.
-    move: (allP clae hec'); rewrite !mem_cat hec'in ?orbT.
-    by move=> /(_ isT) /andP[]; rewrite B -E.
-  rewrite /end_edge /event_close_edge /= orbA.
-  move => /orP[rpt_easy | /hasP [ev2 ev2in /eqP rhc]].
-    by apply: (rpt_ev' _ rpt_easy).
-  case:ifP=> [vev' | //]; case:ifP=> [cbev' | _]; [ | case:ifP=> [caev' | // ]].
-    rewrite rhc.
-    have /orP[-> // | /andP[samex2 cmp2]] : lexPt (point ev') (point ev2).
-      move: lexev; rewrite /= => /andP[] _; rewrite path_sortedE; last first.
-        exact: lexPtEv_trans.
-      by move=> /andP[] /allP /(_ ev2 ev2in).
-    have := on_pvert (right_on_edge (high c)); rewrite rhc =>samey.
-    have /eqP samey' := same_pvert_y vev' samex2.
-    by move: cmp2; rewrite -samey -samey' ltNge le_eqVlt cbev' orbT.
-  apply: (le_lt_trans (lef _ cino)).
-  by move: evev'; rewrite /lexPt lt_neqAle (negbTE diffx) orbF.
-apply/allP => g /mapP[c + /[dup] geq ->]; rewrite !mem_cat => /orP[];
-  [ | rewrite orbC => /orP[]]; rewrite /edge_side_prop.
-- move=> cfc.
-  have cino : c \in open by rewrite ocd mem_cat cfc.
-  have vev : valid_edge (high c) (point ev).
-    by apply/(seq_valid_high sval)/map_f.
-  have evafc : pvert_y (point ev) (high c) < p_y (point ev).
-    have := decomposition_above_high_fc oe cbtom adj inbox_e rfo sval cfc.
-    by rewrite under_pvert_y // -ltNge.
-  have [samex | diffx] := boolP(p_x (point ev) == p_x (point ev')); last first.
-    by apply: commondiff=> //; rewrite inE mem_cat cfc ?orbT.
-  case: ifP=> [vev' | //].
-  have higher : p_y (point ev) < p_y (point ev').
-    move: lexev; rewrite /= /lexPtEv /lexPt => /andP[].
-    by rewrite lt_neqAle samex /=.
-  rewrite (le_lt_trans _ higher); last first.
-    by rewrite -(eqP (same_pvert_y vev samex)) le_eqVlt evafc orbT.
-  rewrite -(eqP samex).
-  have := partedge (high c); rewrite /edge_side_prop map_f // vev => /(_ isT).
-  by rewrite evafc.
-- move=> clc.
-  have cino : c \in open by rewrite ocd !mem_cat clc !orbT.
-  have vev : valid_edge (high c) (point ev).
-    by apply/(seq_valid_high sval)/map_f.
-  have [samex | diffx] :=
-         boolP(p_x (point ev) == p_x (point ev')); last first.
-    by apply: commondiff => //; rewrite inE mem_cat clc !orbT.
-  have yevev' : p_y (point ev) < p_y (point ev').
-    move: lexev; rewrite /= /lexPtEv/lexPt lt_neqAle eq_sym=> /andP[] + _.
-    by rewrite eq_sym samex.
-  move: clae=> /allP/(_ c); rewrite !mem_cat clc ?orbT => /(_ isT) /andP[] _.
-  rewrite /end_edge/event_close_edge /= orbA.
-  move => /orP[rpt_easy | /hasP[ev2 ev2in /eqP rhc]].
-    by apply: rpt_ev' rpt_easy.
-  case: ifP => [vce' | //]; case: ifP => [cbev' | _]; last first.
-    case: ifP => [caev' | //].
-    have := partedge (high c).
-    rewrite /edge_side_prop map_f ?cino // vev => /(_ isT).
-    suff caev : p_y (point ev) < pvert_y (point ev) (high c).
-      rewrite caev ltNge le_eqVlt caev orbT /=.
-      by rewrite (eqP samex).
-    by move: caev'; rewrite (eqP (same_pvert_y vev samex)); apply: lt_trans.
-  rewrite rhc.
-  have /orP[// | /andP[samex2 cmp2] ] : lexPt (point ev') (point ev2).
-    move: lexev; rewrite /= => /andP[] _; rewrite path_sortedE; last first.
-      exact: lexPtEv_trans.
-    by move=> /andP[] /allP /(_ ev2 ev2in).
-  have := on_pvert (right_on_edge (high c)); rewrite rhc =>samey.
-  have /eqP samey' := same_pvert_y vce' samex2.
-  by move: cmp2; rewrite -samey -samey' ltNge le_eqVlt cbev' orbT.
 move=> /(opening_cells_subset vle vhe outs).
 move=>/andP[] _; rewrite inE => /orP[/eqP ishe | ].
 - have heino : hec \in open by rewrite ocd C D !mem_cat mem_last !orbT.
