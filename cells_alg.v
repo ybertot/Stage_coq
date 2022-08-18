@@ -1490,6 +1490,8 @@ Variable future_events : seq event.
 Variable p : pt.
 
 Let open := (fop ++ lsto :: lop).
+(* There is almost no guarantee where lsto is with respect to the next event. *)
+(* It is only guaranteed to be the highest of the last created cells. *)
 
 Hypothesis inbox_e : inside_box (point e).
 Hypothesis oute : out_left_event e.
@@ -1826,6 +1828,10 @@ case: ifP=> [eabove | ebelow].
   move=> [] <- <- <- _ _ _ _.
   have := default_case nil lsto lsthe (p_x (point e)).
   by rewrite oe' oca_eq /invariant1 /state_open_seq /= cat_rcons.
+have [vllsto vhlsto] : valid_edge (low lsto) (point e) /\
+                       valid_edge (high lsto) (point e).
+  move: sval=> /allP /(_ lsto); rewrite /open mem_cat inE eqxx orbT.
+  by move=> /(_ isT) /andP.
 case: ifP => [ebelow_st | eonlsthe].
   have vlop : seq_valid lop (point e).
     by apply/allP=> x xin; apply: (allP sval); apply: inlop.
@@ -1907,8 +1913,10 @@ case: ifP => [ebelow_st | eonlsthe].
         case o_eq : (outgoing e) xin => [ | g s].
           by move=> /[swap] -[] <- <-; rewrite /valid_cell inE=> /eqP ->.
         move=> xin.
-        have := allP (opening_valid oute vlo vho); rewrite /opening_cells=>/[swap].
-        rewrite -o_eq; case: (opening_cells_aux _ _ _ _) => a b [] -> -> /(_ _ xin).
+        have := allP (opening_valid oute vlo vho).
+        rewrite /opening_cells=>/[swap].
+        rewrite -o_eq; case: (opening_cells_aux _ _ _ _) =>
+           a b [] -> -> /(_ _ xin).
         by move/andP.
       by rewrite !val_bet.
     have /andP[vlx vhx] :
@@ -1922,9 +1930,6 @@ case: ifP => [ebelow_st | eonlsthe].
     by rewrite !val_bet.
   rewrite -catA.
   have lstonnil : [:: lsto] != nil by [].
-  have [vllsto vhlsto] : valid_edge (low lsto) (point e) /\
-                         valid_edge (high lsto) (point e).
-    by apply/andP/(allP sval); rewrite mem_cat inE eqxx orbT.
   have [lq [hq adjnew]] := adjacent_update_open_cell uoc_eq.
   split.
     apply: (replacing_seq_adjacent lstonnil).
