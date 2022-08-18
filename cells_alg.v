@@ -1494,6 +1494,7 @@ Let open := (fop ++ lsto :: lop).
 (* It is only guaranteed to be the highest of the last created cells. *)
 
 Hypothesis inbox_e : inside_box (point e).
+Hypothesis inbox_es : all inside_box [seq point x | x <- future_events].
 Hypothesis oute : out_left_event e.
 Hypothesis rfo : s_right_form open.
 Hypothesis cbtom : cells_bottom_top open.
@@ -1510,6 +1511,8 @@ Hypothesis elexp : lexePt (point e) p.
 Hypothesis plexfut : {in future_events, forall e', lexePt p (point e')}.
 Hypothesis inbox_p : inside_box p.
 Hypothesis noc : {in all_edges open (e :: future_events) &, no_crossing R}.
+Hypothesis gs : edge_side  (e :: future_events) open.
+Hypothesis sort_evs : path (@lexPtEv _) e future_events.
 
 Let subo : {subset outgoing e <= all_edges open (e :: future_events)}.
 Proof.
@@ -2671,23 +2674,35 @@ have phc1 : p_y pp <= pvert_y pp (high c1).
 by apply: lt_le_trans phc1.
 Qed.
 
-Lemma step_keeps_edge_side ev open closed open' closed' events :
-  step ev open closed = (open', closed') ->
-  all inside_box [seq point i | i <- ev :: events] ->
-  out_left_event ev ->
-  s_right_form open ->
-  cells_bottom_top open ->
-  adjacent_cells open ->
-  seq_valid open (point ev) ->
-  close_edges_from_events (ev :: events) ->
-  close_alive_edges open' events ->
-  path (@lexPtEv _) ev events ->
-  {in cell_edges open ++ outgoing ev &, no_crossing R} ->
-  edge_side (ev :: events) open ->
-  edge_side events open'.
+Let open_edge_valid x :
+   x \in cell_edges open -> valid_edge x (point e).
 Proof.
-(* 
-rewrite /step.
+by rewrite /cell_edges mem_cat => /orP[] /mapP [c /(allP sval) /andP[]+ + ->].
+Qed.
+
+Lemma step_keeps_edge_side_default ncs lnc lh lx:
+  let '(fc, cc, lcc, lc, le, he) :=
+    open_cells_decomposition open (point e) in
+    let '(nos, lno) :=
+      opening_cells_aux (point e)
+       (sort (@edge_below _) (outgoing e)) le he in
+  edge_side future_events
+    (state_open_seq {| sc_open1 := fc ++ nos;
+       lst_open := lno;
+       sc_open2 := lc;
+       sc_closed := ncs;
+       lst_closed := lnc;
+       lst_high := lh;
+       lst_x := lx|}).
+Proof.
+case oe : (open_cells_decomposition open (point e)) =>
+  [[[[[fc cc] lcc] lc] le] he].
+case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+rewrite /state_open_seq /=.
+case futq : future_events => [ // | e' events] /=.
+have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]]
+  := open_cells_decomposition_main_properties oe exi.
+(*
 case oe: (open_cells_decomposition open (point ev)) => [[[[fc cc] lc] le] he].
 move: events => [// | ev' events] [] <- _ {open' closed'}
   + outs rfo cbtom adj sval cle clae lexev noc /allP partedge.
@@ -2695,25 +2710,63 @@ rewrite [X in X -> _]/= => /andP[] inbox_e /andP[] inbox_e' inbox_o.
 have [lec [hec [cc' [ocd [A [B [C D]]]]]]]:= lhc_dec cbtom adj inbox_e oe.
 have noco :  {in cell_edges open &, no_crossing R}.
   by move: noc; apply: sub_in2=> g gin; rewrite mem_cat gin.
-have lef c : c \in open -> p_x (left_pt (high c)) <= p_x (point ev).
-  by move=> cino; have [] := andP (seq_valid_high sval (map_f (@high R) cino)).
-have evev' : lexPt (point ev) (point ev') by case/andP: lexev.
-have [vle vhe] := l_h_valid cbtom adj inbox_e sval oe.
-have /eqP  := @higher_edge_new_cells ev le  he outs _ erefl vle vhe.
-set hec' := last _ _ => E.
-have hec'in : hec' \in opening_cells (point ev) (outgoing ev) le he.
-   have : opening_cells (point ev) (outgoing ev) le he != nil.
-     by apply: opening_cells_not_nil.
-  rewrite /hec'.
-  by case: (opening_cells _ _ _) => [// | /= ? ? _]; rewrite mem_last.
-have rpt_ev' : forall g, 
-  (g \in [:: bottom; top]) || (right_pt g == point ev') -> edge_side_prop ev' g.
-  move=> g /orP[gbt | gev']; rewrite /edge_side_prop.
-    move: inbox_e'=> /andP[] _ /andP[] /andP[] + + /andP[]; move: gbt.
+*)
+have lef c : c \in open -> p_x (left_pt (high c)) <= p_x (point e).
+  by move=> cino; have [] := andP (seq_valid_high sval (map_f (@high _) cino)).
+have ee' : lexPt (point e) (point e').
+  by move: sort_evs; rewrite futq /= => /andP[].
+have vle := open_edge_valid lein.
+have vhe := open_edge_valid hein.
+have := opening_cells_aux_high_last vle vhe (outleft_event_sort oute).
+  rewrite oca_eq /= => highlnoq.
+have rpt_ev' : forall g : edge,
+  (g \in [:: bottom; top])  || (right_pt g == point e') -> edge_side_prop e' g.
+  move=> g /orP[gbt | ge']; rewrite /edge_side_prop.
+    have : inside_box (point e').
+      by apply: (allP inbox_es); rewrite futq; apply/map_f; rewrite inE eqxx.
+    move=> /andP[] _ /andP[] /andP[] + + /andP[]; move: gbt.
     by rewrite !inE=> /orP[] /eqP ->; case: ifP=> //; case: ifP=> //; case: ifP.
-  case: ifP => [ _ | //].
-  have := on_pvert (right_on_edge g); rewrite (eqP gev') => ->.
+  case: ifP=> [ _ | // ].
+  have := on_pvert (right_on_edge g); rewrite (eqP ge') => ->.
   by rewrite !lt_irreflexive.
+have commondiff c : c \in lcc :: fc ++ lc ->
+  p_x (point e) != p_x (point e') -> edge_side_prop e' (high c).
+  move=> cin diffx; rewrite /edge_side_prop.
+  have cino : c \in open.
+    by move: cin; rewrite ocd !(inE, mem_cat) => /orP[/eqP -> | /orP[] ->];
+      rewrite ?eqxx ?orbT.
+  have : end_edge (high c) (e' :: events).
+    move: cin; rewrite inE => /orP[/eqP -> | cin]; last first.
+      apply: (proj2 (andP (allP clae c _))).
+      by move: cin; rewrite !mem_cat => /orP[] ->; rewrite ?orbT.
+    move: (allP clae hec'); rewrite !mem_cat hec'in ?orbT.
+    by move=> /(_ isT) /andP[]; rewrite B -E.
+  rewrite /end_edge /event_close_edge /= orbA.
+  move => /orP[rpt_easy | /hasP [ev2 ev2in /eqP rhc]].
+    by apply: (rpt_ev' _ rpt_easy).
+  case:ifP=> [vev' | //]; case:ifP=> [cbev' | _]; [ | case:ifP=> [caev' | // ]].
+    rewrite rhc.
+    have /orP[-> // | /andP[samex2 cmp2]] : lexPt (point ev') (point ev2).
+      move: lexev; rewrite /= => /andP[] _; rewrite path_sortedE; last first.
+        exact: lexPtEv_trans.
+      by move=> /andP[] /allP /(_ ev2 ev2in).
+    have := on_pvert (right_on_edge (high c)); rewrite rhc =>samey.
+    have /eqP samey' := same_pvert_y vev' samex2.
+    by move: cmp2; rewrite -samey -samey' ltNge le_eqVlt cbev' orbT.
+  apply: (le_lt_trans (lef _ cino)).
+  by move: evev'; rewrite /lexPt lt_neqAle (negbTE diffx) orbF.
+
+
+Lemma step_keeps_edge_side :
+  edge_side future_events 
+       (state_open_seq (step e (Bscan fop lsto lop cls lstc lsthe lstx))).
+Proof.
+remember (step _ _) as new_state eqn: new_stateq.
+rewrite new_stateq /=.
+Proof.
+(* 
+rewrite /step.
+have rpt_ev' : forall g, 
 have commondiff c : c \in hec :: fc ++ lc ->
   p_x (point ev) != p_x (point ev') -> edge_side_prop ev' (high c).
   move=> cin diffx; rewrite /edge_side_prop.
