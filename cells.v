@@ -309,7 +309,7 @@ valid_edge (low c) (point e) /\ valid_edge (high c) (point e) ->
 Proof.
   move => rf val ev.
 have aimpb := (close_imp_cont rf val).
-have  := (contra_not  ( contains_point (point e) c) (event_close_edge (low c) e \/ event_close_edge (high c) e) aimpb ev) .
+have  := (@contra_not  ( contains_point (point e) c) (event_close_edge (low c) e \/ event_close_edge (high c) e) aimpb ev) .
 move => /orP /= .
 rewrite negb_or.
 by move => /andP [] /negP a /negP.
