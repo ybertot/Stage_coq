@@ -1514,6 +1514,9 @@ Hypothesis noc : {in all_edges open (e :: future_events) &, no_crossing R}.
 Hypothesis gs : edge_side  (e :: future_events) open.
 Hypothesis sort_evs : path (@lexPtEv _) e future_events.
 
+Let bet_e : between_edges bottom top (point e).
+Proof. by apply inside_box_between. Qed.
+
 Let subo : {subset outgoing e <= all_edges open (e :: future_events)}.
 Proof.
 move=> x xo.
@@ -1529,7 +1532,7 @@ by move=> x; rewrite mem_sort=> xo; apply: subo.
 Qed.
 
 Let exi : exists2 c, c \in open & contains_point' (point e) c.
-Proof. by apply: (exists_cell cbtom adj (inside_box_between inbox_e)). Qed.
+Proof. by apply: (exists_cell cbtom adj bet_e). Qed.
 
 Let exi' : point e >>> lsthe ->
   exists2 c, c \in lop & contains_point' (point e) c.
@@ -1600,13 +1603,11 @@ case oe : (open_cells_decomposition open (point e)) =>
 have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
     open_cells_decomposition_main_properties oe exi.
 have [pal puh vle vhe ncont] :=
-    decomposition_connect_properties rfo sval adj cbtom 
-            (inside_box_between inbox_e) oe.
+    decomposition_connect_properties rfo sval adj cbtom bet_e oe.
 case oca_eq:(opening_cells_aux _ _ _ _) => [nos nlsto].
 rewrite /invariant1 /state_open_seq /=.
 have dec_not_end :=
-    decomposition_not_end rfo sval adj cbtom 
-          (inside_box_between inbox_e) oe.
+    decomposition_not_end rfo sval adj cbtom bet_e oe.
 have close_fc : close_alive_edges fc future_events.
   suff/head_not_end : close_alive_edges fc (e :: future_events).
     by apply=> c0 cin; apply: dec_not_end; rewrite cin.
@@ -2000,9 +2001,10 @@ have cbtom' : cells.cells_bottom_top (low lsto) top (lsto :: lop).
 have bet : between_edges (low lsto) top (point e).
   rewrite /between_edges (proj1 (andP lsto_ctn)).
   by move: inbox_e=>/andP[]/andP[] _ -> _.
+(* TODO : replace by a use of decomposition_connect_properties *)
 have [pal puh vl vh not_ct] := 
-  connect_properties cbtom adj rfo sval (inside_box_between inbox_e)
-     ocd all_nct all_ct lcc_ctn flcnct.
+  connect_properties cbtom adj rfo sval bet_e ocd all_nct all_ct
+  lcc_ctn flcnct.
 have claef' : close_alive_edges (fop ++ fc') future_events.
   elim/last_ind: {-1}(fop ++ fc') (erefl (fop ++ fc')) => [// | fc2 c2 _] f_eq.
   have hc2q : high c2 = low (head lcc cc).
@@ -2171,7 +2173,7 @@ case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
 have [ocd [_ [_ [_ [_ [leq [heq [lein hein]]]]]]]]:=
   open_cells_decomposition_main_properties oe exi.
 have [pal puh vle vhe A']:= decomposition_connect_properties rfo sval adj cbtom
-  (inside_box_between inbox_e) oe.
+  bet_e oe.
 have sublehe : {subset rcons (le :: sort (@edge_below _) (outgoing e)) he <=
                   all_edges open (e :: future_events)}.
   move=> x; rewrite mem_rcons inE => /orP[/eqP -> | ].
@@ -2307,7 +2309,7 @@ have [ocd [_ [_ [_ [_ [heq [leq [lein hein]]]]]]]] :=
    open_cells_decomposition_main_properties oe exi.
 have [pal puh vle vhe X] :=
   decomposition_connect_properties rfo sval adj cbtom 
-    (inside_box_between inbox_e) oe.
+    bet_e oe.
 set result_open :=
    fc ++ opening_cells (point e) (outgoing e) le he ++ lc.
 rewrite /opening_cells.
@@ -2328,15 +2330,12 @@ have adj' : adjacent_cells result_open.
 have nceq : opening_cells (point e) (outgoing e) le he = rcons s' c'.
   by rewrite /opening_cells oca_eq.
 have [nle nhe]:=
-    higher_lower_equality oute oe nceq (exists_cell cbtom adj 
-         (inside_box_between inbox_e))
-         vle vhe.
+    higher_lower_equality oute oe nceq exi vle vhe.
 have [fceq | [fc' [lfc fceq]]] : fc = nil \/ exists fc' lfc, fc = rcons fc' lfc.
     by elim/last_ind : (fc) => [ | fc' lfc _];[left | right; exists fc', lfc].
   by rewrite fceq.
 have lfceq : high lfc = le.
-  have := last_first_cells_high cbtom adj 
-             (inside_box_between inbox_e) oe; rewrite fceq.
+  have := last_first_cells_high cbtom adj bet_e oe; rewrite fceq.
   by rewrite map_rcons last_rcons.
 set s1 := [seq high c | c <- fc'].
 set s2 := [seq high c | c <- behead (rcons s' c') ++ lc].
@@ -2378,8 +2377,7 @@ have hein' : he \in all_edges open (e :: future_events).
 have  [edgesabove edgesbelow noce]:=
    outgoing_conditions pal puh lein' hein' vle vhe subo noc oute.
 have lbh : le <| he.
-  by apply: (open_cells_decomposition_low_under_high noco cbtom _
-              (inside_box_between _) _ _ oe).
+  by apply: (open_cells_decomposition_low_under_high noco cbtom _ _ _ _ oe).
 have rfr' : sorted (@edge_below R) (s1 ++ [:: le, g2 & s2]).
   have rfnew : s_right_form (opening_cells (point e) (outgoing e) le he).
       by apply: (opening_cells_right_form vle vhe (underWC pal) _ _ _ _ _ noce).
@@ -2455,8 +2453,7 @@ case: lowc2in=> [lowc2le | lowc2hnc].
   have : high c1 <| le.
     have noc' : {in cell_edges open &, no_crossing R}.
     by move: noc; apply: sub_in2=> g gin; rewrite mem_cat gin.
-    have := high_in_first_cells_below oe cbtom adj 
-              (inside_box_between inbox_e) sval rfo noc' redges.
+    have := high_in_first_cells_below oe cbtom adj bet_e sval rfo noc' redges.
     by apply; apply: map_f.
   move/edge_below_pvert_y=>/(_ _ vc1); rewrite -lowc2le vc2=> /(_ isT) c1c2.
   by apply/(le_trans belhc1').
@@ -2484,8 +2481,7 @@ move=> oe aesp lok.
 have [ocd [_ [_ [_ [_ [heq [leq [lein hein]]]]]]]] :=
   open_cells_decomposition_main_properties oe exi.
 have [pal puh vle vhe allnct] :=
-   decomposition_connect_properties rfo sval adj cbtom
-             (inside_box_between inbox_e) oe.
+   decomposition_connect_properties rfo sval adj cbtom bet_e oe.
 set new_cells := opening_cells _ _ _ _.
 set result_open := fc ++ new_cells ++ lc.
 case oca_eq : (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e))
@@ -2503,9 +2499,7 @@ have adj' : adjacent_cells result_open.
   move=> /(_ _ _ adjold adjn); rewrite cat_rcons /result_open.
   by rewrite /new_cells /opening_cells oca_eq cat_rcons.
 have [nle nhe]:=
-    higher_lower_equality oute oe erefl (exists_cell cbtom adj 
-             (inside_box_between inbox_e))
-         vle vhe.
+    higher_lower_equality oute oe erefl exi vle vhe.
 move=> c1 c2; rewrite /new_cells /opening_cells oca_eq=> c1in c2in.
 have [s3 [s4 lceq]] := mem_seq_split c2in.
 have lceq' : lc = rcons s3 c2 ++ s4 by rewrite -cats1 -catA.
@@ -2566,8 +2560,7 @@ have c1c2 : high c1 <| low c2.
    invariant. *)
     have all_left :{in he :: [seq high i | i <- lc], forall g,
            p_x (left_pt g) < p_x (point e)}.
-      have lelow := decomposition_under_low_lc oe cbtom adj
-                     (inside_box_between inbox_e) rfo sval.
+      have lelow := decomposition_under_low_lc oe cbtom adj bet_e rfo sval.
       have adjlc' : adjacent_cells (lcc :: lc).
         move: adj; rewrite ocd => /adjacent_catW[] _.
         by move=> /adjacent_catW[] _.
@@ -2862,22 +2855,20 @@ have common c : c \in lcc :: fc ++ lc ->
   rewrite inE => /orP[/eqP -> | ].
     have lccino : lcc \in open by rewrite ocd !mem_cat !inE eqxx ?orbT.
     have [ _ uhe _ _ nctn]:= decomposition_connect_properties rfo sval adj
-         cbtom (inside_box_between inbox_e) oe.
+         cbtom bet_e oe.
     apply: (last_cells_edge_side futq) => //.
     by rewrite -heq.
   rewrite mem_cat=> /orP[infc | inlc].
     have cino : c \in open by rewrite ocd !mem_cat infc.
     apply: (first_cells_edge_side futq) => //.
-    by apply: (decomposition_above_high_fc oe cbtom adj
-          (inside_box_between inbox_e) rfo sval infc).
+    by apply: (decomposition_above_high_fc oe cbtom adj bet_e rfo sval infc).
   have cino : c \in open by rewrite ocd !(mem_cat, inE) inlc ?orbT.
   have [vlc vhc] :
      valid_edge (low c) (point e) /\ valid_edge (high c) (point e).
     by apply/andP; apply: (allP sval _ cino).
   suff/(last_cells_edge_side futq cino): point e <<< high c by [].
   apply: (order_edges_strict_viz_point' vlc vhc (allP rfo _ cino)).
-  by apply: (decomposition_under_low_lc oe cbtom adj
-               (inside_box_between inbox_e) rfo sval inlc).
+  by apply: (decomposition_under_low_lc oe cbtom adj bet_e rfo sval inlc).
 apply/allP => g /mapP[c + /[dup] geq ->]; rewrite !mem_cat inE.
   rewrite -orbA (orbA (c \in nos)) orbCA orbC.
   move=> /orP[ /orP[] | ].
@@ -3061,7 +3052,7 @@ rewrite oe' => oe.
 have [ocd [_ [_ [fopfc'nct _]]]] :=
     open_cells_decomposition_main_properties oe exi.
 have [_ ebellcc _ _ _] := connect_properties cbtom adj rfo sval
-       (inside_box_between inbox_e) ocd fopfc'nct ctns ctn flcnct.
+  bet_e ocd fopfc'nct ctns ctn flcnct.
 case ogq : (outgoing e) => [ | og1 ogs] /=.
   rewrite cats0; set nop := Bcell _ _ _ _ => clae'.
   apply/allP=> g /mapP [c + ->].
@@ -3070,8 +3061,7 @@ case ogq : (outgoing e) => [ | og1 ogs] /=.
 (* TODO : big duplication here (use of below_all_cells) *)
       have cino : c \in open by rewrite /open ocd' !catA 2!mem_cat cin.
       apply: (first_cells_edge_side futq) => //.
-      by have := decomposition_above_high_fc oe cbtom adj
-           (inside_box_between inbox_e) rfo sval cin.
+      by have := decomposition_above_high_fc oe cbtom adj bet_e rfo sval cin.
     have lcsub: {subset lc <= open}.
       by move=> x xin; rewrite /open ocd' !(mem_cat, inE) xin ?orbT.
     apply: (last_cells_edge_side futq); first by apply: lcsub.
