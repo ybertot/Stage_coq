@@ -494,10 +494,10 @@ Lemma open_cells_decomposition_point_on open p fc cc lcc lc le he c:
   between_edges bottom top p ->
   seq_valid open p ->
   open_cells_decomposition open p = (fc, cc, lcc, lc, le, he) ->
-  c \in cc -> high c != he -> p === high c.
+  c \in cc -> p === high c.
 Proof.
 
-move=> cbtom adj inbox_p sval oe ccc nhe.
+move=> cbtom adj inbox_p sval oe ccc.
 have [ocd [lcc_ctn [allctn _]]]:= open_cells_decomposition_main_properties oe
            (exists_cell cbtom adj inbox_p).
 by have := in_cc_on_high adj sval ocd allctn lcc_ctn ccc.
@@ -3092,18 +3092,39 @@ case ogq : (outgoing e) => [ | og1 ogs] /=.
   rewrite /= heq.
   apply: (last_cells_edge_side futq) => //.
   by rewrite /open ocd' !(mem_cat, inE) eqxx !orbT.
-rewrite -ogq.
+rewrite -ogq /=.
 case oca_eq : (opening_cells_aux _ _ _ _) => [nops lnop] /=.
+have hein' : he \in cell_edges open.
+  by rewrite /open cell_edges_cat mem_cat hein orbT.
+move=> clae'.
 have := step_keeps_edge_side_default; rewrite oe.
-  have -> : le = low lsto.
-    have [fc'0 | [fc2 [lfc' fc'q]]] :
-      fc' = nil \/ exists fc2  lfc', fc' = rcons fc2 lfc'.
-      elim/last_ind : (fc') => [ | fc2 lfc' _];[by left | ].
-      by right; exists fc2, lfc'.
-    move: ocd'; rewrite fc'0 /= => ocd'.
-    by rewrite -[lsto]/(head lcc (lsto :: lop)) ocd' leq /=; case: (cc).
-  have : high lfc' = low lsto.
-    have := adj; rewrite /open ocd' fc'q=> /adjacent_catW[].
+have inlsto : contains_point (point e) lsto.
+  rewrite /contains_point  -leNgt ltW; last first.
+    by rewrite ltNge; exact: palstol.
+  by move: ebelow=> /negbFE; rewrite lstheq.
+have fc'0 : fc' = [::].
+  case fc'q : fc' => [// | fc'i fc2].
+  move: ocd'; rewrite fc'q /= => - [] lstoisfc'i _.
+  by move: (all_nct lsto); rewrite inlsto fc'q lstoisfc'i inE eqxx=> /(_ isT).
+have lelsto : le = low lsto.
+  have [ fopq | [fop' [lfop fopq]]] :
+      fop = nil \/ exists fop' lfop, fop = rcons fop' lfop.
+      elim/last_ind: (fop) => [| fop' lfop]; first by left.
+      by right; exists fop', lfop.
+    move: ocd'; rewrite -cat_rcons fc'0 /= => lstohead.
+    suff : lsto = head lcc cc by move=> ->.
+    by rewrite -[LHS]/(head lsto (lsto :: lop)) lstohead; case: (cc).
+  move: adj; rewrite /open ocd' fopq fc'0 cat_rcons /=.
+  move=> /adjacent_catW[] _ it.
+  move: ocd'; rewrite fc'0 /=; move: it=> /[swap] <- /andP[] /eqP <- _.
+  apply/esym; rewrite leq.
+  move: adj; rewrite /open ocd fc'0 cats0 fopq cat_rcons=>/adjacent_catW[] _.
+  by case: (cc) => [ | cc0 cc'] /andP[] /eqP ->.
+rewrite lelsto oca_eq /= /state_open_seq /= =>
+  /(_ nil dummy_cell dummy_edge 0).
+move: clae'; rewrite -futq !catA => clae'.
+by move=> /(_ clae'); rewrite futq /=.
+Qed.
 
 Lemma step_keeps_disjoint_open ev open closed open' closed' events :
   cells_bottom_top open ->
