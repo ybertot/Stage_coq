@@ -3126,6 +3126,47 @@ move: clae'; rewrite -futq !catA => clae'.
 by move=> /(_ clae'); rewrite futq /=.
 Qed.
 
+Lemma inside_box_sorted_le :
+  sorted <=%R [seq pvert_y (point e) (high c) | c <- extra_bot :: open].
+Proof.
+have sval' : seq_valid (extra_bot :: open) (point e).
+  apply/allP=> g; rewrite inE => /orP[]; last by apply: (allP sval g).
+  move=> /eqP-> /=; rewrite /valid_edge.
+  by move: inbox_e=> /andP[] _ /andP[] /andP[] /ltW -> /ltW ->.
+have adj' : adjacent_cells (extra_bot :: open).
+  rewrite /=; move: cbtom=> /andP[] /andP[]; case: (open) adj => // o1 os + _.
+  by move=> /= -> /eqP ->; rewrite eqxx.
+apply: adjacent_right_form_sorted_le_y => //.
+have rfo' : s_right_form 
+    case fcq : fc => [ |
+    rewrite /=; rewrite ocd.
+      rewrite andbb; apply/andP; split=> //.
+      by apply: (inside_box_valid_bottom_top inbox_e)=> //; rewrite inE eqxx.
+    by rewrite edge_below_refl.
+  rewrite /= => pathlt.
+  move=> g /mapP[c cin gceq].
+  have [s1 [s2 fceq]] := mem_seq_split cin.
+  have vertle : pvert_y (point ev) le < p_y (point ev).
+    have [+ _]:= l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+    rewrite under_pvert_y; last first.
+      rewrite lehcc ccdec; apply/(seq_valid_low sval)/map_f.
+      by rewrite ocd ccdec !mem_cat /= inE eqxx ?orbT.
+    by rewrite ltNge.
+  elim/last_ind : (s2) fceq => [ | s2' ls2 _] fceq.
+    rewrite gceq.
+    move: adje; rewrite ocd fceq /=.
+    rewrite cat_path ccdec /= cats1 last_rcons => /andP[] _ /andP[] /eqP higheq.
+    by rewrite higheq -lehcc => _.
+  move: pathlt; rewrite ocd fceq map_cat cat_path=> /andP[] + _.
+  rewrite map_cat cat_path => /andP[] _ /= => /andP[] _.
+  rewrite map_rcons path_sortedE; last by apply: le_trans.
+  move=>/andP[] + _ => /allP /(_ (pvert_y (point ev) (high ls2))).
+  rewrite mem_rcons inE eqxx -gceq => /(_ isT) first_part.
+  apply: (le_lt_trans first_part) => {first_part}.
+  move: (adje);  rewrite ocd /= fceq cat_path => /andP[] _.
+  rewrite -[c :: _]/([:: c] ++ _) catA -rcons_cat last_rcons ccdec /=.
+  by move=> /andP[]/eqP -> _; rewrite -lehcc.
+
 Lemma step_keeps_disjoint_open_default :
   let '(fc, cc, lcc, lc, le, he) :=
     open_cells_decomposition open (point e) in
@@ -3186,7 +3227,10 @@ have lowvert : {in fc_edges, forall g, pvert_y (point e) g < p_y (point e)}.
   have : sorted <=%R [seq pvert_y (point e) (high c) | c <- open].
     by apply: adjacent_right_form_sorted_le_y => //=.
   have : sorted <=%R [seq pvert_y (point e) (high c) | c <- extra_bot :: open].
-
+Lemma inside_box_sorted_le :
+  sorted <=%R [seq pvert_y (point e) (high c) | c <- extra_bot :: open].
+    case fcq : fc => [ |
+    rewrite /=; rewrite ocd.
       rewrite andbb; apply/andP; split=> //.
       by apply: (inside_box_valid_bottom_top inbox_e)=> //; rewrite inE eqxx.
     by rewrite edge_below_refl.
