@@ -3400,24 +3400,36 @@ case: ifP => [pxaway | /negbFE/eqP/[dup] pxhere /abovelstle palstol].
    case oe : (open_cells_decomposition (fop ++ lsto :: lop) (point e)) =>
      [[[[[fc cc] lcc] lc] le] he].
    case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
-   by move=>def_result; rewrite /state_open_seq /=; rewrite -catA.
-:
-  cells_bottom_top open ->
-  adjacent_cells open ->
-  inside_box (point ev) ->
-  seq_valid open (point ev) ->
-  s_right_form open ->
-  {in [seq low c | c <- open] ++ [seq high c | c <- open] ++
-      outgoing ev &, forall e1 e2, inter_at_ext e1 e2} ->
-  {in open &, disjoint_open_cells R} ->
-  out_left_event ev ->
-  all open_cell_side_limit_ok open ->
-  edge_side (ev :: events) open ->
-  close_alive_edges open (ev :: events) ->
-  all (fun x => lexPtEv ev x) events ->
-  step ev open closed = (open', closed') ->
-  {in open' &, disjoint_open_cells R}.
-Proof.
+   move=> def_result; rewrite /state_open_seq /= -catA.
+   apply: def_result.
+   have [+ _] := step_keeps_invariant1; rewrite /step.
+   by rewrite pxaway oe oca_eq /state_open_seq /= -catA.
+case: ifP=> [eabove | ebelow].
+  case oe: (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
+  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+  have eabove' : point e >>> low (head dummy_cell lop).
+    have llopq : low (head dummy_cell lop) = lsthe.
+      apply: esym; rewrite lstheq.
+      move: (exi' eabove)=> [w + _].
+      by move: adj=> /adjacent_catW[] _; case: (lop) => [ // | ? ?] /andP[] /eqP.
+    by rewrite llopq.
+  have oe' :
+    open_cells_decomposition open (point e) =
+     (rcons fop lsto ++ fc', cc, lcc, lc, le, he).
+    move: adj rfo sval; rewrite /open -cat_rcons=> adj' rfo' sval'.
+    move: (open_cells_decomposition_cat adj' rfo' sval' (exi' eabove)).
+    by rewrite oe; apply.
+  have := step_keeps_disjoint_open_default; rewrite oe' oca_eq.
+  rewrite [state_open_seq _]
+           (_ : _ = (rcons fop lsto ++ fc') ++ nos ++ lno :: lc); last first.
+    by rewrite /state_open_seq /= cat_rcons !catA.
+  apply.
+  have [+ _] := step_keeps_invariant1; rewrite /step pxhere eqxx /= eabove.
+  by rewrite /state_open_seq /= oe oca_eq /=; rewrite cat_rcons !catA.
+case: ifP => [ebelow_st | eonlsthe].
+  case uocq : update_open_cell => [lnop lno].
+  rewrite /state_open_seq /=.
+fail.
 
 Lemma step_keeps_disjoint ev open closed open' closed' events :
   cells_bottom_top open ->
