@@ -2558,6 +2558,14 @@ have := opening_cells_subset vle vhe oute; rewrite nceq=> /(_ _ c2in) /andP[].
 by rewrite inE=> /orP[/eqP -> | /subo //] _; rewrite lein'.
 Qed.
 
+(*
+Lemma middle_disj_last fc cc lcc lc nc:
+ open = fc ++ cc ++ lcc :: lc ->
+  new_cells = fc ++ nc ++ lc ->
+  adjacent_cells result_open ->
+  nc != nil ->
+  low (head dummy_cell nc) =low (head lcc cc) ->
+*)
 Lemma in_new_cell_not_in_last_old fc cc lcc lc le he:
   open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
   {in opening_cells (point e) (outgoing e) le he & lc,
@@ -3318,6 +3326,28 @@ rewrite geq; apply.
 by rewrite fcteq -fcteq' map_f // fcteq' last_cat /= mem_last.
 Qed.
 
+
+Lemma disjoint_open_parts fc cc lcc lc nos lno :
+   open = fc ++ cc ++ lcc :: lc ->
+  close_alive_edges (fc ++ nos ++ lno :: lc) future_events ->
+  low (head lcc cc) <| high lcc ->
+   low (head lcc cc) = low (head lno nos) ->
+   high lcc = high lno ->
+  {in rcons nos lno &, disjoint_open_cells R} ->
+  {in fc ++ nos ++ lno :: lc &, disjoint_open_cells R}.
+Proof.
+move=> ocd clae_new low_high.
+have lfcbot : fc != [::] -> low (head dummy_cell fc) = bottom.
+  move: cbtom; rewrite ocd.
+  by case: (fc) => [// | /= ca ?] /andP[] /andP[] _ /=/eqP.
+have higfc : fc != nil -> high (last dummy_cell fc) = low (head lcc cc).
+  elim/last_ind : (fc) ocd => [// |s c' _] /= ocd.
+  move: adj; rewrite ocd cat_rcons last_rcons =>/adjacent_catW[] _ /=.
+  by case: (cc) => [ | cc0 cc'] /= /andP[] /eqP ->.
+move=> le_cnct.
+move=> he_cnct.
+Admitted.
+
 Lemma step_keeps_disjoint_open_default :
   let '(fc, cc, lcc, lc, le, he) :=
     open_cells_decomposition open (point e) in
@@ -3345,11 +3375,6 @@ have noc2 : {in [:: le, he & outgoing e] &, no_crossing R}.
 have srt := sorted_outgoing vle vhe pal puh oute noc2.
 case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
 move=> clae_new.
-have clae' : close_alive_edges fc future_events.
-  by apply: all_sub clae_new; subset_tac.
-have outlefts :
- {in sort (@edge_below R) (outgoing e), forall g, left_pt g == point e}.
- by move=> g; apply: (outleft_event_sort oute).
 have higfc : fc != nil -> high (last dummy_cell fc) = le.
   elim/last_ind : (fc) ocd => [// |s c' _] /= ocd.
   move: adj; rewrite ocd cat_rcons last_rcons leq =>/adjacent_catW[] _ /=.
@@ -3360,9 +3385,6 @@ have lfcbot : fc != [::] -> low (head dummy_cell fc) = bottom.
   by case: (fc) => [// | /= ca ?] /andP[] /andP[] _ /=/eqP.
 have lowvert : {in fc_edges, forall g, pvert_y (point e) g < p_y (point e)}.
   by apply: (first_cells_strictly_below_event oe higfc lfcbot).
-have fcopen : {subset fc <= open} by rewrite ocd; subset_tac.
-have valhfc : {in [seq high c | c <- fc], forall g, valid_edge g (point e)}.
-  by move=> g /mapP[c cin ->]; apply: proj2 (andP (allP sval _ (fcopen _ _))).
 have fchright :
   {in [seq high c | c <- fc], forall g, p_x (point e) < p_x (right_pt g)}.
   apply: (first_cell_high_edges_right ocd clae_new lowvert).
@@ -3429,6 +3451,7 @@ case: ifP=> [eabove | ebelow].
 case: ifP => [ebelow_st | eonlsthe].
   case uocq : update_open_cell => [lnop lno].
   rewrite /state_open_seq /=.
+
 fail.
 
 Lemma step_keeps_disjoint ev open closed open' closed' events :
