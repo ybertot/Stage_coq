@@ -2558,14 +2558,19 @@ have := opening_cells_subset vle vhe oute; rewrite nceq=> /(_ _ c2in) /andP[].
 by rewrite inE=> /orP[/eqP -> | /subo //] _; rewrite lein'.
 Qed.
 
-(*
-Lemma middle_disj_last fc cc lcc lc nc:
+
+Lemma middle_disj_last fc cc lcc lc nos lno:
  open = fc ++ cc ++ lcc :: lc ->
-  new_cells = fc ++ nc ++ lc ->
-  adjacent_cells result_open ->
-  nc != nil ->
-  low (head dummy_cell nc) =low (head lcc cc) ->
-*)
+  adjacent_cells (fc ++ nos ++ lno :: lc) ->
+  s_right_form  (fc ++ nos ++ lno :: lc)->
+  low (head lno nos) =low (head lcc cc) ->
+  high lno = high lcc ->
+  {in [seq high c | c <- nos], forall g, left_pt g == (point e)} ->
+  {in rcons nos lno &, disjoint_open_cells R} ->
+   {in fc ++ nos ++ lno :: lc &, disjoint_open_cells R}.
+Proof.
+move=> ocd adjn rfon lecnct hecnct lefts ndisj.
+
 Lemma in_new_cell_not_in_last_old fc cc lcc lc le he:
   open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
   {in opening_cells (point e) (outgoing e) le he & lc,
@@ -3346,7 +3351,7 @@ have higfc : fc != nil -> high (last dummy_cell fc) = low (head lcc cc).
   by case: (cc) => [ | cc0 cc'] /= /andP[] /eqP ->.
 move=> le_cnct.
 move=> he_cnct.
-Admitted.
+fail.
 
 Lemma step_keeps_disjoint_open_default :
   let '(fc, cc, lcc, lc, le, he) :=
