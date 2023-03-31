@@ -4,7 +4,7 @@ Require Import QArith List.
 Notation seq := list.
 Record pt := Bpt {p_x : Q; p_y : Q}.
 Record edge :=
- { left_pt : pt; right_pt : pt}.
+ Bedge { left_pt : pt; right_pt : pt}.
 
 Record event :=
   Bevent {point : pt; outgoing : seq edge}.
@@ -12,13 +12,25 @@ Record event :=
 Record cell := Bcell  {left_pts : list pt; right_pts : list pt;
                         low : edge; high : edge}.
 
-Definition dummy_pt := {| p_x := 0%Q; p_y := 0%Q |}.
+Definition dummy_pt := ({| p_x := 0%Q; p_y := 0%Q|}).
+Notation DUMMY_PT := 
+  ({| p_x := (0 # _); p_y := (0 # _)|}).
+
 Definition dummy_edge := 
   {| left_pt := dummy_pt; right_pt := dummy_pt|}.
+
+Notation DUMMY_EDGE :=
+  ({| left_pt := DUMMY_PT; right_pt := DUMMY_PT |}).
 
 Definition dummy_cell := 
   {| left_pts := nil; right_pts := nil; low := dummy_edge; high := dummy_edge|}.
 
+Notation DUMMY_CELL :=
+  ({| left_pts := nil; right_pts := nil; 
+    low := DUMMY_EDGE; high := DUMMY_EDGE|}).
+
+Definition dummy_event :=
+  {| point := dummy_pt; outgoing := nil|}.
 
 Definition pt_eqb (a b : pt) : bool :=
   let: Bpt a_x a_y := a in
@@ -292,28 +304,81 @@ Definition complete_last_open (bottom top : edge) (c : cell) :=
       Bcell lpts (rightmost_points bottom top) le he
   end.
 
-Fixpoint scan (events : seq event) (st : scan_state)
-  : seq cell * seq cell :=
-  match events, st with
-     | nil, Bscan op1 lop op2 cl lcl _ _ =>
-       (op1 ++ lop :: op2, lcl :: cl)
-     | e::q, _ => scan q (step e st)
-  end.
-
 Definition start_open_cell (bottom top : edge) :=
   Bcell (leftmost_points bottom top) nil bottom top.
 
-Definition start (events : seq event) (bottom : edge) (top : edge) :
-  seq cell * seq cell :=
+Definition start (first_event : event) (bottom : edge) (top : edge) :
+  scan_state :=
+  let (newcells, lastopen) :=
+  opening_cells_aux (point first_event)
+      (path.sort edge_below (outgoing first_event)) bottom top in
+      (Bscan newcells lastopen nil nil
+         (close_cell (point first_event) (start_open_cell bottom top))
+         top (p_x (point first_event))).
+
+Definition scan (events : seq event) (bottom top : edge) : seq cell :=
   match events with
-  | nil => (start_open_cell bottom top :: nil, nil)
+  | nil => (complete_last_open bottom top (start_open_cell bottom top) :: nil)
   | ev0 :: events =>
-    let (newcells, lastopen) :=
-      opening_cells_aux (point ev0) (path.sort edge_below (outgoing ev0))
-            bottom top in
-      scan events (Bscan newcells lastopen nil nil
-         (close_cell (point ev0) (start_open_cell bottom top))
-         top (p_x (point ev0)))
+    let start_scan := start ev0 bottom top in
+    let final_scan := fold_right step start_scan events in
+      lst_closed final_scan :: map (complete_last_open bottom top)
+      (lst_open final_scan :: sc_open1 final_scan ++ sc_open2 final_scan) ++
+      sc_closed final_scan
   end.
 
-End working_environment.
+Definition edges_to_cells bottom top edges :=
+  scan (edges_to_events edges) bottom top.
+
+Definition example_edge_list : seq edge :=
+  Bedge (Bpt (-2) (-1)) (Bpt 2 1) ::
+  Bedge (Bpt (4 # 5) (-1 # 5)) (Bpt 2 1) ::
+  Bedge (Bpt (4 # 5) (-1 # 5)) (Bpt (17 # 5) (-5 / 2)) ::
+  Bedge  (Bpt (-2) (-1)) (Bpt (17 # 5) (-5 / 2)) :: nil.
+
+Definition edge_cond (e : edge) :=
+  Qlt_bool (p_x (left_pt e)) (p_x (right_pt e)).
+
+Lemma example_edge_cond :
+   forallb edge_cond example_edge_list = true.
+Proof. easy. Qed.
+
+Notation BOTTOM :=
+  ({| left_pt := {| p_x := -3; p_y := -3|};
+      right_pt := {| p_x := 4; p_y := -4|}|}).
+
+Notation TOP :=
+  ({| left_pt := {| p_x := -4; p_y := 2|};
+      right_pt := {| p_x := 4; p_y := 3|}|}).
+
+Definition example_bottom : edge :=
+  Bedge (Bpt (-3) (-3)) (Bpt 4 (-4)).
+
+Definition example_top : edge :=
+  Bedge (Bpt (-4) 2) (Bpt 4 3).
+
+Definition inside_box (p : pt) (bottom top : edge) :=
+  negb (point_under_edge p bottom) &&
+  point_strictly_under_edge p top &&
+  (Qlt_bool (p_x (left_pt bottom)) (p_x p) &&
+     Qlt_bool (p_x p) (p_x (right_pt bottom))) &&
+  (Qlt_bool (p_x (left_pt top)) (p_x p) &&
+     Qlt_bool (p_x p) (p_x (right_pt top))).
+
+Lemma example_inside_box :
+  forallb (fun e => inside_box (point e) example_bottom example_top)
+     (edges_to_events example_edge_list) = true.
+Proof. easy. Qed.
+
+Definition example_start_event :=
+  seq.head dummy_event (edges_to_events example_edge_list).
+
+Compute start example_start_event example_bottom example_top.
+Compute length
+  (sc_open1 (start example_start_event example_bottom example_top)).
+Compute 
+  (lst_closed (start example_start_event example_bottom example_top)).
+
+Compute 
+  edges_to_cells example_bottom example_top example_edge_list.
+
