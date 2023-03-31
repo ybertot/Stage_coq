@@ -238,7 +238,7 @@ Definition step (e : event) (st : scan_state) : scan_state :=
        open_cells_decomposition (op1 ++ lsto :: op2) p in
      let closed := closing_cells p contact_cells in
      let last_closed := close_cell p last_contact in
-     let closed_cells := cls++closed in
+     let closed_cells := cls ++ cl :: closed in
      let (new_open_cells, newlastopen) :=
        opening_cells_aux p (path.sort edge_below (outgoing e))
             lower_edge higher_edge in
@@ -316,12 +316,18 @@ Definition start (first_event : event) (bottom : edge) (top : edge) :
          (close_cell (point first_event) (start_open_cell bottom top))
          top (p_x (point first_event))).
 
+Fixpoint iter_list [A B : Type] (f : A -> B -> B) (s : seq A) (init : B) :=
+  match s with
+  | nil => init
+  | a :: tl => iter_list f tl (f a init)
+  end.
+
 Definition scan (events : seq event) (bottom top : edge) : seq cell :=
   match events with
   | nil => (complete_last_open bottom top (start_open_cell bottom top) :: nil)
   | ev0 :: events =>
     let start_scan := start ev0 bottom top in
-    let final_scan := fold_right step start_scan events in
+    let final_scan := iter_list step events start_scan in
       lst_closed final_scan :: map (complete_last_open bottom top)
       (lst_open final_scan :: sc_open1 final_scan ++ sc_open2 final_scan) ++
       sc_closed final_scan
@@ -374,11 +380,56 @@ Definition example_start_event :=
   seq.head dummy_event (edges_to_events example_edge_list).
 
 Compute start example_start_event example_bottom example_top.
+
 Compute length
   (sc_open1 (start example_start_event example_bottom example_top)).
 Compute 
   (lst_closed (start example_start_event example_bottom example_top)).
 
-Compute 
-  edges_to_cells example_bottom example_top example_edge_list.
+Definition all_open (s : scan_state) :=
+  sc_open2 s ++ lst_open s :: sc_open1 s.
+
+Definition all_closed (s : scan_state) :=
+  lst_closed s :: sc_closed s.
+
+Definition step1m1 :=
+        (start example_start_event example_bottom example_top).
+
+Definition step1 :=
+    step (nth 1 (edges_to_events example_edge_list) dummy_event)
+    step1m1.
+
+Definition step2m1 := step1.
+
+Definition step2 :=
+    step (nth 2 (edges_to_events example_edge_list) dummy_event)
+        step2m1.
+
+Definition step3m1 := step2.
+
+Definition step3 :=
+    step (nth 3 (edges_to_events example_edge_list) dummy_event)
+        step3m1.
+
+Definition step4m1 := step3.
+
+Compute (length (all_open step1m1), all_open step1m1).
+Compute (length (all_open step1), all_open step1).
+Compute (length (all_open step2), all_open step2).
+Compute (length (all_open step3), all_open step3).
+
+Compute (length (all_closed step1m1), all_closed step1m1).
+Compute (length (all_closed step1), all_closed step1).
+Compute (length (all_closed step2), all_closed step2).
+Compute (length (all_closed step3), all_closed step3).
+Compute step3.
+
+Compute lst_closed step3.
+
+Compute length (sc_closed (iter_list step 
+  (seq.behead (edges_to_events example_edge_list)) (start (seq.head dummy_event (edges_to_events example_edge_list))
+      example_bottom example_top))).
+
+Compute length (edges_to_cells example_bottom example_top example_edge_list).
+
 

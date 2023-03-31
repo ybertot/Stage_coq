@@ -215,7 +215,7 @@ Definition step (e : event) (st : scan_state) : scan_state :=
        open_cells_decomposition (op1 ++ lsto :: op2) p in
      let closed := closing_cells p contact_cells in
      let last_closed := close_cell p last_contact in
-     let closed_cells := cls++closed in
+     let closed_cells := cls ++ cl :: closed in
      let (new_open_cells, newlastopen) :=
        opening_cells_aux p (sort (@edge_below _) (outgoing e))
             lower_edge higher_edge in
