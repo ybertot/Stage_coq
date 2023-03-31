@@ -1,5 +1,5 @@
 From mathcomp Require all_ssreflect.
-Require Import QArith List.
+Require Import ZArith QArith List String.
 
 Notation seq := list.
 Record pt := Bpt {p_x : Q; p_y : Q}.
@@ -336,6 +336,105 @@ Definition scan (events : seq event) (bottom top : edge) : seq cell :=
 Definition edges_to_cells bottom top edges :=
   scan (edges_to_events edges) bottom top.
 
+Record vert_edge :=
+ { ve_x : Q; ve_top : Q; ve_bot : Q}.
+
+Fixpoint seq_to_intervals_aux [A : Type] (a : A) (s : seq A) :=
+match s with
+| nil => nil
+| b :: tl => (a, b) :: seq_to_intervals_aux b tl
+end.
+
+Definition seq_to_intervals [A : Type] (s : seq A) :=
+match s with
+  nil => nil
+| a :: tl => seq_to_intervals_aux a tl
+end.
+
+Definition cell_safe_exits_left (c : cell) : seq vert_edge :=
+  let lx := p_x (seq.head dummy_pt (left_pts c)) in
+  map (fun p => Build_vert_edge lx (p_y (fst p)) (p_y (snd p))) 
+   (seq_to_intervals (left_pts c)).
+
+Definition cell_safe_exits_right (c : cell) : seq vert_edge :=
+  let lx := p_x (head dummy_pt (right_pts c)) in
+  map (fun p => Build_vert_edge lx (p_y (fst p)) (p_y (snd p))) 
+   (seq_to_intervals (rev (right_pts c))).
+
+
+Fixpoint positive_Z_to_decimal_string (fuel : nat) (z : Z) :=
+  match fuel with
+  | O => ""%string
+  | S p =>
+    if (z =? 0)%Z then
+       ""%string
+    else
+    let (q, r) := Z.div_eucl z 10 in
+    append (positive_Z_to_decimal_string p q) 
+    match r with
+    | 0%Z => "0"%string
+    | 1%Z => "1"%string
+    | 2%Z => "2"%string
+    | 3%Z => "3"%string
+    | 4%Z => "4"%string
+    | 5%Z => "5"%string
+    | 6%Z => "6"%string
+    | 7%Z => "7"%string
+    | 8%Z => "8"%string
+    | _%Z => "9"%string
+    end
+  end.
+
+Definition Z_to_string (z : Z) :=
+  if (z =? 0)%Z then
+    "0"%string
+  else if (z <? 0)%Z then
+    append "-" 
+       (positive_Z_to_decimal_string (S (Z.abs_nat (Z.log2_up (- z)))) (- z))
+  else 
+    (positive_Z_to_decimal_string (S (Z.abs_nat (Z.log2_up z))) z).
+
+Definition positive_rational_to_approx_decimal_string (x : Q) : string :=
+    let frac_part := 
+        (((1000 * Qnum x) / Zpos (Qden x)) mod 1000)%Z in
+    let frac_part_string := 
+      if (frac_part =? 0)%Z then
+         "000"%string
+      else if (frac_part <? 10)%Z then
+        append "00" (Z_to_string frac_part)
+      else if (frac_part <? 100)%Z then
+        append "0" (Z_to_string frac_part)
+      else 
+        (Z_to_string frac_part) in
+     append (Z_to_string (Qnum x / Z.pos (Qden x))) 
+         (append "." frac_part_string).
+
+Compute positive_rational_to_approx_decimal_string 1000.
+
+Definition Q_to_approx_decimal_string (x : Q) :=
+  if Qeq_bool x 0 then
+    "0.000"%string
+  else if Qle_bool 0 x then
+    positive_rational_to_approx_decimal_string x
+  else
+    append "-" (positive_rational_to_approx_decimal_string (-x)).
+
+Definition display_edge (tr_x tr_y scale : Q) (e : edge) :=
+  let process_coord tr scale v :=
+    Q_to_approx_decimal_string (tr + scale * v) in
+  let process_point p :=
+    append (process_coord tr_x scale (p_x p))
+       (append " " (process_coord tr_y scale (p_y p))) in
+  append (process_point (left_pt e))
+    (append " moveto
+" (append (process_point (right_pt e)) " lineto
+")).
+
+Definition display_cell (tr_x tr_y scale : Q) (c : cell) :=
+  display_edge tr_x tr_y scale
+      {| left_pt := seq.head dummy_pt (left_pts c);
+                  right_pt := seq.last dummy_pt (left_pts c) |}.
+
 Definition example_edge_list : seq edge :=
   Bedge (Bpt (-2) (-1)) (Bpt 2 1) ::
   Bedge (Bpt (4 # 5) (-1 # 5)) (Bpt 2 1) ::
@@ -381,7 +480,7 @@ Definition example_start_event :=
 
 Compute start example_start_event example_bottom example_top.
 
-Compute length
+Compute List.length
   (sc_open1 (start example_start_event example_bottom example_top)).
 Compute 
   (lst_closed (start example_start_event example_bottom example_top)).
@@ -413,23 +512,40 @@ Definition step3 :=
 
 Definition step4m1 := step3.
 
-Compute (length (all_open step1m1), all_open step1m1).
-Compute (length (all_open step1), all_open step1).
-Compute (length (all_open step2), all_open step2).
-Compute (length (all_open step3), all_open step3).
+Compute (List.length (all_open step1m1), all_open step1m1).
+Compute (List.length (all_open step1), all_open step1).
+Compute (List.length (all_open step2), all_open step2).
+Compute (List.length (all_open step3), all_open step3).
 
-Compute (length (all_closed step1m1), all_closed step1m1).
-Compute (length (all_closed step1), all_closed step1).
-Compute (length (all_closed step2), all_closed step2).
-Compute (length (all_closed step3), all_closed step3).
+Compute (List.length (all_closed step1m1), all_closed step1m1).
+Compute (List.length (all_closed step1), all_closed step1).
+Compute (List.length (all_closed step2), all_closed step2).
+Compute (List.length (all_closed step3), all_closed step3).
 Compute step3.
 
 Compute lst_closed step3.
 
-Compute length (sc_closed (iter_list step 
+Compute List.length (sc_closed (iter_list step 
   (seq.behead (edges_to_events example_edge_list)) (start (seq.head dummy_event (edges_to_events example_edge_list))
       example_bottom example_top))).
 
-Compute length (edges_to_cells example_bottom example_top example_edge_list).
+Compute List.length (edges_to_cells example_bottom example_top example_edge_list).
 
 
+Open Scope string_scope.
+Compute
+concat "
+"
+("" ::
+"START"  ::
+"%!PS" ::
+List.map
+  (fun (e : edge) => (display_edge 300 400 50 e))
+  (example_bottom :: example_top :: example_edge_list) ++
+List.map
+  (fun c : cell => display_cell 300 400 50 c)
+  (edges_to_cells example_bottom example_top example_edge_list) ++
+"
+stroke
+" ::
+"END" :: nil).
