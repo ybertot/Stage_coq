@@ -1,5 +1,5 @@
 From mathcomp Require all_ssreflect.
-Require Import ZArith QArith List String.
+Require Import ZArith QArith List String OrderedType OrderedTypeEx FMapAVL.
 
 Notation seq := list.
 Record pt := Bpt {p_x : Q; p_y : Q}.
@@ -293,7 +293,7 @@ Definition rightmost_points (bottom top : edge) :=
     | _ => nil
     end
   else
-    match vertical_intersection_point (left_pt top) bottom with
+    match vertical_intersection_point (right_pt top) bottom with
     | Some pt => pt :: right_pt top :: nil
     | _ => nil
     end.
@@ -339,6 +339,12 @@ Definition edges_to_cells bottom top edges :=
 Record vert_edge :=
  { ve_x : Q; ve_top : Q; ve_bot : Q}.
 
+Definition vert_edge_eqb (v1 v2 : vert_edge) :=
+  let: Build_vert_edge v1x v1t v1b := v1 in
+  let: Build_vert_edge v2x v2t v2b := v2 in
+  Qeq_bool v1x v2x && Qeq_bool v1t v2t && 
+  Qeq_bool v1b v2b.
+
 Fixpoint seq_to_intervals_aux [A : Type] (a : A) (s : seq A) :=
 match s with
 | nil => nil
@@ -357,10 +363,68 @@ Definition cell_safe_exits_left (c : cell) : seq vert_edge :=
    (seq_to_intervals (left_pts c)).
 
 Definition cell_safe_exits_right (c : cell) : seq vert_edge :=
-  let lx := p_x (head dummy_pt (right_pts c)) in
+  let lx := p_x (seq.head dummy_pt (right_pts c)) in
   map (fun p => Build_vert_edge lx (p_y (fst p)) (p_y (snd p))) 
    (seq_to_intervals (rev (right_pts c))).
 
+Definition vert_edge_midpoint (ve : vert_edge) : pt :=
+  {|p_x := ve_x ve; p_y := (ve_top ve + ve_bot ve) / 2|}.
+
+Definition lr_connected (c1 c2 : cell) : bool :=
+  existsb (fun v => existsb (fun v' => vert_edge_eqb v v')
+                       (cell_safe_exits_left c2))
+       (cell_safe_exits_right c1).
+
+Definition bi_connected c1 c2 :=
+  lr_connected c1 c2 || lr_connected c2 c1.
+
+Definition dummy_vert_edge :=
+  {| ve_x := 0; ve_top := 0; ve_bot := 0|}.
+
+Definition lr_door (c1 c2 : cell) :=
+  seq.head dummy_vert_edge
+     (filter (fun x => existsb (fun x' => vert_edge_eqb x x')
+                  (cell_safe_exits_left c2)) (cell_safe_exits_right c1)).
+
+Definition lr_connected_path (c1 c2 : cell) (p1 p2 : pt) :
+  seq (pt * pt) :=
+  (p1, vert_edge_midpoint (lr_door c1 c2)) ::
+      (vert_edge_midpoint (lr_door c1 c2), p2) :: nil.
+
+Definition connected_cells (c : cell) (s : seq cell) :=
+  path.path bi_connected c s.
+
+Definition midpoint (p1 p2 : pt) : pt :=
+ {| p_x := (p_x p1 + p_x p2) / 2; p_y := (p_y p1 + p_y p2) / 2|}.
+
+Definition cell_center (c : cell) :=
+  midpoint
+    (midpoint (seq.last dummy_pt (left_pts c)) 
+              (seq.head dummy_pt (right_pts c)))
+    (midpoint (seq.head dummy_pt (left_pts c))
+              (seq.last dummy_pt (right_pts c))).
+
+Fixpoint connected_cells_path (c1 c2 : cell) (tl : seq cell) :=
+  match tl with
+  | nil => nil
+  | c3 :: tl' =>
+    let tail_path := connected_cells_path c2 c3 tl' in
+    if lr_connected c1 c2 && lr_connected c2 c3 then
+       (vert_edge_midpoint (lr_door c1 c2),
+           vert_edge_midpoint (lr_door c2 c3)) ::
+       tail_path else
+    if lr_connected c3 c2 && lr_connected c2 c1 then
+       (vert_edge_midpoint (lr_door c2 c1),
+           vert_edge_midpoint (lr_door c3 c2)) ::
+       tail_path else
+    if lr_connected c1 c2 (* we assume lr_connected c3 c2 *) then
+       (vert_edge_midpoint (lr_door c1 c2), cell_center c2) ::
+           (cell_center c2, vert_edge_midpoint (lr_door c3 c2)) ::
+           tail_path else
+    (vert_edge_midpoint (lr_door c2 c1), cell_center c2) ::
+        (cell_center c2, vert_edge_midpoint (lr_door c2 c3)) ::
+        tail_path
+  end.
 
 Fixpoint positive_Z_to_decimal_string (fuel : nat) (z : Z) :=
   match fuel with
@@ -409,8 +473,6 @@ Definition positive_rational_to_approx_decimal_string (x : Q) : string :=
      append (Z_to_string (Qnum x / Z.pos (Qden x))) 
          (append "." frac_part_string).
 
-Compute positive_rational_to_approx_decimal_string 1000.
-
 Definition Q_to_approx_decimal_string (x : Q) :=
   if Qeq_bool x 0 then
     "0.000"%string
@@ -419,21 +481,206 @@ Definition Q_to_approx_decimal_string (x : Q) :=
   else
     append "-" (positive_rational_to_approx_decimal_string (-x)).
 
-Definition display_edge (tr_x tr_y scale : Q) (e : edge) :=
+Definition display_point (tr_x tr_y scale : Q) (p : pt) :=
   let process_coord tr scale v :=
     Q_to_approx_decimal_string (tr + scale * v) in
-  let process_point p :=
     append (process_coord tr_x scale (p_x p))
-       (append " " (process_coord tr_y scale (p_y p))) in
-  append (process_point (left_pt e))
+       (append " " (process_coord tr_y scale (p_y p))).
+
+Definition display_edge (tr_x tr_y scale : Q) (e : edge) :=
+  append (display_point tr_x tr_y scale (left_pt e))
     (append " moveto
-" (append (process_point (right_pt e)) " lineto
+" (append (display_point tr_x tr_y scale (right_pt e)) " lineto
 ")).
+
+Definition display_segment (tr_x tr_y scale : Q) (s : pt * pt) :=
+  display_edge tr_x tr_y scale (Bedge (fst s) (snd s)).
 
 Definition display_cell (tr_x tr_y scale : Q) (c : cell) :=
   display_edge tr_x tr_y scale
       {| left_pt := seq.head dummy_pt (left_pts c);
                   right_pt := seq.last dummy_pt (left_pts c) |}.
+
+Definition display_cell_centers (tr_x tr_y scale : Q) (s : seq cell) :=
+  let indices := seq.iota 0 (List.length s) in
+  map (fun i =>
+         append "newpath "
+         (append (display_point tr_x tr_y scale 
+                      (cell_center (nth i s dummy_cell)))
+          (append " moveto ("
+            (append (Z_to_string (Z.of_nat i))
+               ") show")))) indices.
+        
+Section bfs.
+
+Variable (state move : Type).
+Variable (state_fmap : Type).
+Variable find : state_fmap -> state -> option move.
+Variable add : state_fmap -> state -> move -> state_fmap.
+Variable (step : state -> list (state * move)).
+Variable (state_eq_dec : forall s1 s2 : state, {s1 = s2}+{s1 <> s2}).
+
+Variable map_order : state_fmap -> state_fmap -> Prop.
+Hypothesis map_order_wf : well_founded map_order.
+Hypothesis add_order : forall map s v,
+  find map s = None -> map_order (add map s v) map.
+Hypothesis map_order_trans : forall map2 map1 map3,
+  map_order map1 map2 -> map_order map2 map3 -> map_order map1 map3.
+
+Fixpoint bfs_aux (w w2 : list (state * move))
+  (sufficient : state)
+  (settled : state_fmap) : (list (state * move) * state_fmap) :=
+match w with
+| (s, m) :: w' =>
+  match find settled s with
+  | Some _ => bfs_aux w' w2 sufficient settled
+  | None =>
+    if state_eq_dec s sufficient then
+      (nil, add settled s m)
+    else
+    bfs_aux w' (step s ++ w2) sufficient (add settled s m)
+  end
+| nil => (w2, settled)
+end.
+
+Fixpoint bfs (fuel : nat) (w : list (state * move)) (settled : state_fmap) 
+  (sufficient : state)
+  (round : nat) :
+  (state_fmap * nat) + (list (state * move) * state_fmap) :=
+  match fuel with
+  | O => inr (w, settled)
+  | S p =>
+    match bfs_aux w nil sufficient settled with
+    | (nil, s) => inl (s, round)
+    | (w, s) => bfs p w s sufficient (round + 1)
+    end
+  end.
+
+  (* We then explain how we build a path using the database. *)
+Fixpoint make_path (db : state_fmap)
+(targetb : state -> bool) (play : state -> move -> option state)
+(x : state) (fuel : nat) :=
+match fuel with
+| O => None
+| S p =>
+if targetb x then
+  Some nil
+else
+  match find db x with
+  | None => None
+  | Some m =>
+    match play x m with
+    | Some y =>
+      match make_path db targetb play y p with
+      | None => None
+      | Some l => Some (m :: l)
+      end
+   | None => None
+   end
+  end
+end.
+
+End bfs.
+
+Module natmap := FMapAVL.Make Nat_as_OT.
+
+Definition bfs_find : natmap.t nat -> nat -> option nat :=
+  (fun m k => natmap.find k m).
+
+Definition bfs_add : natmap.t nat -> nat -> nat -> natmap.t nat :=
+  (fun m k v => natmap.add k v m).
+
+Definition reverse_step cells cell_i : seq (nat * nat) :=
+  map (fun i => (i, cell_i))
+    (filter (fun c_i => bi_connected (nth c_i cells dummy_cell)
+                       (nth cell_i cells dummy_cell))
+     (seq.iota 0 (List.length cells))).
+
+Check bfs nat nat (natmap.t nat) bfs_find bfs_add (reverse_step nil)
+       eq_nat_dec.
+
+Definition left_limit (c : cell) :=
+  p_x (seq.last dummy_pt (left_pts c)).
+
+Definition right_limit c := p_x (seq.last dummy_pt (right_pts c)).
+
+Definition strict_inside_closed p c :=
+  negb (point_under_edge p (low c)) &&
+  point_strictly_under_edge p (high c) &&
+ (Qlt_bool (left_limit c) (p_x p) &&
+ (Qlt_bool (p_x p) (right_limit c))).
+
+Definition common_vert_edge (c1 c2 : cell) : option vert_edge:=
+  if Qeq_bool (right_limit c1) (left_limit c2) then
+    find (fun v => existsb (fun v' => vert_edge_eqb v v')
+                      (cell_safe_exits_left c2))
+      (cell_safe_exits_right c1)
+  else
+    find (fun v => existsb (fun v' => vert_edge_eqb v v')
+                      (cell_safe_exits_left c1))
+      (cell_safe_exits_right c2).
+
+Definition path_adjacent_cells (source target : pt)
+  (source_cell target_cell : cell) : option (seq (pt * pt)) :=
+  match common_vert_edge source_cell target_cell with
+  | Some v => Some ((source, vert_edge_midpoint v) ::
+              (vert_edge_midpoint v, target) :: nil)
+  | None => None
+  end.
+      
+Definition point_to_point (bottom top : edge)
+ (obstacles : seq edge) (source target : pt) :
+  option (seq (pt * pt)) :=
+let cells := edges_to_cells bottom top obstacles in
+let source_i := find 
+        (fun i => strict_inside_closed source (nth i cells dummy_cell))
+        (seq.iota 0 (List.length cells)) in
+let target_i := find 
+        (fun i => strict_inside_closed target (nth i cells dummy_cell))
+        (seq.iota 0 (List.length cells)) in
+match source_i, target_i with
+| Some source_i, Some target_i =>
+  if eq_nat_dec source_i target_i then
+     Some ((source, target) :: nil)
+  else
+  let table :=
+    bfs _ _ _ bfs_find bfs_add (reverse_step cells) eq_nat_dec
+    (List.length cells) ((target_i, target_i) :: nil) (natmap.empty nat)
+    source_i 0 in
+  match table with
+    inr _ => None
+  | inl (table, count) =>
+    let cell_path :=
+      make_path _ _ _ bfs_find table
+        (fun c_i => if eq_nat_dec c_i target_i then true else false)
+        (fun n1 n2 => Some n2) source_i (List.length cells) in
+      match cell_path with
+      | Some cell_path =>
+          if 2 <=? List.length cell_path then
+            let penultimate_cell_i := nth 1 (List.rev cell_path) 0%nat in
+            match common_vert_edge 
+                     (nth penultimate_cell_i cells dummy_cell)
+                     (nth target_i cells dummy_cell) with
+            | Some last_door =>
+              Some (connected_cells_path (nth source_i cells dummy_cell)
+                 (nth (seq.head 0%nat cell_path) cells dummy_cell)
+                 (List.map (fun i => nth i cells dummy_cell)
+                       (seq.behead cell_path)) ++
+                    (vert_edge_midpoint last_door, target) :: nil)
+            | None => None
+            end
+           else
+             path_adjacent_cells source target
+               (nth source_i cells dummy_cell)
+               (nth target_i cells dummy_cell)
+      | None => None
+      end
+  end
+| _, _ => None
+end.
+  
+
+(*******  starting work on an example ******************)
 
 Definition example_edge_list : seq edge :=
   Bedge (Bpt (-2) (-1)) (Bpt 2 1) ::
@@ -477,8 +724,6 @@ Proof. easy. Qed.
 
 Definition example_start_event :=
   seq.head dummy_event (edges_to_events example_edge_list).
-
-Compute start example_start_event example_bottom example_top.
 
 Compute List.length
   (sc_open1 (start example_start_event example_bottom example_top)).
@@ -533,19 +778,46 @@ Compute List.length (edges_to_cells example_bottom example_top example_edge_list
 
 
 Open Scope string_scope.
+
+Compute nth 1 (edges_to_cells example_bottom example_top example_edge_list)
+          dummy_cell.
+
+Compute let cells := edges_to_cells example_bottom example_top
+                        example_edge_list in
+           connected_cells (nth 2 cells dummy_cell)
+             (map (fun n => nth n cells dummy_cell)
+                 (6 :: 0 :: 4 :: nil)%nat).
+
 Compute
-concat "
+let cells :=
+  edges_to_cells example_bottom example_top example_edge_list in
+String.concat "
 "
 ("" ::
 "START"  ::
 "%!PS" ::
+"/Times-Roman findfont" ::
+"12 scalefont" ::
+"setfont" ::
 List.map
-  (fun (e : edge) => (display_edge 300 400 50 e))
+  (fun (e : edge) => (display_edge 300 400 70 e))
   (example_bottom :: example_top :: example_edge_list) ++
-List.map
-  (fun c : cell => display_cell 300 400 50 c)
-  (edges_to_cells example_bottom example_top example_edge_list) ++
-"
-stroke
+"stroke" ::
+display_cell_centers 300 400 70 cells
+   ++
+"stroke gsave [1 3] 0 setdash
 " ::
-"END" :: nil).
+List.map
+  (fun c : cell => display_cell 300 400 70 c)
+  cells ++
+"
+stroke grestore
+" ::
+List.map
+  (fun s : pt * pt => display_segment 300 400 70 s)
+  (connected_cells_path
+     (nth 2 cells dummy_cell)
+     (nth 6 cells dummy_cell)
+     (map (fun n => nth n cells dummy_cell) (0 :: 4 :: nil)%nat)) ++
+"stroke
+END" :: nil).
