@@ -142,8 +142,8 @@ Definition vert_edge_midpoint (ve : vert_edge) : pt :=
   {|p_x := ve_x ve; p_y := (ve_top ve + ve_bot ve) / 2%R|}.
 
 Definition lr_connected (c1 c2 : cell) : bool :=
-  [seq v | v <- cell_safe_exits_right c1 & v \in cell_safe_exits_left c2] !=
-  [::].
+  has (fun v => has (fun v' => v == v') (cell_safe_exits_left c2))
+     (cell_safe_exits_right c1).
 
 Definition bi_connected c1 c2 :=
   lr_connected c1 c2 || lr_connected c2 c1.
