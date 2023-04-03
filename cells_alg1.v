@@ -404,27 +404,141 @@ Definition cell_center (c : cell) :=
     (midpoint (seq.head dummy_pt (left_pts c))
               (seq.last dummy_pt (right_pts c))).
 
-Fixpoint connected_cells_path (c1 c2 : cell) (tl : seq cell) :=
+Record annotated_point :=
+  Apt { apt_val : pt; cell_indices : seq nat}.
+
+Fixpoint connected_cells_path (cells : seq cell)
+  (i1 i2 : nat) (tl : seq nat) :
+  seq (annotated_point * annotated_point) :=
   match tl with
   | nil => nil
-  | c3 :: tl' =>
-    let tail_path := connected_cells_path c2 c3 tl' in
+  | i3 :: tl' =>
+    let tail_path := connected_cells_path cells i2 i3 tl' in
+    let c1 := nth i1 cells dummy_cell in
+    let c2 := nth i2 cells dummy_cell in
+    let c3 := nth i3 cells dummy_cell in
     if lr_connected c1 c2 && lr_connected c2 c3 then
-       (vert_edge_midpoint (lr_door c1 c2),
-           vert_edge_midpoint (lr_door c2 c3)) ::
+       (Apt (vert_edge_midpoint (lr_door c1 c2)) (i1 :: i2 :: nil),
+           Apt (vert_edge_midpoint (lr_door c2 c3)) (i2 :: i3 :: nil)) ::
        tail_path else
     if lr_connected c3 c2 && lr_connected c2 c1 then
-       (vert_edge_midpoint (lr_door c2 c1),
-           vert_edge_midpoint (lr_door c3 c2)) ::
+       (Apt (vert_edge_midpoint (lr_door c2 c1)) (i1 :: i2 :: nil),
+           Apt (vert_edge_midpoint (lr_door c3 c2))
+                    (i2 :: i3 :: nil)) ::
        tail_path else
     if lr_connected c1 c2 (* we assume lr_connected c3 c2 *) then
-       (vert_edge_midpoint (lr_door c1 c2), cell_center c2) ::
-           (cell_center c2, vert_edge_midpoint (lr_door c3 c2)) ::
+       (Apt (vert_edge_midpoint (lr_door c1 c2))
+            (i1 :: i2 :: nil),
+          Apt (cell_center c2) (i2 :: nil)) ::
+           (Apt (cell_center c2) (i2 :: nil), 
+            Apt (vert_edge_midpoint (lr_door c3 c2))
+                (i2 :: i3 :: nil)) ::
            tail_path else
-    (vert_edge_midpoint (lr_door c2 c1), cell_center c2) ::
-        (cell_center c2, vert_edge_midpoint (lr_door c2 c3)) ::
+    (Apt (vert_edge_midpoint (lr_door c2 c1)) (i1 :: i2 :: nil), 
+     Apt (cell_center c2) (i2 :: nil)) ::
+        (Apt (cell_center c2) (i2 :: nil),
+         Apt (vert_edge_midpoint (lr_door c2 c3))
+           (i2 :: i3 :: nil)) ::
         tail_path
   end.
+
+Definition intersection (s1 s2 : seq nat) :=
+  filter (fun e => existsb (fun e' => Nat.eqb e e')
+                      s2) s1.
+
+Fixpoint break_segments (s : seq (annotated_point * annotated_point)) :
+  seq (annotated_point * annotated_point) :=
+  match s with
+  | (Apt p1 a1, Apt p2 a2) :: tl =>
+    (Apt p1 a1, Apt (midpoint p1 p2) (intersection a1 a2)) ::
+    (Apt (midpoint p1 p2) (intersection a1 a2), Apt p2 a2) ::
+        break_segments tl
+  | nil => nil
+  end. 
+
+Variant curve_element :=
+ straight (x y : annotated_point) | bezier (x y z : annotated_point).
+
+(* This function is to be used when p_x a < p_x b < p_x c and
+  a b c is ccw (counter clockwise). It assumes that there is no need to
+ check the bottom point. *)
+Fixpoint check_bezier_ccw (fuel : nat) (v : vert_edge)
+  (a b c : pt) : 
+  option bool :=
+match fuel with
+| O => None
+| S p =>
+  let top_edge := Bpt (ve_x v)  (ve_top v) in
+  if negb (point_under_edge top_edge (Bedge a c)) then
+    Some true
+  else if
+     point_under_edge top_edge (Bedge a b) ||
+     point_under_edge top_edge (Bedge b c)
+  then 
+    Some false
+  else
+    let b' := midpoint a b in
+    let b2 := midpoint b c in
+    let c' := midpoint b' b2 in
+    if Qlt_bool (p_x c') (ve_x v) then
+      check_bezier_ccw p v c' b2 c
+    else if Qlt_bool (ve_x v) (p_x c') then
+      check_bezier_ccw p v a b' c'
+    else
+      if Qlt_bool (p_y c') (ve_top v) then
+         Some true
+      else
+         Some false
+end.
+
+(* This function is to be used when p_x a < p_x b < p_x c and
+  a b c is cw (clockwise).
+  It assumes that there is no need to check the top point. *)
+Fixpoint check_bezier_cw (fuel : nat) (v : vert_edge)
+  (a b c : pt) : 
+  option bool :=
+match fuel with
+| O => None
+| S p =>
+  let bot_edge := Bpt (ve_x v)  (ve_bot v) in
+  if point_strictly_under_edge bot_edge (Bedge a c) then
+    Some true
+  else if
+     negb (point_strictly_under_edge bot_edge (Bedge a b)) ||
+     negb (point_strictly_under_edge bot_edge (Bedge b c))
+  then 
+    Some false
+  else
+    let b' := midpoint a b in
+    let b2 := midpoint b c in
+    let c' := midpoint b' b2 in
+    if Qlt_bool (p_x c') (ve_x v) then
+      check_bezier_cw p v c' b2 c
+    else if Qlt_bool (ve_x v) (p_x c') then
+      check_bezier_cw p v a b' c'
+    else
+      if Qlt_bool (ve_bot v) (p_y c') then
+         Some true
+      else
+         Some false
+end.
+
+(* The input of this function is guaranteed to have b = b' in the second
+  pattern matching rule below. *)
+Fixpoint smoothen_aux (s : seq (annotated_point * annotated_point)) :
+   seq curve_element :=
+match s with
+| nil => nil
+| (a, b) :: nil => straight a b :: nil
+| (a, b) :: (b', c) :: tl => bezier a b c :: smoothen_aux tl
+end.
+
+Definition smoothen (s : seq (annotated_point * annotated_point)) :
+   seq curve_element :=
+match s with
+| (a, b)  :: tl => straight a b :: smoothen_aux tl
+| nil => nil
+end.
 
 Fixpoint positive_Z_to_decimal_string (fuel : nat) (z : Z) :=
   match fuel with
@@ -495,6 +609,40 @@ Definition display_edge (tr_x tr_y scale : Q) (e : edge) :=
 
 Definition display_segment (tr_x tr_y scale : Q) (s : pt * pt) :=
   display_edge tr_x tr_y scale (Bedge (fst s) (snd s)).
+
+Definition weighted_sum (p1 p2 : pt) (weight1 : Q) :=
+  Bpt (p_x p1 * weight1 + p_x p2 * (1 - weight1))
+    (p_y p1 * weight1 + p_y p2 * (1 - weight1)).
+
+(* The Bezer elements are quadratic elements, but postscript implements
+  cubic Bezier curves, so some extra computation needs to be done.
+  The mathematical elements were found on stackoverflow. *)
+
+Definition display_curve_element (tr_x tr_y scale : Q) (e : curve_element) :=
+match e with
+| straight p1 p2 => display_segment tr_x tr_y scale (apt_val p1, apt_val p2)
+| bezier p1 p2 p3 =>
+  append (display_point tr_x tr_y scale (apt_val p1))
+    (append " moveto "
+      (append (display_point tr_x tr_y scale 
+           (weighted_sum (apt_val p1) (apt_val p2) (1/3)))
+         (append " "
+           (append (display_point tr_x tr_y scale
+                     (weighted_sum (apt_val p3) (apt_val p2) (1/3)))
+             (append " "
+                (append (display_point tr_x tr_y scale (apt_val p3))
+             " curveto
+"))))))
+end.
+
+Definition red_point p :=
+  match p with (Bpt x y) => Bpt (Qred x) (Qred y) end.
+
+Compute  red_point (midpoint (midpoint (Bpt (-4) 0) (Bpt 0 (-2)))
+                      (midpoint (Bpt 0 (-2)) (Bpt 2 2))).
+
+
+
 
 Definition display_cell (tr_x tr_y scale : Q) (c : cell) :=
   display_edge tr_x tr_y scale
@@ -620,17 +768,22 @@ Definition common_vert_edge (c1 c2 : cell) : option vert_edge:=
                       (cell_safe_exits_left c1))
       (cell_safe_exits_right c2).
 
-Definition path_adjacent_cells (source target : pt)
-  (source_cell target_cell : cell) : option (seq (pt * pt)) :=
+Definition path_adjacent_cells (cells : seq cell) (source target : pt)
+  (source_i target_i : nat) : option (seq (annotated_point * annotated_point)) :=
+  let source_cell := nth source_i cells dummy_cell in
+  let target_cell := nth target_i cells dummy_cell in
   match common_vert_edge source_cell target_cell with
-  | Some v => Some ((source, vert_edge_midpoint v) ::
-              (vert_edge_midpoint v, target) :: nil)
+  | Some v => 
+    Some ((Apt source (source_i :: nil), 
+           Apt (vert_edge_midpoint v) (source_i :: target_i :: nil)) ::
+              (Apt (vert_edge_midpoint v) (source_i :: target_i :: nil),
+               Apt target (target_i :: nil)) :: nil)
   | None => None
   end.
-      
+
 Definition point_to_point (bottom top : edge)
  (obstacles : seq edge) (source target : pt) :
-  option (seq (pt * pt)) :=
+  option (seq (annotated_point * annotated_point)) :=
 let cells := edges_to_cells bottom top obstacles in
 let source_i := find 
         (fun i => strict_inside_closed source (nth i cells dummy_cell))
@@ -640,8 +793,9 @@ let target_i := find
         (seq.iota 0 (List.length cells)) in
 match source_i, target_i with
 | Some source_i, Some target_i =>
-  if eq_nat_dec source_i target_i then
-     Some ((source, target) :: nil)
+  if Nat.eqb source_i target_i then
+     Some ((Apt source (source_i :: nil), 
+           Apt target (target_i :: nil)) :: nil)
   else
   let table :=
     bfs _ _ _ bfs_find bfs_add (reverse_step cells) eq_nat_dec
@@ -652,7 +806,7 @@ match source_i, target_i with
   | inl (table, count) =>
     let cell_path :=
       make_path _ _ _ bfs_find table
-        (fun c_i => if eq_nat_dec c_i target_i then true else false)
+        (fun c_i => Nat.eqb c_i target_i)
         (fun n1 n2 => Some n2) source_i (List.length cells) in
       match cell_path with
       | Some cell_path =>
@@ -660,24 +814,86 @@ match source_i, target_i with
             let penultimate_cell_i := nth 1 (List.rev cell_path) 0%nat in
             match common_vert_edge 
                      (nth penultimate_cell_i cells dummy_cell)
-                     (nth target_i cells dummy_cell) with
-            | Some last_door =>
-              Some (connected_cells_path (nth source_i cells dummy_cell)
-                 (nth (seq.head 0%nat cell_path) cells dummy_cell)
-                 (List.map (fun i => nth i cells dummy_cell)
-                       (seq.behead cell_path)) ++
-                    (vert_edge_midpoint last_door, target) :: nil)
-            | None => None
+                     (nth target_i cells dummy_cell),
+                  common_vert_edge
+                    (nth source_i cells dummy_cell)
+                    (nth (seq.head 0%nat cell_path) cells dummy_cell) with
+            | Some last_door, Some first_door =>
+              Some ((Apt source (source_i :: nil), 
+                (Apt (vert_edge_midpoint first_door)
+                     (source_i :: seq.head 0%nat cell_path :: nil))) ::
+                connected_cells_path cells source_i (seq.head 0%nat cell_path)
+                  (seq.behead cell_path) ++
+                    (Apt (vert_edge_midpoint last_door)
+                         (penultimate_cell_i :: target_i :: nil),
+                     Apt target (target_i :: nil)) :: nil)
+            | _, _ => None
             end
            else
-             path_adjacent_cells source target
-               (nth source_i cells dummy_cell)
-               (nth target_i cells dummy_cell)
+             path_adjacent_cells cells source target
+               source_i target_i
       | None => None
       end
   end
 | _, _ => None
 end.
+
+
+
+Fixpoint check_curve_element_and_repair
+  (fuel : nat) (cells : seq cell) (e : curve_element) :
+   seq curve_element :=
+match e with
+| straight p1 p2 => straight p1 p2 :: nil
+| bezier p1 p2 p3 =>
+  if Nat.eqb (List.length (cell_indices p2)) 2 then
+    let i1 := nth 0 (cell_indices p2) 0%nat in
+    let i2 := nth 1 (cell_indices p2) 0%nat in
+    let vedge := match common_vert_edge 
+         (nth i1 cells dummy_cell) (nth i2 cells dummy_cell) with
+      Some v => v
+      | None => dummy_vert_edge
+      end in
+    let e' :=
+      (if Qlt_bool (p_x (apt_val p1)) (p_x (apt_val p2)) then
+        bezier p1 p2 p3
+      else
+        bezier p3 p2 p1) in
+    match e' with
+    |straight _ _ => e' :: nil
+    | bezier p1' p2' p3' =>
+      let check_function :=
+      if Qlt_bool 0 
+          (pue_formula (apt_val p1') (apt_val p2') (apt_val p3')) then
+          check_bezier_ccw
+      else
+          check_bezier_cw in
+        match check_function 20%nat vedge
+                  (apt_val p1')(apt_val p2')(apt_val p3') with
+        | Some true => bezier p1 p2 p3 :: nil
+        | _ => 
+          match fuel with
+          | S p =>
+            straight p1 
+               (Apt (midpoint (apt_val p1) (apt_val p2)) (cell_indices p1))
+              ::
+              check_curve_element_and_repair p cells
+                (bezier (Apt (midpoint (apt_val p1) (apt_val p2))
+                       (cell_indices p1))
+                 p2
+                 (Apt (midpoint (apt_val p2) (apt_val p3)) (cell_indices p3)))
+              ++
+              straight (Apt (midpoint (apt_val p2) (apt_val p3))
+                    (cell_indices p3)) p3 :: nil
+          | _ =>
+            straight p1 p2 :: straight p2 p3 :: nil
+          end
+        end
+    end
+  else
+    (bezier p1 p2 p3 :: nil)
+    end.
+
   
 
 (*******  starting work on an example ******************)
@@ -774,23 +990,28 @@ Compute List.length (sc_closed (iter_list step
   (seq.behead (edges_to_events example_edge_list)) (start (seq.head dummy_event (edges_to_events example_edge_list))
       example_bottom example_top))).
 
-Compute List.length (edges_to_cells example_bottom example_top example_edge_list).
+Definition example_cells :=
+  edges_to_cells example_bottom example_top example_edge_list.
 
+Compute List.length example_cells.
 
 Open Scope string_scope.
 
-Compute nth 1 (edges_to_cells example_bottom example_top example_edge_list)
-          dummy_cell.
+Compute nth 1 example_cells dummy_cell.
 
-Compute let cells := edges_to_cells example_bottom example_top
-                        example_edge_list in
-           connected_cells (nth 2 cells dummy_cell)
-             (map (fun n => nth n cells dummy_cell)
+Compute connected_cells (nth 2 example_cells dummy_cell)
+             (map (fun n => nth n example_cells dummy_cell)
                  (6 :: 0 :: 4 :: nil)%nat).
 
+Compute let p := Bpt (-1) 1 in
+   find (fun i => strict_inside_closed p (nth i example_cells dummy_cell))
+           (seq.iota 0 9).
+
+Compute let p := Bpt (-1) (-5/2) in
+   find (fun i => strict_inside_closed p (nth i example_cells dummy_cell))
+           (seq.iota 0 9).
+
 Compute
-let cells :=
-  edges_to_cells example_bottom example_top example_edge_list in
 String.concat "
 "
 ("" ::
@@ -803,21 +1024,58 @@ List.map
   (fun (e : edge) => (display_edge 300 400 70 e))
   (example_bottom :: example_top :: example_edge_list) ++
 "stroke" ::
-display_cell_centers 300 400 70 cells
+display_cell_centers 300 400 70 example_cells
    ++
 "stroke gsave [1 3] 0 setdash
 " ::
 List.map
   (fun c : cell => display_cell 300 400 70 c)
-  cells ++
+  example_cells ++
 "
 stroke grestore
 " ::
+(* List.map
+  (fun e : curve_element => display_curve_element 300 400 70 e)
+  match 
+    point_to_point example_bottom example_top example_edge_list (Bpt (-1) (-5/2))
+         (Bpt (-1) 1) with
+  | Some s => smoothen (break_segments s)
+  | None => nil
+  end
+ ++ "stroke
+" :: *)
 List.map
-  (fun s : pt * pt => display_segment 300 400 70 s)
-  (connected_cells_path
-     (nth 2 cells dummy_cell)
-     (nth 6 cells dummy_cell)
-     (map (fun n => nth n cells dummy_cell) (0 :: 4 :: nil)%nat)) ++
-"stroke
-END" :: nil).
+  (fun e : curve_element => display_curve_element 300 400 70 e)
+  match 
+    point_to_point example_bottom example_top example_edge_list (Bpt (-2) (-3/4))
+         (cell_center (nth 4 example_cells dummy_cell)) with
+  | Some s => List.concat (List.map 
+    (check_curve_element_and_repair 20 example_cells)
+   (smoothen (break_segments s)))
+  | None => nil
+  end
+ ++ "stroke
+" :: (*
+List.map
+  (fun e : curve_element => display_curve_element 300 400 70 e)
+  match 
+    point_to_point example_bottom example_top example_edge_list (Bpt (-19/10) (-1/2))
+         (cell_center (nth 4 example_cells dummy_cell)) with
+  | Some s => smoothen (break_segments s)
+  | None => nil
+  end
+ ++ "stroke
+" *)
+(* ::
+List.map
+  (fun e : pt * pt => display_segment 300 400 70 e)
+  match 
+    point_to_point example_bottom example_top example_edge_list (Bpt (-1) (-5/2))
+         (cell_center (nth 4 example_cells dummy_cell)) with
+  | Some s => s
+  | None => nil
+  end
+++
+"stroke"
+:: *)
+"END" :: nil).
