@@ -249,7 +249,7 @@ Definition step (e : event) (st : scan_state) : scan_state :=
      let last_closed := close_cell p last_contact in
      let (new_opens, new_lopen) := update_open_cell_top lsto higher_edge e in
      Bscan (op1 ++ fc' ++ new_opens) new_lopen last_cells
-          (cls ++ closed) last_closed higher_edge lx.
+          (cls ++ cl :: closed) last_closed higher_edge lx.
 
 Definition leftmost_points (bottom top : edge) :=
   if p_x (left_pt bottom) < p_x (left_pt top) then
