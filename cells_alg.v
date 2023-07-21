@@ -1564,6 +1564,32 @@ have hfq : high (last dummy_cell f) = low (head dummy_cell l).
 by apply: open_cells_decomposition_cat; rewrite // -hfq.
 Qed.
 
+Lemma open_cells_decomposition_single f l c p :
+  adjacent_cells (f ++ c :: l) ->
+  s_right_form (f ++ c :: l) ->
+  seq_valid (f ++ c :: l) p ->
+  p >>> low c ->
+  p <<< high c ->
+  open_cells_decomposition (f ++ c :: l) p =
+    (f, nil, c, l, low c, high c).
+Proof.
+move=> adj srf sv pal puh.
+have exi : exists2 c', c' \in (c :: l) & contains_point' p c'.
+  by exists c;[ rewrite inE eqxx // | rewrite /contains_point' pal underW].
+have := open_cells_decomposition_cat adj srf sv exi pal.
+case ocl : (open_cells_decomposition (c :: l) p) =>
+        [[[[[fc cc] lcc] lc] le] he].
+move: ocl; rewrite /open_cells_decomposition /=.
+have -> : contains_point p c.
+  by rewrite /contains_point underWC // underW.
+case lq : l => [ | c1 l'] /=.
+  by move=> [] <- <- <- <- <- <-; rewrite cats0.
+suff -> : contains_point p c1 = false.
+  by move=> [] <- <- <- <- <- <-; rewrite cats0.
+move: adj=> /adjacent_catW[] _; rewrite lq /= => /andP[] /eqP lc1q  _.
+by rewrite /contains_point -lc1q puh.
+Qed.
+
 Section step.
 
 
@@ -3738,8 +3764,8 @@ Lemma step_keeps_pw :
 Proof.
 rewrite /step/=.
 case: ifP=> [pxaway | /negbFE/eqP/[dup] pxhere/abovelstle palstol].
-case oe : (open_cells_decomposition (fop ++ lsto :: lop) (point e))=>
-  [[[[[fc cc] lcc] lc] le] he].
+  case oe : (open_cells_decomposition (fop ++ lsto :: lop) (point e))=>
+    [[[[[fc cc] lcc] lc] le] he].
 case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
 move: step_keeps_pw_default; rewrite /open.
   by rewrite oe oca_eq /state_open_seq /= catA.
@@ -3764,9 +3790,22 @@ case: ifP=> [eabove | ebelow].
            (_ : _ = (rcons fop lsto ++ fc') ++ nos ++ lno :: lc); last first.
     by rewrite /state_open_seq /= cat_rcons !catA.
   by apply.
+case: ifP => [ebelow_st | eonlsthe].
+  rewrite /state_open_seq /=.
+  rewrite /update_open_cell.
+  case oq : (outgoing e) => [ | fog ogs] /=.
+    rewrite cats0 map_cat /=.
+    move: pwo; rewrite pairwise_cons /open => /andP[] _.
+    by rewrite map_cat /=.
+  case oca_eq : (opening_cells_aux _ _ _ _) => [s c] /=.
+  rewrite -catA -cat_rcons.
+  have:= step_keeps_pw_default.
+  have ocd : open_cells_decomposition open (point e) =
+            (fop, [::], lsto, lop, low lsto, high lsto).
+    by rewrite open_cells_decomposition_single=> //; last by rewrite -lstheq.
+  by rewrite ocd oq oca_eq cat_rcons.
 
-  {in state_open_seq (step e (Bscan fop lsto lop cls lstc lsthe lstx)) &,
-     disjoint_open_cells R}.
+
 Proof.
 
   have := step_keeps_disjoint_open_default; rewrite oe' oca_eq.
