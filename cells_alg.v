@@ -3619,6 +3619,97 @@ have rfnew : s_right_form (fc ++ nos ++ lno :: lc).
 apply: (@middle_disj_last _ cc lcc)=> //.
 Admitted.
 
+Lemma pairwise_subst {T : Type} [leT : rel T] (os ns s1 s2 : seq T) :
+  pairwise leT (s1 ++ os ++ s2) ->
+  pairwise leT ns ->
+  allrel leT s1 ns ->
+  allrel leT ns s2 ->
+  pairwise leT (s1 ++ ns ++ s2).
+Proof.
+rewrite !pairwise_cat !allrel_catr => /andP[] /andP[] _ -> /andP[] ->.
+by move=>/andP[] _ /andP[] _ -> -> -> ->.
+Qed.
+
+Lemma step_keeps_pw_default :
+  let '(fc, cc, lcc, lc, le, he) :=
+  open_cells_decomposition open (point e) in
+  let '(nos, lno) := 
+    opening_cells_aux (point e)
+        (sort (@edge_below _) (outgoing e)) le he in
+(*    pairwise (@edge_below _) [seq high x | fc ++ nos ++ lno :: lc). *)
+    {in (fc ++ nos ++ lno :: lc) &, disjoint_open_cells R}.
+Proof.
+case oe: (open_cells_decomposition open (point e)) =>
+  [[[[[fc cc] lcc] lc] le] he].
+have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]]
+  := decomposition_main_properties oe exi.
+have [pal puh vle vhe allnct] :=
+  decomposition_connect_properties rfo sval adj cbtom bet_e oe.
+case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+have oc_eq : opening_cells (point e) (outgoing e) le he = rcons nos lno.
+  by rewrite /opening_cells oca_eq.
+rewrite -cat_rcons.
+have adjnew : adjacent_cells (fc ++ rcons nos lno ++ lc).
+  have cclccn0 : rcons cc lcc != nil by apply /eqP/rcons_neq0.
+  have noslnon0 : rcons nos lno != nil by apply/eqP/rcons_neq0.
+  have [adjn lle] : adjacent_cells (rcons nos lno) /\
+              low (head dummy_cell (rcons nos lno)) = le.
+    by apply: (adjacent_opening_aux' vle vhe oute' oca_eq).
+  have lnlo : low (head dummy_cell (rcons cc lcc)) =
+              low (head dummy_cell (rcons nos lno)).
+    by rewrite lle; rewrite head_rcons.
+  have hnho : high (last dummy_cell (rcons cc lcc)) =
+        high (last dummy_cell (rcons nos lno)).
+    rewrite !last_rcons -heq.
+    have := opening_cells_aux_high_last vle vhe oute'.
+    by rewrite oca_eq /=.
+  have adjocd : adjacent_cells (fc ++ rcons cc lcc ++ lc).
+    by rewrite cat_rcons -ocd.
+  by apply (replacing_seq_adjacent cclccn0).
+have pwnew : pairwise (@edge_below _)
+       [seq high c | c <- fc ++ rcons nos lno ++ lc].
+  rewrite pairwise_map.
+  move: pwo; rewrite pairwise_cons ocd -cat_rcons pairwise_map=> /andP[] _ pwo'.
+  have vhocd : all ((@valid_edge _)^~ (point e))
+       [seq high x | x <- fc ++ cc ++ lcc :: lc].
+    by rewrite -ocd; apply/allP; apply: seq_valid_high.
+  move: (pwo'); rewrite cat_rcons -pairwise_map=> pwo2.
+  have puh' : point e <<< high lcc by rewrite -heq.
+  apply: (pairwise_subst pwo'); rewrite -?pairwise_map.
+  - rewrite -oc_eq.
+    have lein' : le \in all_edges open (e :: future_events).
+      by rewrite mem_cat lein.
+    have hein' : he \in all_edges open (e :: future_events).
+      by rewrite mem_cat hein.
+    by apply: opening_cells_aux_pairwise.
+  - have : allrel (@edge_below _) [seq high x | x <- fc]
+            [seq high x | x <- rcons nos lno].
+      have fcle : all ((@edge_below _)^~ le) [seq high x | x <- fc].
+        apply/allP=> x /mapP[xc xcin xq].
+        elim/last_ind : {-1} (fc) (erefl fc) => [ | fc' lfc _] fcq.
+          by move: xcin; rewrite fcq.
+        have := last_first_cells_high cbtom adj bet_e oe => <-.
+        rewrite fcq map_rcons last_rcons xq.
+        move: xcin; rewrite fcq mem_rcons inE=> /orP[/eqP -> | xcin ].
+          by apply: edge_below_refl.
+        move: pwo'; rewrite pairwise_cat fcq pairwise_rcons=> /andP[] _ /andP[].
+        by move=> /andP[] + _ _ => /allP /(_ xc xcin) /=.
+      have := new_edges_above_first_old ocd vhocd pwo2 fcle pal puh' vle.
+      by rewrite -oc_eq heq.
+    by rewrite allrel_mapr allrel_mapl.
+  have : allrel (@edge_below _) [seq high x | x <- rcons nos lno]
+              [seq high x | x <- lc].
+     have := new_edges_below_last_old ocd vhocd pwo2 (underWC pal) puh' vle.
+     by rewrite -heq oc_eq.
+  by rewrite allrel_mapl allrel_mapr.
+have newok : all open_cell_side_limit_ok (fc ++ rcons nos lno ++ lc).
+  rewrite -oc_eq !all_cat.
+  move: open_side_limit; rewrite ocd -cat_rcons !all_cat=> /andP[] ->.
+  move=> /andP[] _ ->; rewrite /= andbT.
+  by apply opening_cells_side_limit=> //; apply/underWC.
+apply: disoc=> //.
+Qed.
+
 Lemma step_keeps_disjoint_open_default :
   let '(fc, cc, lcc, lc, le, he) :=
     open_cells_decomposition open (point e) in
@@ -3630,6 +3721,7 @@ Lemma step_keeps_disjoint_open_default :
 Proof.
 case oe: (open_cells_decomposition open (point e)) =>
   [[[[[fc cc] lcc] lc] le] he].
+
 have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]]
   := decomposition_main_properties oe exi.
 have [pal puh vle vhe allnct] :=
