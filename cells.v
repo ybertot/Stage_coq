@@ -242,11 +242,11 @@ Proof.
 by move=> sval g /mapP [c cin ->]; move: (allP sval c cin)=> /andP[].
 Qed.
 
-Lemma insert_opening_valid first_cells new_open_cells last_cells p :
-seq_valid first_cells p -> seq_valid  new_open_cells p ->
-seq_valid last_cells p -> seq_valid  (first_cells++new_open_cells++ last_cells) p.
+Lemma insert_opening_valid fc nc lc p :
+  [&& seq_valid fc p, seq_valid nc p & seq_valid lc p] =
+  seq_valid (fc ++ nc ++ lc) p.
 Proof.
-apply insert_opening_all.
+by rewrite /seq_valid !all_cat.
 Qed.
 
 Lemma strict_under_seq p c q :
