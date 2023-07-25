@@ -4113,27 +4113,12 @@ case: ifP=> [eabove | ebelow].
   by apply: underWC.
 case: ifP => [ebelow_st | eonlsthe].
   rewrite /state_open_seq /=.
-  rewrite /update_open_cell.
-  case oq : (outgoing e) => [ | fog ogs] /=.
-    rewrite cats0 all_cat /=; apply/andP; split.
-      apply/allP=> x xin; apply: (allP open_side_limit).
-      by rewrite /open; subset_tac.
-    apply/andP; split; last first.
-      apply/allP=> x xin; apply: (allP open_side_limit).
-      by rewrite /open; subset_tac.
-    rewrite /open_cell_side_limit_ok /=.
-  
-    move: pwo; rewrite pairwise_cons /open => /andP[] _.
-    by rewrite map_cat /=.
-  case oca_eq : (opening_cells_aux _ _ _ _) => [s c] /=.
-  rewrite -catA -cat_rcons.
-  have:= step_keeps_pw_default.
-  have ocd : open_cells_decomposition open (point e) =
-            (fop, [::], lsto, lop, low lsto, high lsto).
-    by rewrite open_cells_decomposition_single=> //; last by rewrite -lstheq.
-  by rewrite ocd oq oca_eq cat_rcons.
-case: ifP=>
-
+  case uoc_eq : (update_open_cell lsto e) => [nos lno] /=.
+  have pxhere' : p_x (point e) = left_limit lsto by rewrite pxhere.
+  have puh : point e <<< high lsto by rewrite -lstheq.
+  have nosok := update_open_cell_side_limit_ok uoc_eq pxhere' puh palstol.
+  rewrite -catA -cat_rcons !all_cat nosok /= -all_cat.
+  by apply: (all_sub _ open_side_limit); rewrite /open; subset_tac.
 Admitted.
 
 Lemma step_keeps_open_disjoint :
