@@ -215,8 +215,12 @@ Definition update_open_cell_top (c : cell) (new_high : edge) (e : event) :=
           left_pts c] in
       ([::], Bcell newptseq (right_pts c) (low c) new_high)
   else
-    opening_cells_aux (point e) (sort (@edge_below _) (outgoing e))
-        (low c) new_high.
+    match opening_cells_aux (point e) (sort (@edge_below _) (outgoing e))
+        (low c) new_high with
+    | ([::], lc) => (* this is not supposed to happen *) ([::], lc)
+    | (f :: q, lc) =>
+      (set_left_pts f (point e :: behead (left_pts c)) :: q, lc)
+    end.
 
 Definition step (e : event) (st : scan_state) : scan_state :=
    let p := point e in
