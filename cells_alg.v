@@ -4247,6 +4247,36 @@ have := step_keeps_open_side_limit; rewrite -/s'=> ok'.
 apply: disoc=>//.
 Qed.
 
+(* This is not used, just now. *)
+Lemma left_limit_closing_cells (cc : seq cell) (p1 : pt) :
+  adjacent_cells cc -> seq_valid cc p1 ->
+  p1 >>> low (head_cell cc) -> p1 <<< high (last_cell cc) ->
+  all (contains_point p1) cc ->
+  [seq left_limit i | i <- closing_cells p1 cc] = [seq left_limit i | i <- cc].
+Proof.
+move=> adjcc svalcc pale puhe allcont.
+rewrite /closing_cells.
+rewrite -map_comp; rewrite -eq_in_map /close_cell => -[] ls rs lo hi cin /=.
+move: (allP svalcc _ cin) => /= /andP[] vloc vhic.
+by rewrite (pvertE vloc) (pvertE vhic).
+Qed.
+
+Lemma right_limit_close_cell p1 c :
+  valid_edge (low c) p1 -> valid_edge (high c) p1 ->
+  right_limit (close_cell p1 c) = p_x p1.
+Proof.
+move=> vlc vhc; rewrite /close_cell /right_limit.
+rewrite !pvertE //=.
+by case: ifP; case: ifP.
+Qed.
+
+Lemma left_limit_close_cell p1 c :
+   left_limit (close_cell p1 c) = left_limit c.
+Proof.
+rewrite /close_cell.
+by do 2 (case: (vertical_intersection_point _ _) => //).
+Qed.
+
 Lemma step_keeps_disjoint_default :
   let '(fc, cc, lcc, lc, le, he) :=
     open_cells_decomposition open (point e) in
@@ -4684,20 +4714,6 @@ set nlsto := (X in (_ ++ X :: lc)).
 split.
 Qed.
 
-
-Lemma left_limit_closing_cells (cc : seq cell) (p : pt) :
-  adjacent_cells cc -> seq_valid cc p ->
-  p >>> low (head_cell cc) -> p <<< high (last_cell cc) ->
-  all (contains_point p) cc ->
-  [seq left_limit i | i <- closing_cells p cc] = [seq left_limit i | i <- cc].
-Proof.
-move=> adj sval pale puhe allcont.
-rewrite /closing_cells.
-rewrite -map_comp; rewrite -eq_in_map /close_cell => -[] ls rs lo hi cin /=.
-move: (allP sval _ cin) => /= /andP[] vlo vhi.
-by rewrite (pvertE vlo) (pvertE vhi).
-Qed.
-
 Lemma step_keeps_injective_high e open closed open2 closed2 :
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -4780,15 +4796,6 @@ have : uniq (rcons (sort (@edge_below _) (outgoing e)) he).
 by rewrite -(opening_cells_high vle vhe out_e) => /uniq_map_injective; apply.
 Qed.
 
-Lemma right_limit_close_cell p c :
-  valid_edge (low c) p -> valid_edge (high c) p ->
-  right_limit (close_cell p c) = p_x p.
-Proof.
-move=> vlc vhc; rewrite /close_cell /right_limit.
-rewrite !pvertE //=.
-by case: ifP; case: ifP.
-Qed.
-
 Lemma step_keeps_closed_to_the_left ev open closed open' closed' :
   cells_bottom_top open ->
   adjacent_cells open ->
@@ -4823,13 +4830,6 @@ move=> rtl c; rewrite mem_cat=> /orP[].
 move=> /mapP[c' c'in ceq].
 rewrite ceq (close_cell_right_limit) //.
 by apply/andP/(allP svalcc).
-Qed.
-
-Lemma left_limit_close_cell p c : 
-   left_limit (close_cell p c) = left_limit c.
-Proof.
-rewrite /close_cell.
-by do 2 (case: (vertical_intersection_point _ _) => //).
 Qed.
 
 Lemma outgoing_high_opening s p g le he:
