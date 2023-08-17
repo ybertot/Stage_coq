@@ -1682,6 +1682,7 @@ Hypothesis uniq_closed : uniq (rcons cls lstc).
 Hypothesis non_empty_closed :
   {in rcons cls lstc, forall c, exists p, inside_closed' p c}.
 Hypothesis non_empty_right : right_pts lstc != [::].
+Hypothesis uniq_out : uniq (outgoing e).
 
 Lemma disoc_i i j s : (i < j < size s)%N ->
   adjacent_cells s ->
@@ -4770,7 +4771,25 @@ rewrite -(on_pvert one); apply: same_pvert_y; first by case/andP: one.
 by rewrite pxhere sx.
 Qed.
 
+Lemma lex_left_high_open :
+  {in open, forall c, lexPt (left_pt (high c)) (point e)}.
+Proof.
 
+move=> c cin.
+have hcin : high c \in [seq high x | x <- open] by apply: map_f.
+have := allP gs (high c) hcin; rewrite /edge_side_prop.
+have vhce : valid_edge (high c) (point e).
+  by apply: (seq_valid_high sval).
+rewrite vhce.
+case: ifP=> [eac _| ebc].
+  rewrite /lexPt.
+  move: (vhce)=> /andP[] +; rewrite le_eqVlt orbC=> /orP[-> | ] //.
+  move=> /[dup] /eqP/esym/eqP samex -> _.
+  have := same_pvert_y vhce samex.
+  have -> := on_pvert (left_on_edge (high c))=> /eqP <-.
+  by rewrite eac orbT.
+move: ebc=> /negP/negP; rewrite -leNgt.
+move/negPf: ebc.
 Lemma step_keeps_injective_high e open closed open2 closed2 :
   cells_bottom_top open ->
   adjacent_cells open ->
