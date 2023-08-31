@@ -4928,6 +4928,24 @@ move=> /(_ j1 j2); rewrite !inE => /(_ j1lt j2lt) /[apply].
 by rewrite -j1q -j2q => ->.
 Qed.
 
+Lemma opening_cells_aux_uniq q l g1 g2 r1 r2:
+  uniq l ->
+  g2 \notin l ->
+  {in l, forall g, left_pt g == q} ->
+  valid_edge g1 q ->
+  valid_edge g2 q ->
+  opening_cells_aux q l g1 g2 = (r1, r2) ->
+  uniq (rcons r1 r2).
+Proof.
+move=> ul g2nin ol v1 v2 oca_eq.
+have lg2 := opening_cells_aux_high_last v1 v2 ol.
+have lg1 := opening_cells_aux_high v1 v2 ol.
+apply: (@map_uniq _ _ (@high _)).
+rewrite map_rcons rcons_uniq.
+rewrite oca_eq /= in lg2 lg1.
+by rewrite lg2 lg1 g2nin ul.
+Qed.
+
 Lemma step_keeps_injective_high :
   let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
   {in state_open_seq s' &, injective (@high R)}.
@@ -5015,18 +5033,32 @@ case ogq : (outgoing e) => [ | fog ogs] /=.
     rewrite has_cat negb_or => /andP[] _ /= => ->.
     by rewrite [X in is_true X -> _]cat_uniq => /andP[] _ /andP[] _.
   by rewrite /= heq.
-case oca_eq : (opening_cells_aux _ _ _ _) => [ [ | fno nos] lno].
-  have := opening_cells_aux_absurd_case .
-have := open_cells_decomposition_cat.
-
-  have [pal puh vle vhe _]:=
-   decomposition_connect_properties rfo sval adj cbtom bet_e oe'.
-
-
+have := open_cells_decomposition_cat adj rfo sval exi2 palstol.
+rewrite oe' => oe.
 have [pal puh vle vhe _]:=
-   decomposition_connect_properties rfo sval adj cbtom bet_e oe'.
-
-    rewrite /=.
+   decomposition_connect_properties rfo sval adj cbtom bet_e oe.
+case oca_eq : (opening_cells_aux _ _ _ _) => [ [ | fno nos] lno].
+  have ogn : fog :: ogs != nil by [].
+  have := opening_cells_aux_absurd_case vlo vhe ogn.
+  by rewrite -[X in {in X, _}]ogq oca_eq => /(_ oute).
+rewrite /state_open_seq /= !catA -(catA (_ ++ _)) -cat_rcons.
+have := step_keeps_injective_high_default.
+rewrite oe ogq.
+have le'q : le' = low lsto.
+  have := last_step_situation oe' pxhere.
+  rewrite eonlsthe=> /(_ isT).
+  by move: ebelow=> /negbT; rewrite negbK=> -> /(_ isT)[].
+rewrite le'q oca_eq -cat_rcons.
+apply: update_cells_injective_high=> //.
+rewrite uniq_catCA cat_uniq.
+have he'nin : he' \notin (sort (@edge_below _) (outgoing e)).
+  apply/negP=> abs.
+  have := puh; rewrite -(eqP (oute' abs)).
+  by rewrite -(negbK (_ <<< _)) left_pt_above.
+have uniq_out' : uniq (sort (@edge_below _) (outgoing e)).
+  by rewrite sort_uniq.
+have := opening_cells_aux_uniq uniq_out' he'nin oute' vle vhe.
+rewrite ogq le'q oca_eq=> /(_ _ _ erefl) => -> /=.
 Lemma step_keeps_closed_to_the_left ev open closed open' closed' :
   cells_bottom_top open ->
   adjacent_cells open ->
