@@ -4946,6 +4946,27 @@ rewrite oca_eq /= in lg2 lg1.
 by rewrite lg2 lg1 g2nin ul.
 Qed.
 
+Lemma opening_cells_contains_point le he nos:
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  point e >>> le ->
+  point e <<< he ->
+  opening_cells (point e) (outgoing e) le he = nos ->
+  {in nos, forall c, contains_point (point e) c}.
+Proof.
+move=> vle vhe pal puh oceq.
+have := opening_cells_aux_subset vle vhe oute'.
+move: oceq; rewrite /opening_cells.
+case oca_eq : (opening_cells_aux _ _ _ _)=> [nos' lno'] <- /(_ _ _ _ erefl).
+move=> main x xin; rewrite /contains_point.
+move: (main x xin); rewrite !inE=> /andP[] lows highs.
+apply/andP; split.
+  move: lows=> /orP[/eqP -> | /oute'/eqP <-]; first by rewrite underWC.
+  by rewrite left_pt_above.
+move: highs=> /orP[/eqP -> | /oute'/eqP <-]; first by rewrite underW.
+by rewrite left_pt_below.
+Qed.
+
 Lemma step_keeps_injective_high :
   let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
   {in state_open_seq s' &, injective (@high R)}.
@@ -5059,6 +5080,26 @@ have uniq_out' : uniq (sort (@edge_below _) (outgoing e)).
   by rewrite sort_uniq.
 have := opening_cells_aux_uniq uniq_out' he'nin oute' vle vhe.
 rewrite ogq le'q oca_eq=> /(_ _ _ erefl) => -> /=.
+move: uniq_open.
+rewrite /open ocd catA -cat_rcons uniq_catCA cat_uniq.
+move=> /andP[] _ /andP[] _ ->; rewrite andbT.
+(* Starting to prove that all cells are different from new ones. *)
+rewrite -all_predC; apply/allP=> x xin /=.
+have [A [B [C [all_nct2 [flcnct2 D]]]]] :=
+    decomposition_main_properties oe exi.
+have := connect_properties cbtom adj rfo sval bet_e A all_nct2 C B flcnct2.
+move=> {A B C D} [] _ _ _ _.
+move: xin; rewrite mem_cat=> /[swap] /[apply] nctn.
+have -> : fno :: rcons nos lno = opening_cells (point e) (outgoing e)
+            (low lsto) he'.
+  by rewrite /opening_cells ogq oca_eq.
+apply/negP=> abs.
+have := opening_cells_contains_point vlo vhe palstol puh.
+move: abs.
+rewrite /opening_cells ogq oca_eq => xin2 /(_ _ erefl _ xin2).
+by rewrite (negbTE nctn).
+Qed.
+
 Lemma step_keeps_closed_to_the_left ev open closed open' closed' :
   cells_bottom_top open ->
   adjacent_cells open ->
