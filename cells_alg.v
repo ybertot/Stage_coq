@@ -4967,6 +4967,30 @@ move: highs=> /orP[/eqP -> | /oute'/eqP <-]; first by rewrite underW.
 by rewrite left_pt_below.
 Qed.
 
+Lemma step_keeps_uniq_default fc cc lcc lc le he nos lno:
+  open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
+  opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he = (nos, lno) ->
+  uniq (fc ++ nos ++ lno :: lc).
+Proof.
+move=> oe oca_eq.
+have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]] :=
+    decomposition_main_properties oe exi.
+have [pal puh vle vhe old_nctn]:=
+   decomposition_connect_properties rfo sval adj cbtom bet_e oe.
+have := opening_cells_contains_point vle vhe pal puh.
+rewrite /opening_cells oca_eq => /(_ _ erefl)=> new_ctn.
+have uo : uniq (sort (@edge_below _) (outgoing e)) by rewrite sort_uniq.
+have heno : he \notin (sort (@edge_below _) (outgoing e)).
+  apply/negP=> /oute'/eqP; move: puh=> /[swap] <-.
+  by rewrite (negbTE (left_pt_above he)).
+have uniqnew := opening_cells_aux_uniq uo heno oute' vle vhe oca_eq.
+rewrite -cat_rcons uniq_catCA cat_uniq uniqnew.
+move: uniq_open; rewrite ocd -cat_rcons uniq_catCA cat_uniq=> /andP[] _.
+move=>/andP[] _ ->; rewrite andbT /= -all_predC /=.
+apply/allP=> x /=; rewrite mem_cat=> /old_nctn nctn.
+by apply/negP=> /new_ctn/nctn.
+Qed.
+
 Lemma step_keeps_injective_high :
   let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
   {in state_open_seq s' &, injective (@high R)}.
@@ -5028,7 +5052,8 @@ case: ifP => [ebelow_st | eonlsthe].
   have := step_keeps_injective_high_default.
   rewrite oe ogq oca_eq -cat_rcons.
   apply: update_cells_injective_high.
-    admit.
+    have := step_keeps_uniq_default oe; rewrite ogq=> /(_ _ _ oca_eq).
+    by rewrite cat_rcons catA.
   by rewrite !map_rcons.
 case oe' : (open_cells_decomposition _ _) => [[[[[fc' cc'] lcc'] lc'] le'] he'].
 have lsto_ctn : contains_point' (point e) lsto.
@@ -5071,33 +5096,8 @@ have le'q : le' = low lsto.
   by move: ebelow=> /negbT; rewrite negbK=> -> /(_ isT)[].
 rewrite le'q oca_eq -cat_rcons.
 apply: update_cells_injective_high=> //.
-rewrite uniq_catCA cat_uniq.
-have he'nin : he' \notin (sort (@edge_below _) (outgoing e)).
-  apply/negP=> abs.
-  have := puh; rewrite -(eqP (oute' abs)).
-  by rewrite -(negbK (_ <<< _)) left_pt_above.
-have uniq_out' : uniq (sort (@edge_below _) (outgoing e)).
-  by rewrite sort_uniq.
-have := opening_cells_aux_uniq uniq_out' he'nin oute' vle vhe.
-rewrite ogq le'q oca_eq=> /(_ _ _ erefl) => -> /=.
-move: uniq_open.
-rewrite /open ocd catA -cat_rcons uniq_catCA cat_uniq.
-move=> /andP[] _ /andP[] _ ->; rewrite andbT.
-(* Starting to prove that all cells are different from new ones. *)
-rewrite -all_predC; apply/allP=> x xin /=.
-have [A [B [C [all_nct2 [flcnct2 D]]]]] :=
-    decomposition_main_properties oe exi.
-have := connect_properties cbtom adj rfo sval bet_e A all_nct2 C B flcnct2.
-move=> {A B C D} [] _ _ _ _.
-move: xin; rewrite mem_cat=> /[swap] /[apply] nctn.
-have -> : fno :: rcons nos lno = opening_cells (point e) (outgoing e)
-            (low lsto) he'.
-  by rewrite /opening_cells ogq oca_eq.
-apply/negP=> abs.
-have := opening_cells_contains_point vlo vhe palstol puh.
-move: abs.
-rewrite /opening_cells ogq oca_eq => xin2 /(_ _ erefl _ xin2).
-by rewrite (negbTE nctn).
+have := step_keeps_uniq_default oe; rewrite ogq le'q=> /(_ _ _ oca_eq).
+by rewrite cat_rcons !catA.
 Qed.
 
 Lemma step_keeps_closed_to_the_left ev open closed open' closed' :
