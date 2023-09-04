@@ -1686,6 +1686,8 @@ Hypothesis uniq_out : uniq (outgoing e).
 Hypothesis high_inj : {in open &, injective (@high _)}.
 Hypothesis btm_left : bottom_left_cells_lex open (point e).
 Hypothesis uniq_open : uniq open.
+Hypothesis closed_to_left :
+  {in rcons cls lstc, forall c, right_limit c <= p_x (point e)}.
 
 Lemma disoc_i i j s : (i < j < size s)%N ->
   adjacent_cells s ->
@@ -5100,40 +5102,86 @@ have := step_keeps_uniq_default oe; rewrite ogq le'q=> /(_ _ _ oca_eq).
 by rewrite cat_rcons !catA.
 Qed.
 
-Lemma step_keeps_closed_to_the_left ev open closed open' closed' :
-  cells_bottom_top open ->
-  adjacent_cells open ->
-  seq_valid open (point ev) ->
-  inside_box (point ev) ->
-  s_right_form open ->
-  step ev open closed = (open', closed') ->
-  {in closed, forall c, right_limit c <= p_x (point ev)} ->
-  {in closed', forall c, right_limit c <= p_x (point ev)}.
+Lemma closing_cells_to_the_left fc cc lcc lc le he :
+  open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
+  {in closing_cells (point e) cc, forall c, right_limit c <= p_x (point e)} /\
+  right_limit (close_cell (point e) lcc) <= p_x (point e).
 Proof.
-move=> cbtom adj sval inbox_e rfo.
+move=> oe.
+have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]] :=
+    decomposition_main_properties oe exi.
+have [pal puh vle vhe _]:=
+  decomposition_connect_properties rfo sval adj cbtom bet_e oe.
+split; last first.
+  have vlolcc : valid_edge (low lcc) (point e).
+    apply: (proj1 (andP (allP sval lcc _))).
+    by rewrite ocd !(mem_cat, inE) eqxx ?orbT.
+  rewrite /close_cell (pvertE vlolcc).
+  rewrite -heq (pvertE vhe) /right_limit /=.
+  by case: ifP; case: ifP.
+move=> c /mapP[c' c'in ->].
+have c'in2 : c' \in open by rewrite ocd !mem_cat c'in ?orbT.
+have /andP[vlc vhc] := allP sval c' c'in2.
+rewrite /close_cell (pvertE vlc) (pvertE vhc) /=.
+by case: ifP; case: ifP.
+Qed.
+
+Lemma step_keeps_closed_to_the_left :
+  let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  {in state_closed_seq s', forall c, right_limit c <= p_x (point e)}.
+Proof.
 rewrite /step.
-case oe: (open_cells_decomposition open (point ev)) =>
-      [[[[fc cc] lc] le] he] [_ <-].
-have [lec [hec [cc' [ocd [leq [heq [ccq heceq]]]]]]] :=
-  lhc_dec cbtom adj inbox_e oe.
-have ccsub : {subset cc <= open}.
-  by rewrite ocd=> c; rewrite !mem_cat orbCA=> ->.
-have adjcc : adjacent_cells cc.
-  by rewrite ocd in adj; move: adj => /adjacent_catW[] _ /adjacent_catW[].
-have svalcc : seq_valid cc (point ev).
-  by apply/allP=> c cin; apply/(allP sval)/ccsub.
-have [al uh] :
-  point ev >>> (low (head dummy_cell cc)) /\
-  point ev <<< (high (last dummy_cell cc)).
-  rewrite ccq /= -heceq leq heq.
-  by apply: (l_h_above_under_strict cbtom adj inbox_e sval rfo oe).
-have allcont : all (contains_point (point ev)) cc.
-  by apply/allP=> c; apply: (open_cells_decomposition_contains oe).
-move=> rtl c; rewrite mem_cat=> /orP[].
-  by apply: rtl.
-move=> /mapP[c' c'in ceq].
-rewrite ceq (close_cell_right_limit) //.
-by apply/andP/(allP svalcc).
+case: ifP => [pxaway | /negbFE/eqP/[dup] pxhere /abovelstle palstol].
+  case oe : (open_cells_decomposition _ _) => [[[[[fc cc] lcc] lc] le] he].
+  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+  rewrite /state_closed_seq /=.
+  have [ccP lccP] := closing_cells_to_the_left oe.
+  move=> x; rewrite mem_rcons inE => /orP[/eqP -> // | ].
+  by rewrite -cat_rcons mem_cat => /orP[/closed_to_left | /ccP].
+case: ifP=> [eabove | ebelow].
+  case oe' : (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
+  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+  have eabove' : point e >>> low (head dummy_cell lop).
+    have llopq : low (head dummy_cell lop) = lsthe.
+      apply: esym; rewrite lstheq.
+      move: (exi' eabove)=> [w + _].
+      move: adj=> /adjacent_catW[] _.
+      by case: (lop) => [ // | ? ?] /andP[] /eqP.
+    by rewrite llopq.
+  move: adj rfo sval; rewrite /open -cat_rcons => adj' rfo' sval'.
+  have := open_cells_decomposition_cat adj' rfo' sval' (exi' eabove) eabove'.
+  rewrite oe' cat_rcons => oe.
+  have [ccP lccP] := closing_cells_to_the_left oe.
+  rewrite /state_closed_seq /=.
+  move=> x; rewrite mem_rcons inE => /orP[/eqP -> // | ].
+  by rewrite -cat_rcons mem_cat => /orP[ /closed_to_left | /ccP].
+case: ifP => [ebelow_st | eonlsthe].
+  case uoc_eq : (update_open_cell _ _) => [nos lno].
+  rewrite /state_closed_seq /=.
+  move=> x; rewrite mem_rcons inE => /orP[/eqP -> | ].
+    rewrite /update_closed_cell /right_limit /=.
+    have := non_empty_right; case pts_eq: (right_pts lstc) => [| p1 rpts] // _.
+    rewrite /= last_cat /=.
+    have /closed_to_left: lstc \in rcons cls lstc by rewrite mem_rcons inE eqxx.
+    by rewrite /right_limit pts_eq.
+  move=> xin.
+  have /closed_to_left : x \in rcons cls lstc by rewrite mem_rcons inE xin orbT.
+  by [].
+case oe' : (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
+case uoct_eq : (update_open_cell_top _ _ _) => [nos lno].
+have exi2 : exists2 c, c \in (lsto :: lop) &
+          contains_point' (point e) c.
+  exists lsto; first by rewrite inE eqxx.
+  by rewrite /contains_point' palstol -lstheq (negbFE ebelow).
+have := open_cells_decomposition_cat adj rfo sval exi2 palstol.
+rewrite oe' => oe.
+rewrite /state_closed_seq /=.
+have [ccP lccP] := closing_cells_to_the_left oe.
+move=> x; rewrite mem_rcons inE => /orP[/eqP -> // |].
+rewrite mem_cat=> /orP[xin | ].
+  have /ccP // : x \in closing_cells (point e) cc.
+  by move/mapP: xin=> [] x' x'in ->; apply/map_f/mem_behead.
+by rewrite -mem_rcons; apply: closed_to_left.
 Qed.
 
 Lemma outgoing_high_opening s p g le he:
