@@ -5229,7 +5229,106 @@ Lemma step_keeps_left_pt_open_lex :
   let s' :=  step e (Bscan fop lsto lop cls lstc lsthe lstx) in
   {in state_open_seq s' & future_events,
     forall c e', lexPt (left_pt (high c)) (point e')}.
-
+Proof.
+rewrite /step.
+case: ifP => [pxaway | /negbFE/eqP/[dup] pxhere /abovelstle palstol].
+  case oe : (open_cells_decomposition _ _) => [[[[[fc cc] lcc] lc] le] he].
+  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+  rewrite /state_open_seq /= -catA.
+  apply: (step_keeps_left_pt_open_lex_default oe oca_eq).
+case: ifP=> [eabove | ebelow].
+  case oe' : (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
+  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+  have eabove' : point e >>> low (head dummy_cell lop).
+    have llopq : low (head dummy_cell lop) = lsthe.
+      apply: esym; rewrite lstheq.
+      move: (exi' eabove)=> [w + _].
+      move: adj=> /adjacent_catW[] _.
+      by case: (lop) => [ // | ? ?] /andP[] /eqP.
+    by rewrite llopq.
+  move: adj rfo sval; rewrite /open -cat_rcons => adj' rfo' sval'.
+  have := open_cells_decomposition_cat adj' rfo' sval' (exi' eabove) eabove'.
+  rewrite oe' cat_rcons => oe.
+  rewrite /state_open_seq /= -catA.
+  have := (step_keeps_left_pt_open_lex_default oe oca_eq).
+  by rewrite cat_rcons -!catA.
+case: ifP => [ebelow_st | eonlsthe].
+  rewrite /update_open_cell.
+  case ogq : (outgoing e) => [ /= | fog ogs].
+    rewrite /state_open_seq /= cats0 => x e' + e'in.
+    have e'in2 : e' \in e :: future_events by rewrite inE e'in orbT.
+    rewrite mem_cat inE orbCA /set_left_pts /= => /orP[/eqP -> /=| xin ].
+      by apply: left_pt_open_lex; rewrite // /open mem_cat inE eqxx orbT.
+    by apply: left_pt_open_lex; rewrite // /open mem_cat inE orbCA xin orbT.
+  case oca_eq : (opening_cells_aux _ _ _ _) => [[ | fno nos] lno].
+    have ogn : outgoing e != [::] by rewrite ogq.
+    have := opening_cells_aux_absurd_case vlo vho ogn oute.
+    by rewrite ogq oca_eq.
+  rewrite /state_open_seq /=.
+  have sub1 : {subset (lno :: fno :: nos) ++ (fop ++ lop) <=
+                  fop ++ (fno :: nos) ++ lno :: lop}.
+    move=> x; rewrite !(mem_cat, inE) -!orbA.
+    repeat move=> /orP[-> | ]; rewrite ?orbT//.
+    by move=> ->; rewrite ?orbT.
+  rewrite -catA -cat_rcons=> x e' + e'in.
+  have := open_cells_decomposition_single adj rfo sval palstol.
+  rewrite -lstheq ebelow_st => /(_ isT) oe.
+  have := step_keeps_left_pt_open_lex_default oe.
+  rewrite ogq lstheq oca_eq => /(_ _ _ erefl _ e' _ e'in) main.
+  rewrite 2!mem_cat orbCA=> /orP[| xin]; last first.
+    by apply/main/sub1; rewrite !mem_cat xin ?orbT.
+  rewrite mem_rcons inE => /orP[/eqP xq | ].
+    by apply/main/sub1; rewrite xq !(mem_cat, inE) eqxx.
+  rewrite inE => /orP[/eqP xq | xin ].
+    have /main : fno \in fop ++ (fno :: nos) ++ lno :: lop.
+      by rewrite !(mem_cat, inE, eqxx, orbT).
+    by have -> : high x = high fno by rewrite xq.
+  by apply/main/sub1; rewrite !(mem_cat, inE, xin, orbT).
+case oe' : (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
+have exi2 : exists2 c, c \in (lsto :: lop) & contains_point' (point e) c.
+  have : contains_point' (point e) lsto.
+    by rewrite /contains_point' palstol -lstheq (negbFE ebelow).
+  by exists lsto;[rewrite inE eqxx | ].
+have := open_cells_decomposition_cat adj rfo sval exi2.
+rewrite /= oe' => /(_ palstol)=> oe.
+have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]] :=
+    decomposition_main_properties oe exi.
+rewrite /update_open_cell_top.
+case ogq : (outgoing e) => [ | fog ogs].
+  rewrite /state_open_seq /= => x e' + e'in.
+  have e'in2 : e' \in e :: future_events by rewrite inE e'in orbT.
+  rewrite mem_cat=> /orP[].
+    rewrite cats0=> xin; apply: left_pt_open_lex => //.
+    by rewrite /open ocd mem_cat xin.
+  rewrite inE heq=> /orP[/eqP -> /= | ].
+    have lccin : lcc \in open by rewrite /open ocd !(mem_cat, inE, eqxx, orbT).
+    by apply: left_pt_open_lex.
+  move=> A; have B: x \in open by rewrite /open ocd !(mem_cat, inE, A, orbT).
+  by apply: left_pt_open_lex.
+case oca_eq : (opening_cells_aux _ _ _ _) => [[ | fno nos] lno].
+rewrite /state_open_seq /=.
+  have [pal puh vle vhe old_nctn]:=
+     decomposition_connect_properties rfo sval adj cbtom bet_e oe.
+  have ogn : fog :: ogs != [::] by [].
+  have := opening_cells_aux_absurd_case vlo vhe ogn.
+  by rewrite -[X in {in X, _}]ogq oca_eq=> /(_ oute).
+rewrite /state_open_seq /= => x e' + e'in.
+have e'in2 : e' \in e :: future_events by rewrite inE e'in orbT.
+rewrite catA 3!mem_cat -orbA=> /orP[xin |].
+  apply: left_pt_open_lex => //.
+  by rewrite /open ocd 2!mem_cat xin.
+have leq2 : le = low lsto.
+  have := last_step_situation oe' pxhere.
+  rewrite eonlsthe=> /(_ isT).
+  by move: ebelow=> /negbT; rewrite negbK=> -> /(_ isT)[].
+have main := step_keeps_left_pt_open_lex_default oe.
+rewrite inE -orbA => /orP[/eqP -> | xin].
+  have fnoin : fno \in (fop ++ fc') ++ (fno :: nos) ++ lno :: lc.
+    by rewrite !(mem_cat, inE, eqxx, orbT).
+  by move: main; rewrite ogq leq2 oca_eq=> /(_ _ _ erefl _ _ fnoin e'in).
+move: main; rewrite ogq leq2 oca_eq=> /(_ _ _ erefl x e' _ e'in).
+by apply; rewrite !mem_cat inE -!orbA xin ?orbT.
+Qed.
 
 Lemma step_keeps_open_cell_side_limit ev open closed open' closed' :
   cells_bottom_top open ->
