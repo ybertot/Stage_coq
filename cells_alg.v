@@ -1691,6 +1691,11 @@ Hypothesis closed_to_left :
 Hypothesis left_pt_open_lex :
   {in open & (e :: future_events), forall c e',
     lexPt (left_pt (high c)) (point e')}.
+Hypothesis event_extr :
+  {in e :: future_events &
+       all_edges open (e :: future_events),
+    forall e g, point e === g ->
+        point e \in [:: left_pt g; right_pt g]}.
 
 Lemma disoc_i i j s : (i < j < size s)%N ->
   adjacent_cells s ->
@@ -4102,6 +4107,33 @@ have := same_pvert_y vlo samex => /eqP ->.
 by rewrite -ltNge (on_pvert p1onl).
 Qed.
 
+Lemma step_keeps_open_cell_side_limit_default fc cc lcc lc le he nos lno:
+  open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
+  opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he =
+     (nos, lno) ->
+  all open_cell_side_limit_ok (fc ++ nos ++ lno :: lc).
+Proof.
+move=> oe oca_eq.
+have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]] :=
+    decomposition_main_properties oe exi.
+have [pal puh vle vhe old_nctn]:=
+   decomposition_connect_properties rfo sval adj cbtom bet_e oe.
+apply/allP; move=> g; rewrite -cat_rcons !mem_cat orbCA=> /orP[ | gold]; last first.
+  apply: (allP open_side_limit).
+  by rewrite ocd -cat_rcons !mem_cat orbCA gold ?orbT.
+move: g; apply/allP.
+have llh : le <| he.
+  apply: open_cells_decomposition_low_under_high oe => //.
+  apply: sub_in2 noc; move=> g gin; rewrite /all_edges mem_cat.
+  by rewrite /cell_edges gin.
+have -> : rcons nos lno = opening_cells (point e) (outgoing e) le he.
+  by rewrite /opening_cells oca_eq.
+apply: opening_cells_side_limit => //.
+  by apply: underWC.
+Qed.
+
+(* This proof can probably be improved using
+  step_keeps_open_cells_side_limit_default *)
 Lemma step_keeps_open_side_limit :
   all open_cell_side_limit_ok
     (state_open_seq (step e (Bscan fop lsto lop cls lstc lsthe lstx))).
@@ -5329,65 +5361,6 @@ rewrite inE -orbA => /orP[/eqP -> | xin].
 move: main; rewrite ogq leq2 oca_eq=> /(_ _ _ erefl x e' _ e'in).
 by apply; rewrite !mem_cat inE -!orbA xin ?orbT.
 Qed.
-
-Lemma step_keeps_open_cell_side_limit_default fc cc lcc lc le he nos lno:
-  open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
-  opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he =
-     (nos, lno) ->
-  all open_cell_side_limit_ok (fc ++ nos ++ lno :: lc).
-Proof.
-move=> oe oca_eq.
-have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]] :=
-    decomposition_main_properties oe exi.
-have [pal puh vle vhe old_nctn]:=
-   decomposition_connect_properties rfo sval adj cbtom bet_e oe.
-apply/allP; move=> g; rewrite -cat_rcons !mem_cat orbCA=> /orP[ | gold]; last first.
-  apply: (allP open_side_limit).
-  by rewrite ocd -cat_rcons !mem_cat orbCA gold ?orbT.
-move: g; apply/allP.
-have llh : le <| he.
-  apply: open_cells_decomposition_low_under_high oe => //.
-  apply: sub_in2 noc; move=> g gin; rewrite /all_edges mem_cat.
-  by rewrite /cell_edges gin.
-have -> : rcons nos lno = opening_cells (point e) (outgoing e) le he.
-  by rewrite /opening_cells oca_eq.
-apply: opening_cells_side_limit => //.
-  by apply: underWC.
-Qed.
-
-Lemma step_keeps_open_cell_side_limit :
-  let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
-  all open_cell_side_limit_ok (state_open_seq s').
-Proof.
-rewrite /step.
-case: ifP => [pxaway | /negbFE/eqP/[dup] pxhere /abovelstle palstol].
-  case oe : (open_cells_decomposition _ _) => [[[[[fc cc] lcc] lc] le] he].
-  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
-  rewrite /state_open_seq /= -catA.
-  by apply: (step_keeps_open_cell_side_limit_default oe) oca_eq.
-case: ifP=> [eabove | ebelow].
-  case oe' : (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
-  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
-  have eabove' : point e >>> low (head dummy_cell lop).
-    have llopq : low (head dummy_cell lop) = lsthe.
-      apply: esym; rewrite lstheq.
-      move: (exi' eabove)=> [w + _].
-      move: adj=> /adjacent_catW[] _.
-      by case: (lop) => [ // | ? ?] /andP[] /eqP.
-    by rewrite llopq.
-  move: adj rfo sval; rewrite /open -cat_rcons => adj' rfo' sval'.
-  have := open_cells_decomposition_cat adj' rfo' sval' (exi' eabove) eabove'.
-  rewrite oe' cat_rcons => oe.
-  rewrite /state_open_seq /= -catA.
-  have := step_keeps_open_cell_side_limit_default oe oca_eq.
-  by rewrite cat_rcons.
-case: ifP => [ebelow_st | eonlsthe].
-  case uocq : (update_open_cell lsto e) => [nos lno].
-  rewrite /state_open_seq /= -catA -cat_rcons 2!all_cat andbCA.
-  have puh' : point e <<< high lsto by rewrite -lstheq.
-  have pxhere' : p_x (point e) = left_limit lsto by rewrite -lstxq.
-  rewrite (update_open_cell_side_limit_ok uocq) //=; last first.
-  by move: open_side_limit; rewrite /open all_cat /= andbCA=>/andP[] _ ->.
 
 Lemma step_keeps_edge_covering e open closed open2 closed2 :
 (*  {in open, forall c, lexPt (left_pt (high c)) (point e)} -> *)
