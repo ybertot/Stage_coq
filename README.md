@@ -3,7 +3,7 @@
 ## The algorithm
 
 This development contains a program to decompose a workspace into cells that
-that are free of obstacles.  The workspace is given by a top and a bottom
+are free of obstacles.  The workspace is given by a top and a bottom
 edges (which cannot be vertical).  The obstacles are also given by non-vertical
 edges.
 
@@ -24,4 +24,13 @@ whose leftmost extremity is this event and the event is between the left
 bottom corner and the left top corner of the cell.
 
 Careful treatment is needed when successive events are on the same vertical
-line.
+line.  In this case, it may be necessary to avoid closing a cell that was
+just created and would be flat.  Instead, the location of the new event should
+be added among the obstacles appearing on the cell side.  A similar treatment
+may be necessary for the last created closed ceell.
+
+## The proof
+
+We prove a large invariant concerning the sequence of open cells.  This
+sequence should be ordered vertically, all open cells should be "alive" with
+respect to the next event, etc.
