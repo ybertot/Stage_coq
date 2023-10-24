@@ -85,6 +85,10 @@ Notation dummy_cell := (dummy_cell R).
 
 Notation edge_below := (@edge_below R).
 
+Definition same_x (p : pt) (v : R) := p_x p == v.
+
+Notation "x [<] y" := (x < y) (at level 70, no associativity, only parsing).
+
 (* this function removes consecutives duplicates, meaning the seq needs
  to be sorted first if we want to remove all duplicates *)
 Fixpoint no_dup_seq (A : eqType) (s : seq A) : (seq A) :=
@@ -124,7 +128,7 @@ Fixpoint opening_cells_aux (p : pt) (out : seq edge) (low_e high_e : edge)
     let op0 := vertical_intersection_point p low_e in
     let op1 := vertical_intersection_point p high_e in
     match (op0,op1) with
-    | (None,_) |(_,None) => ([::], dummy_cell)
+    | (None,_) | (_,None) => ([::], dummy_cell)
     | (Some p0,Some p1) =>
       ([::] , Bcell  (no_dup_seq ([:: p1; p; p0])) [::] low_e high_e)
     end
@@ -138,18 +142,14 @@ Fixpoint opening_cells_aux (p : pt) (out : seq edge) (low_e high_e : edge)
     end
   end.
 
-Definition opening_cells (p : pt) (out : seq edge) (l h : edge) : seq cell :=
-   let (s, c) := opening_cells_aux p (sort edge_below out) l h in
-   rcons s c.
-
 Fixpoint open_cells_decomposition_contact open_cells pt :
    option (seq cell * seq cell * cell) :=
 if open_cells is c :: q then
   if contains_point pt c then
     if open_cells_decomposition_contact q pt is Some(cc, lc, c') then
-       Some(c :: cc, lc, c')
-     else
-       Some([::], q, c)
+      Some(c :: cc, lc, c')
+    else
+      Some([::], q, c)
   else
     None
 else
@@ -159,10 +159,10 @@ Fixpoint open_cells_decomposition_rec open_cells pt :
   seq cell * seq cell * cell * seq cell :=
 if open_cells is c :: q then
   if contains_point pt c then
-     if open_cells_decomposition_contact q pt is Some(cc, lc, c') then
-        ([::], c :: cc, c', lc)
-     else
-        ([::], [::], c, q)
+    if open_cells_decomposition_contact q pt is Some(cc, lc, c') then
+      ([::], c :: cc, c', lc)
+    else
+      ([::], [::], c, q)
   else
     let '(fc, cc, c', lc) := open_cells_decomposition_rec q pt in
     (c :: fc, cc, c', lc)
@@ -186,8 +186,8 @@ Record scan_state :=
 Definition update_closed_cell (c : cell) (p : pt) : cell :=
   let ptseq := right_pts c in
   let newptseq :=
-    (belast  (head (cells.dummy_pt R) ptseq) (behead ptseq)) ++
-    [:: p; last (cells.dummy_pt R) ptseq] in
+    (belast (head dummy_pt ptseq) (behead ptseq)) ++
+    [:: p; seq.last dummy_pt ptseq] in
   Bcell (left_pts c) newptseq (low c) (high c).
 
 Definition set_left_pts (c : cell) (l : seq pt) :=
@@ -203,7 +203,7 @@ Definition set_pts (c : cell) (l1 l2 : seq pt) :=
   left points.*)
 Definition update_open_cell (c : cell) (e : event) : seq cell * cell :=
   let ps := left_pts c in
-  if outgoing e is nil then
+  if outgoing e is [::] then
     ([::], set_left_pts c [:: head dummy_pt ps, point e & behead ps])
   else
     match
@@ -216,7 +216,7 @@ Definition update_open_cell (c : cell) (e : event) : seq cell * cell :=
     end.
 
 Definition update_open_cell_top (c : cell) (new_high : edge) (e : event) :=
-  if outgoing e is nil then
+  if outgoing e is [::] then
     let newptseq :=
 (* when function is called, (point e) should alread be in the left points. *)
       [:: Bpt (p_x (point e)) (pvert_y (point e) new_high) &
@@ -229,8 +229,6 @@ Definition update_open_cell_top (c : cell) (new_high : edge) (e : event) :=
     | (f :: q, lc) =>
       (set_left_pts f (point e :: behead (left_pts c)) :: q, lc)
     end.
-
-Definition same_x (p : pt) (v : R) := p_x p == v.
 
 Definition step (e : event) (st : scan_state) : scan_state :=
    let p := point e in
@@ -277,14 +275,14 @@ Definition step (e : event) (st : scan_state) : scan_state :=
          first cell of contact_cells.  So the first element of
          contact_cells should not be closed. It can just be
          disregarded. *)
-     let closed := closing_cells p (seq.behead contact_cells) in
+     let closed := closing_cells p (behead contact_cells) in
      let last_closed := close_cell p last_contact in
      let (new_opens, new_lopen) := update_open_cell_top lsto higher_edge e in
      Bscan (op1 ++ fc' ++ new_opens) new_lopen last_cells
           (closed ++ cl :: cls) last_closed higher_edge lx.
 
 Definition leftmost_points (bottom top : edge) :=
-  if p_x (left_pt bottom) < p_x (left_pt top) then
+  if p_x (left_pt bottom) [<] p_x (left_pt top) then
     if vertical_intersection_point (left_pt top) bottom is Some pt then
        [:: left_pt top; pt]
     else
@@ -296,16 +294,16 @@ Definition leftmost_points (bottom top : edge) :=
         [::].
 
 Definition rightmost_points (bottom top : edge) :=
-  if p_x (right_pt bottom) < p_x (right_pt top) then
+  if p_x (right_pt bottom) [<] p_x (right_pt top) then
     if vertical_intersection_point (right_pt bottom) top is Some pt then
        [:: right_pt bottom; pt]
     else
         [::]
   else
-     if vertical_intersection_point (left_pt top) bottom is Some pt then
-        [:: pt; right_pt top]
-     else
-        [::].
+    if vertical_intersection_point (right_pt top) bottom is Some pt then
+       [:: pt; right_pt top]
+    else
+       [::].
 
 Definition complete_last_open (bottom top : edge) (c : cell) :=
   match c with
@@ -321,7 +319,7 @@ Definition start (first_event : event) (bottom : edge) (top : edge) :
   let (newcells, lastopen) :=
   opening_cells_aux (point first_event)
       (path.sort edge_below (outgoing first_event)) bottom top in
-      (Bscan newcells lastopen nil nil
+      (Bscan newcells lastopen [::] [::]
          (close_cell (point first_event) (start_open_cell bottom top))
          top (p_x (point first_event))).
 
@@ -330,13 +328,13 @@ Definition start (first_event : event) (bottom : edge) (top : edge) :
   generic function. *)
 Fixpoint iter_list [A B : Type] (f : A -> B -> B) (s : seq A) (init : B) :=
   match s with
-  | nil => init
+  | [::] => init
   | a :: tl => iter_list f tl (f a init)
   end.
 
 Definition scan (events : seq event) (bottom top : edge) : seq cell :=
   match events with
-  | nil => (complete_last_open bottom top (start_open_cell bottom top) :: nil)
+  | [::] => [:: complete_last_open bottom top (start_open_cell bottom top)]
   | ev0 :: events =>
     let start_scan := start ev0 bottom top in
     let final_scan := iter_list step events start_scan in
@@ -348,6 +346,10 @@ Definition scan (events : seq event) (bottom top : edge) : seq cell :=
 (* This is the main function of vertical cell decomposition. *)
 Definition edges_to_cells bottom top edges :=
   scan (edges_to_events edges) bottom top.
+
+Definition opening_cells (p : pt) (out : seq edge) (l h : edge) : seq cell :=
+   let (s, c) := opening_cells_aux p (sort edge_below out) l h in
+   rcons s c.
 
 Section proof_environment.
 Variables bottom top : edge.
