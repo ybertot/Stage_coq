@@ -119,22 +119,24 @@ Qed.
 
 Fixpoint opening_cells_aux (p : pt) (out : seq edge) (low_e high_e : edge) 
   : seq cell * cell :=
-      match out with
-    | [::] => let op0 := vertical_intersection_point p low_e in
-              let op1 := vertical_intersection_point p high_e in
-                      match (op0,op1) with
-                          |(None,_) |(_,None)=> ([::], dummy_cell)
-                          |(Some(p0),Some(p1)) =>
-                              ([::] , Bcell  (no_dup_seq ([:: p1; p; p0])) [::] low_e high_e)                      end
-    | c::q => let op0 := vertical_intersection_point p low_e in
-              let (s, nc) := opening_cells_aux p q c high_e in
-                    match op0 with
-                       | None => ([::], dummy_cell)
-                       | Some(p0) =>
-                        (Bcell  (no_dup_seq([:: p; p0])) [::] low_e c :: s,
-                         nc)
-                    end
-end.
+  match out with
+  | [::] =>
+    let op0 := vertical_intersection_point p low_e in
+    let op1 := vertical_intersection_point p high_e in
+    match (op0,op1) with
+    | (None,_) |(_,None) => ([::], dummy_cell)
+    | (Some p0,Some p1) =>
+      ([::] , Bcell  (no_dup_seq ([:: p1; p; p0])) [::] low_e high_e)
+    end
+  | c::q =>
+    let op0 := vertical_intersection_point p low_e in
+    let (s, nc) := opening_cells_aux p q c high_e in
+    match op0 with
+    | None => ([::], dummy_cell)
+    | Some p0 =>
+      (Bcell  (no_dup_seq [:: p; p0]) [::] low_e c :: s, nc)
+    end
+  end.
 
 Definition opening_cells (p : pt) (out : seq edge) (l h : edge) : seq cell :=
    let (s, c) := opening_cells_aux p (sort edge_below out) l h in
@@ -3581,6 +3583,7 @@ rewrite lelsto oca_eq /= /state_open_seq /= =>
 move: clae'; case nopsq : nops => [ | c0 l0] /=; rewrite ?cats0=> clae'.
   by rewrite futq; apply.
 have := step_keeps_invariant1; rewrite /invariant1/state_open_seq /=.
+rewrite /same_x.
 rewrite pxhere eqxx /= ebelow eonlsthe oe' /update_open_cell_top oca_eq ogq.
 rewrite nopsq /= catA -(catA (fop ++ fc')) /= inv1_seq_set_left_pts.
 move=>[] clae2 _ /(_ clae2).
@@ -6606,4 +6609,5 @@ by apply: Ih; right.
 Qed.
 
 End working_environment.
+
 
