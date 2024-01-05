@@ -1012,12 +1012,6 @@ elim: s => [// | c0 s Ih] _ /=.
 by rewrite rcons_path.
 Qed.
 
-Definition non_inner (g : edge) (p : pt) :=
-  p === g -> p = left_pt g \/ p = right_pt g.
-
-Definition open_non_inner_event (open : seq cell) (e : event) :=
-  {in open, forall c, non_inner (high c) (point e)}.
-
 Lemma left_limit_max c:
   open_cell_side_limit_ok c ->
   max (p_x (left_pt (high c))) (p_x (left_pt (low c))) <= left_limit c.
