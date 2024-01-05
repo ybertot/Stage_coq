@@ -5330,8 +5330,7 @@ move: main; rewrite ogq leq2 oca_eq=> /(_ _ _ erefl x e' _ e'in).
 by apply; rewrite !mem_cat inE -!orbA xin ?orbT.
 Qed.
 
-Lemma step_keeps_edge_covering e open closed open2 closed2 :
-(*  {in open, forall c, lexPt (left_pt (high c)) (point e)} -> *)
+Lemma step_keeps_edge_covering_default e open closed open2 closed2 :
   all open_cell_side_limit_ok open ->
   bottom_left_cells_lex open (point e) ->
   open_non_inner_event open e ->
@@ -5399,22 +5398,6 @@ have [/eqP ghe | gnhe] := boolP(g == he).
     rewrite last_map -heceq /close_cell.
     by rewrite (pvertE vlhec) heq (pvertE vhe) /= ghe.
   split.
-(* I don't know if this is used later. *)
-(*
-      have last_conn : right_limit (last_cell new_closed_cells) =
-                 left_limit (last_cell new_cells).
-        rewrite /new_closed_cells/closing_cells/last_cell ccq.
-        rewrite /= last_map -heceq /close_cell.
-        rewrite (pvertE vlhec) heq (pvertE vhe) /=.
-        set rl := right_limit _.
-        have -> : rl = p_x (point e) by rewrite /rl; case: ifP; case: ifP=> //.
-        apply/esym => {rl}.
-        apply: (@opening_cells_left _ (outgoing e) le he).
-        move: (opening_cells_not_nil (outgoing e) le he).
-        rewrite -/new_cells.
-        by case: (new_cells) => [ | a l ]; rewrite //= mem_last.
-*)
-(* End of fragment with unknown usage*)
     elim/last_ind : {-1} pcc1 (erefl pcc1) => [pcc1eq | pcc1' lpcc1 _ pcc1eq].
       rewrite /new_closed_cells/closing_cells/last_cell ccq /= last_map.
       rewrite /close_cell.
