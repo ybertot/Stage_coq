@@ -5484,6 +5484,48 @@ move=> /(_ _ inbox_e btm_left _ opco).
 by rewrite abs lexPt_irrefl.
 Qed.
 
+Lemma edge_covered_set_left_pts g l1 c l2 l3 lpts :
+  left_limit c = p_x (last dummy_pt lpts) ->
+  edge_covered g (l1 ++ c :: l2) l3 ->
+  edge_covered g (l1 ++ (set_left_pts c lpts) :: l2) l3.
+Proof.
+move=> left_cond [active | [pcc pccP]]; last by right; exists pcc; exact pccP.
+move: active => [opc [pcc [pccP1 [pccP2 [pccP3 [pccP4 pccP5]]]]]].
+Lemma step_keeps_edge_covering :
+  let s' :=  step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  forall g, edge_covered g open (rcons cls lstc) \/ g \in outgoing e ->
+  edge_covered g (state_open_seq s') (state_closed_seq s').
+Proof.
+rewrite /step.
+case: ifP => [pxaway | /negbFE/eqP/[dup] pxhere /abovelstle palstol].
+  case oe : (open_cells_decomposition _ _) => [[[[[fc cc] lcc] lc] le] he].
+  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+  rewrite /state_open_seq /state_closed_seq /=.
+  move=> g gin.
+  have := step_keeps_edge_covering_default oe oca_eq gin.
+  by rewrite -!cats1 -?catA /=.
+case: ifP=> [eabove | ebelow].
+  case oe' : (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
+  case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+  have eabove' : point e >>> low (head dummy_cell lop).
+    have llopq : low (head dummy_cell lop) = lsthe.
+      apply: esym; rewrite lstheq.
+      move: (exi' eabove)=> [w + _].
+      move: adj=> /adjacent_catW[] _.
+      by case: (lop) => [ // | ? ?] /andP[] /eqP.
+    by rewrite llopq.
+  move: adj rfo sval; rewrite /open -cat_rcons => adj' rfo' sval'.
+  have := open_cells_decomposition_cat adj' rfo' sval' (exi' eabove) eabove'.
+  rewrite oe' cat_rcons => oe.
+  rewrite /state_open_seq /state_closed_seq /=.
+  move=> g gin.
+  have := step_keeps_edge_covering_default oe oca_eq gin.
+  by rewrite !cat_rcons -!cats1 -?catA /=.
+case: ifP => [ebelow_st {ebelow} | eonlsthe].
+  rewrite /update_open_cell.
+  case ogq : (outgoing e) => [ /= | fog ogs].
+  rewrite /state_open_seq /= cats0 /state_closed_seq /=.
+  
 Lemma step_keeps_subset open closed open' closed' ev :
   cells_bottom_top open ->
   adjacent_cells open ->
