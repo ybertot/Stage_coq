@@ -5131,6 +5131,18 @@ rewrite /close_cell (pvertE vlc) (pvertE vhc) /=.
 by case: ifP; case: ifP.
 Qed.
 
+Lemma update_closed_cell_keeps_right_limit c pt :
+  closed_cell_side_limit_ok c ->
+  right_limit (update_closed_cell c pt) =
+  right_limit c.
+Proof.
+do 5 move=> /andP[_]; move=> /andP[ptsn0 /andP[/allP allx _]].
+rewrite /update_closed_cell /right_limit /=.
+elim/last_ind: {-1} (right_pts c) (erefl (right_pts c))
+     ptsn0=> [ // | [ // | pt0 pts] ptf _] ptsq _ /=.
+  by rewrite last_cat.
+Qed.
+
 Lemma step_keeps_closed_to_the_left :
   let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
   {in state_closed_seq s', forall c, right_limit c <= p_x (point e)}.
@@ -5491,7 +5503,147 @@ Lemma edge_covered_set_left_pts g l1 c l2 l3 lpts :
 Proof.
 move=> left_cond [active | [pcc pccP]]; last by right; exists pcc; exact pccP.
 move: active => [opc [pcc [pccP1 [pccP2 [pccP3 [pccP4 pccP5]]]]]].
-Lemma step_keeps_edge_covering :
+have [copc | cnopc] := eqVneq c opc.
+  left; exists (set_left_pts c lpts), pcc.
+  split; first by [].
+  split.
+    move=> x; rewrite mem_rcons inE=> /orP[ /eqP -> | xin]; last first.
+      by apply: pccP2; rewrite mem_rcons inE xin orbT.
+    rewrite /set_left_pts /=.
+    by apply: pccP2; rewrite mem_rcons inE copc eqxx.
+  split.
+    have [-> | pccn0] := eqVneq pcc [::]; first by [].
+    move: pccP3; rewrite !connect_limits_rcons // => /andP[] -> /eqP -> /=.
+    rewrite /set_left_pts /=.
+    by rewrite -copc left_cond /left_limit.
+  split; first by rewrite mem_cat inE eqxx orbT.
+   move: pccP5; have [-> /= | pccn0] := eqVneq pcc [::].
+     by rewrite -copc left_cond.
+   by move: pccn0; case: (pcc).
+left; exists opc, pcc.
+split; first by [].
+split; first by [].
+split; first by [].
+split; last by [].
+move: pccP4.
+rewrite !mem_cat !inE=> /orP[ -> | /orP [ | -> ]]; rewrite ?orbT //.
+by move: cnopc=> /[swap]; rewrite eq_sym=> ->.
+Qed.
+
+Lemma update_closed_cell_keep_left_limit c pt : 
+  left_limit (update_closed_cell c pt) = left_limit c.
+Proof. by move: c => [? ? ? ?]. Qed.
+
+Lemma connect_limits_seq_subst (l : seq cell) c c' :
+  left_limit c = left_limit c' -> right_limit c = right_limit c' ->
+  connect_limits l -> connect_limits (seq_subst l c c').
+Proof.
+move=> ll rr; elim: l => [ | a [ | b l] Ih] /=; first by [].
+  by case: ifP.
+move=> /[dup] conn /andP[ab conn'].
+have conn0 : path (fun c1 c2 => right_limit c1 == left_limit c2) a (b :: l).
+   by exact: conn. 
+have /Ih : sorted (fun c1 c2 => right_limit c1 == left_limit c2) (b :: l).
+  by apply: (path_sorted conn0).
+case: ifP=> [/eqP ac | anc].
+  rewrite /=; case: ifP => [/eqP bc | bnc].
+    by rewrite /= -rr -ll -ac (eqP ab) ac -bc eqxx.
+  by rewrite /= -rr -ac ab.
+rewrite /=; case: ifP=> [/eqP bc | bnc].
+  by rewrite /= -ll -bc ab.
+by rewrite /= ab.
+Qed.
+
+Lemma edge_covered_update_closed_cell g l1 l2 c pt :
+  closed_cell_side_limit_ok c ->
+  edge_covered g l1 (rcons l2 c) ->
+  edge_covered g l1 (rcons l2 (update_closed_cell c pt)).
+Proof.
+move=> cok ecg.
+have lq : left_limit (update_closed_cell c pt) = left_limit c.
+  by case: (c).
+have rq : right_limit (update_closed_cell c pt) = right_limit c.
+  by rewrite update_closed_cell_keeps_right_limit.
+case: ecg => [[oc [pcc [ocP1 [hP [cP [ocin conn]]]]]] | ].
+  left; exists oc, (seq_subst pcc c (update_closed_cell c pt)).
+  split.
+    elim: (pcc) ocP1 => [ // | a l Ih].
+    move=> subh x; rewrite /=.
+    have /Ih {} Ih : {subset l <= rcons l2 c}.
+      by move=> y yin; have /subh : y \in a:: l by rewrite inE yin orbT.
+    case: ifP => [ac | anc]; rewrite !(inE, mem_rcons).
+      by move=> /orP[-> // | /Ih]; rewrite mem_rcons inE.
+    move=> /orP[xa | ].
+      have /subh : x \in a :: l by rewrite inE xa.
+      by rewrite mem_rcons inE (eqP xa) anc /= orbC => ->.
+    by move/Ih; rewrite mem_rcons inE.
+  split.
+    move=> x; rewrite mem_rcons inE => /orP[xoc | ].
+      by apply: hP; rewrite mem_rcons inE xoc.
+    have : {in pcc, forall c, high c = g}.
+      by move=> y yin; apply: hP; rewrite mem_rcons inE yin orbT.
+    elim: (pcc) => [ // | a l Ih] {}hP.
+    have /Ih {}Ih : {in l, forall c, high c = g}.
+      by move=> y yin; apply: hP; rewrite inE yin orbT.
+    rewrite /=; case: ifP=> [ac | anc].
+      rewrite inE=> /orP[/eqP -> | ]; last by [].
+      have: high c = g by apply: hP; rewrite inE eq_sym ac.
+      by case: (c).    
+    rewrite inE=> /orP[/eqP -> | ]; last by [].
+    by apply: hP; rewrite inE eqxx.
+  split.
+    elim/last_ind: (pcc) cP => [// | pcc' lpcc _].
+    rewrite connect_limits_rcons; last by apply/eqP/rcons_neq0.
+    move=> /andP[] cP cc.
+    rewrite connect_limits_rcons; last first.
+      by case: (pcc')=> /= [ | ? ?]; case: ifP.
+    apply/andP; split; last first.
+      rewrite -cats1 seq_subst_cat /=.
+      move: cc; rewrite last_rcons=> /eqP <-.
+      case: ifP; rewrite cats1 last_rcons; last by [].
+      by rewrite rq => /eqP ->.
+    by apply: connect_limits_seq_subst.
+  split; first by [].
+  case: (pcc) conn => [ | fpcc pcc']/=; first by [].
+  by case: ifP=> [ /eqP -> | ].
+move=> [pcc [P1 [P2 [P3 [P4 P5]]]]].
+right.
+exists (seq_subst pcc c (update_closed_cell c pt)).
+split.
+  elim : (pcc) P1 => [ | a l Ih] P1; first by [].
+  have ain : a \in rcons l2 c by apply: P1; rewrite inE eqxx.
+  have /Ih {} Ih : {subset l <= rcons l2 c}.
+    by move=> y yin; apply: P1; rewrite inE yin orbT.
+  rewrite /=; case: ifP=> [ ac | anc].
+    move=> g'; rewrite !inE => /orP[/eqP -> | /Ih]; last by [].
+    by rewrite mem_rcons inE eqxx.
+  move=> g'; rewrite !inE=> /orP[/eqP -> | ].
+    by move: ain; rewrite !mem_rcons !inE anc /= orbC => ->.
+  by apply: Ih.
+split.
+  elim: (pcc) P2 => [ | a l Ih] P2; first by [].
+  have /Ih {} Ih : {in l, forall c, high c = g}.
+    by move=> x xin; apply: P2; rewrite inE xin orbT.
+  rewrite /=; case: ifP => [ac | anc].
+    move=> c'; rewrite inE => /orP[/eqP -> | ].
+      move: (P2 c); rewrite inE eq_sym ac => /(_ isT).
+      by case: (c).
+    by apply: Ih.
+  move=> c'; rewrite inE => /orP[/eqP -> | ].
+    by apply: P2; rewrite inE eqxx.
+  by apply: Ih.
+split; first by apply: connect_limits_seq_subst.
+split.
+  move: P4; case: (pcc)=> [ | a l]; first by [].
+  rewrite /=; case: ifP=> [/eqP ac | anc] /=; last by [].
+  by rewrite lq ac.
+move: P5; elim/last_ind : (pcc) => [ | l b _]; first by [].
+rewrite -cats1 seq_subst_cat /=; case: ifP=> [/eqP bc | bnc].
+  by rewrite /last_cell !last_cat /= rq bc.
+by rewrite /last_cell !last_cat /=.
+Qed.
+
+Lemma step_keeps_edge_covering:
   let s' :=  step e (Bscan fop lsto lop cls lstc lsthe lstx) in
   forall g, edge_covered g open (rcons cls lstc) \/ g \in outgoing e ->
   edge_covered g (state_open_seq s') (state_closed_seq s').
@@ -5524,8 +5676,13 @@ case: ifP=> [eabove | ebelow].
 case: ifP => [ebelow_st {ebelow} | eonlsthe].
   rewrite /update_open_cell.
   case ogq : (outgoing e) => [ /= | fog ogs].
-  rewrite /state_open_seq /= cats0 /state_closed_seq /=.
-  
+    move=> g [ ecg | //].
+    rewrite /state_open_seq /= cats0 /state_closed_seq /=.
+    apply edge_covered_set_left_pts.
+    have : (1 < size (left_pts lsto))%N.
+      by apply: (size_left_lsto pxhere palstol); rewrite -lstheq underW.
+    by rewrite /left_limit; move: (left_pts lsto) => [ | ? [ | ? ?]].
+
 Lemma step_keeps_subset open closed open' closed' ev :
   cells_bottom_top open ->
   adjacent_cells open ->

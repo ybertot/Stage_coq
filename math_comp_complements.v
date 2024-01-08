@@ -10,6 +10,28 @@ Import Order.TTheory GRing.Theory Num.Theory Num.ExtraDef Num.
 
 Open Scope ring_scope.
 
+Fixpoint seq_subst {A : eqType}(l : seq A) (b c : A) : seq A :=
+  match l with
+  | nil => nil
+  | a :: tl =>
+    if a == b then (c :: seq_subst tl b c) else (a :: seq_subst tl b c)
+  end.
+
+Lemma mem_seq_subst {A : eqType} (l : seq A) b c x :
+  x \in (seq_subst l b c) -> (x \in l) || (x == c).
+Proof.
+elim: l => [// | a l Ih].  
+rewrite /=.
+by case: ifP => [] ?; rewrite !inE=> /orP[ | /Ih /orP[] ] ->; rewrite ?orbT.
+Qed.
+  
+Lemma seq_subst_cat {A : eqType} (l1 l2 : seq A) b c : 
+  seq_subst (l1 ++ l2) b c = seq_subst l1 b c ++ seq_subst l2 b c.
+Proof.
+elim: l1 => [ // | a l1 Ih] /=.
+by case: ifP=> [ab | anb]; rewrite Ih.
+Qed.
+
 Lemma last_in_not_nil (A : eqType) (e : A) (s : seq A) :
 s != [::] -> last e s \in s.
 Proof.
