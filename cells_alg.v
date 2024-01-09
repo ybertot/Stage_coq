@@ -5664,6 +5664,9 @@ rewrite -cats1 seq_subst_cat /=; case: ifP=> [/eqP bc | bnc].
 by rewrite /last_cell !last_cat /=.
 Qed.
 
+Lemma lsthe_at_left : p_x (left_pt lsthe) < p_x (point e).
+Proof.
+
 Lemma step_keeps_edge_covering:
   let s' :=  step e (Bscan fop lsto lop cls lstc lsthe lstx) in
   forall g, edge_covered g open (rcons cls lstc) \/ g \in outgoing e ->
@@ -5862,6 +5865,8 @@ case ogq : (outgoing e) => [ | fog ogs]; last first.
         move: P3; rewrite connect_limits_rcons; last by rewrite pccq.
         by rewrite -pccq=> /andP[].
       split.
+        have gq : g = lsthe.
+          by rewrite lstheq -oclsto P2 // mem_rcons inE eqxx.
 
  (*lstheqc *)
 Lemma step_keeps_subset open closed open' closed' ev :
