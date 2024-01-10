@@ -103,6 +103,9 @@ Variable bottom top : edge.
 Definition lexPtEv (e1 e2 : event) : bool :=
   lexPt (point e1) (point e2).
 
+Definition lexePtEv (e1 e2 : event) : bool :=
+  lexePt (point e1) (point e2).
+
 Definition event_close_edge ed ev : bool :=
 right_pt ed == point ev.
 
@@ -127,6 +130,9 @@ Proof. by case: events. Qed.
 
 Lemma lexPtEv_trans : transitive lexPtEv.
 Proof. by move=> e2 e1 e3; rewrite /lexPtEv; apply: lexPt_trans. Qed.
+
+Lemma lexePtEv_trans : transitive lexePtEv.
+Proof. by move=> e1 e2 e3; rewrite /lexePtEv; apply: lexePt_trans. Qed.
 
 Lemma event_close_edge_on g e:
   event_close_edge g e -> (point e) === g.

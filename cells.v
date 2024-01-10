@@ -540,6 +540,10 @@ move=> g; rewrite /cell_edges !(mem_cat, map_cat) !orbA; congr (_ || _).
 by rewrite -!orbA; congr (_ || _); rewrite orbC.
 Qed.
 
+Lemma cell_edges_cons c s : cell_edges (c :: s) =i
+    (low c :: high c :: cell_edges s).
+Proof. by move=> g; rewrite -[c :: s]/([:: c] ++ s) cell_edges_cat. Qed.
+
 Lemma cell_edges_catCA s1 s2 s3 :
   cell_edges (s1 ++ s2 ++ s3) =i cell_edges (s2 ++ s1 ++ s3).
 Proof.

@@ -1695,6 +1695,9 @@ Hypothesis left_pt_open_lex :
     lexPt (left_pt (high c)) (point e')}.
 Hypothesis open_non_inner :
     {in open, forall c, non_inner (high c) (point e)}.
+Hypothesis lex_open_edges :
+   {in [seq high c | c <- open], forall g, lexPt (left_pt g) (point e) &&
+          lexePt (point e) (right_pt g)}.
 
 Lemma disoc_i i j s : (i < j < size s)%N ->
   adjacent_cells s ->
@@ -1871,6 +1874,52 @@ Definition invariant1 (s : scan_state) :=
 
 Let val_between g (h : valid_edge g (point e)) := 
   valid_between_events elexp plexfut h inbox_p.
+
+Lemma lex_edge_default :
+  let '(fc, cc, lcc, lc, le, he) :=
+    open_cells_decomposition open (point e) in
+    let '(nos, lno) := opening_cells_aux (point e)
+       (sort (@edge_below _) (outgoing e)) le he in
+   forall e', (lexPtEv e e' /\
+               forall e2, e2 \in future_events -> lexePtEv e' e2) ->
+   {in [seq high c | c <- fc ++ nos ++ lno :: lc], forall g,
+       lexPt (left_pt g) (point e') && lexePt (point e') (right_pt g)}.
+Proof.
+case oe : (open_cells_decomposition _ _) =>
+ [[[[[fc cc] lcc] lc] le] he].
+case oca_eq:(opening_cells_aux _ _ _ _) => [nos nlsto].
+have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
+    decomposition_main_properties oe exi.
+move=> e' [ee' e'fut] g.
+rewrite !map_cat !mem_cat.
+have :  (g \in [seq high c | c <- fc]) || (g \in [seq high c | c <- lc]) ->
+   lexPt (left_pt g) (point e') && lexePt (point e') (right_pt g).
+  move=> gin; apply/andP; split.
+    have /lexPt_trans : lexPt (left_pt g) (point e).
+      have /lex_open_edges /andP[] // : g \in [seq high c | c <- open].
+      rewrite ocd !map_cat !mem_cat map_cons inE.
+      by move: gin => /orP[ | ] ->; rewrite ?orbT.
+    by apply.
+  have /mapP [c cin gq] : g \in [seq high c | c <- fc ++ lc].
+    by rewrite map_cat mem_cat.
+  have cino : c \in open.
+    by move: cin; rewrite ocd !mem_cat /= inE=> /orP[] ->; rewrite ?orbT.
+  move : (allP clae _ cino)=> /andP[] _; rewrite /end_edge.
+  have := clae; rewrite /close_alive_edges.
+      have := lex_open_edges g.
+    move: ee'; rewrite /lexPtEv.
+move=> /orP[ gin | ].
+do 2 rewrite cell_edges_cat [_ \in (cell_edges _ ++ _)]mem_cat.
+rewrite cell_edges_cons 2!inE.
+rewrite 3!(orbCA (g \in cell_edges fc)).
+rewrite -3!(orbCA (g == high _)) -2!(orbCA (g == low _)).
+move=> /orP[ gin |].
+
+  rewrite [cell_edges (_ :: _)]/cell_edges.
+
+have [pal puh vle vhe ncont] :=
+    decomposition_connect_properties rfo sval adj cbtom bet_e oe.
+rewrite mem_cat
 
 Lemma invariant1_default_case :
   let '(fc, cc, lcc, lc, le, he) :=
