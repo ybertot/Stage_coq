@@ -5667,6 +5667,18 @@ rewrite -cats1 seq_subst_cat /=; case: ifP=> [/eqP bc | bnc].
 by rewrite /last_cell !last_cat /=.
 Qed.
 
+Lemma inside_box_lexPt_bottom pt :
+  inside_box pt -> lexPt (left_pt bottom) pt && lexPt pt (right_pt bottom).
+Proof.
+by move=> /andP[] _ /andP[] /andP[] lp pr  _; rewrite /lexPt lp pr.
+Qed.
+
+Lemma inside_box_lexPt_top pt :
+  inside_box pt -> lexPt (left_pt top) pt && lexPt pt (right_pt top).
+Proof.
+by move=> /andP[] _ /andP[]  _ /andP[] lp pr; rewrite /lexPt lp pr.
+Qed.
+
 Lemma lex_edge_default :
   let '(fc, cc, lcc, lc, le, he) :=
     open_cells_decomposition open (point e) in
@@ -5732,21 +5744,24 @@ move=> /orP[go | ghe].
       by rewrite (left_pt_below _).
     by rewrite (negbTE (left_pt_above _)).
   by move=> /hasP[e3 e3in /eqP ->]; apply: e'fut.
-
-
-move=> /orP[ gin | ].
-do 2 rewrite cell_edges_cat [_ \in (cell_edges _ ++ _)]mem_cat.
-rewrite cell_edges_cons 2!inE.
-rewrite 3!(orbCA (g \in cell_edges fc)).
-rewrite -3!(orbCA (g == high _)) -2!(orbCA (g == low _)).
-move=> /orP[ gin |].
-
-  rewrite [cell_edges (_ :: _)]/cell_edges.
-
-have [pal puh vle vhe ncont] :=
-    decomposition_connect_properties rfo sval adj cbtom bet_e oe.
-rewrite mem_cat
-
+have := opening_cells_aux_high_last vl vp oute'; rewrite oca_eq /= -(eqP ghe).
+move=> {}ghe.
+have lcco : lcc \in open by rewrite ocd !mem_cat inE eqxx !orbT.
+have /lex_open_edges : g \in [seq high c | c <- open].
+  by apply/mapP; exists lcc; rewrite // ghe.
+move=> /andP[] left_e e_right.
+rewrite (lexPt_trans left_e ee') /=.
+have := (allP clae lcc lcco) => /andP[] _; rewrite /end_edge.
+move=> /orP[].
+  rewrite !inE -heq -ghe => /orP[] /eqP ->; move: inbox_e'.
+    by move=> /inside_box_lexPt_bottom /andP[] _ /lexPtW.
+  by move=> /inside_box_lexPt_top /andP[] _ /lexPtW.
+move=> /hasP [e2 + /eqP ge2].
+rewrite inE=> /orP[ /eqP abs | ].
+  suff /onAbove : point e === he by rewrite puh.
+  by rewrite -abs -ge2 heq right_on_edge.
+by move=> /e'fut; rewrite /lexePtEv -ge2 -heq ghe.
+Qed.
 
 Lemma lsthe_at_left : p_x (left_pt lsthe) < p_x (point e).
 Proof.
