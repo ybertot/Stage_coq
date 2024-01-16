@@ -1021,7 +1021,7 @@ Lemma left_limit_max c:
   max (p_x (left_pt (high c))) (p_x (left_pt (low c))) <= left_limit c.
 Proof.
 move=>/andP[] + /andP[] + /andP[] _ /andP[] /andP[] _ + /andP[] _ +.
-rewrite /left_limit le_maxl.
+rewrite /left_limit ge_max.
 case: (left_pts c) => [ // | p tl] /=.
 by move => _ /andP[] /eqP +  _ /andP[] + _ /andP[] + _ => <- -> ->.
 Qed.
@@ -1080,26 +1080,33 @@ Hypothesis noc : {in cell_edges open &, no_crossing R}.
 Let le := low (head lcc cc).
 Let he := high lcc.
 
+#[clearbody]
 Let headin : head lcc cc \in open.
 Proof.
 by rewrite ocd; case: cc => [ | a cc'] /=; rewrite !(mem_cat, inE) eqxx ?orbT.
-Qed.
+Defined.
 
+#[clearbody]
 Let vle : valid_edge le p.  
-Proof. by have /andP[] := (allP sval _ headin). Qed.
+Proof. by have /andP[] := (allP sval _ headin). Defined.
 
+#[clearbody]
 Let lccin : lcc \in open.
-Proof. by rewrite ocd !(mem_cat, inE) eqxx !orbT. Qed.
+Proof. by rewrite ocd !(mem_cat, inE) eqxx !orbT. Defined.
 
+#[clearbody]
 Let lein : le \in cell_edges open.
-Proof. by rewrite mem_cat /le map_f // headin. Qed.
+Proof. by rewrite mem_cat /le map_f // headin. Defined.
 
+#[clearbody]
 Let hein : he \in cell_edges open.
-Proof. by rewrite mem_cat /he map_f ?orbT // lccin. Qed.
+Proof. by rewrite mem_cat /he map_f ?orbT // lccin. Defined.
 
+#[clearbody]
 Let vhe : valid_edge he p.
-Proof. by have /andP[] := (allP sval _ lccin). Qed.
+Proof. by have /andP[] := (allP sval _ lccin). Defined.
 
+#[clearbody]
 Let pal : p >>> le.
 Proof.
 elim/last_ind : {-1}(fc) (erefl fc) => [ | fc' c1 _] fc_eq.
@@ -1125,8 +1132,9 @@ have palc1 : p >>= low c1.
 have nctc1 : ~~ contains_point p c1.
   by apply: allnct; rewrite fc_eq mem_rcons inE eqxx.
 by move: nctc1; rewrite /contains_point palc1 /= hc1q.
-Qed.
+Defined.
 
+#[clearbody]
 Let puh : p <<< he.
 Proof.
 case lc_eq : lc => [ | c1 lc'].
@@ -1144,7 +1152,7 @@ have pulc1 : p <<= low c1.
   by rewrite -hlcclc1; move: lcc_ctn => /andP[].
 move: head_nct; rewrite lc_eq /= negb_and (oc1 pulc1) orbF negbK -hlcclc1.
 by apply.
-Qed.
+Defined.
 
 Lemma fclc_not_contain c : (c \in fc) || (c \in lc) ->
   ~~ contains_point p c.

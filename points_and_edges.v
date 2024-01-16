@@ -516,7 +516,7 @@ Lemma point_sub_right (p a : pt) :
   (p_x p < p_x a) -> 0 < pue_formula p (subpoint p) a.
 Proof.
 move=> edge_cond.
-rewrite edge_and_left_vertical //; rewrite /subpoint /= lter_sub_addr cpr_add.
+rewrite edge_and_left_vertical //; rewrite /subpoint /= lterBDr cprD.
 by rewrite ltr01.
 Qed.
 
@@ -649,7 +649,7 @@ have diffb : (p_x hr - p_x a) >= 0.
   by rewrite subr_cp0.
 have difflh : (p_x lr - p_x hr) < 0.
   by rewrite subr_cp0.
-rewrite -(ler_nmul2l difflh _ 0) mulr0 -opprB mulNr oppr_le0 (eqP pf).
+rewrite -(ler_nM2l difflh _ 0) mulr0 -opprB mulNr oppr_le0 (eqP pf).
 by rewrite addr_ge0 // mulr_ge0 // subr_ge0.
 Qed.
 
@@ -669,7 +669,7 @@ have diffb : (p_x hr - p_x a) >= 0.
   by rewrite subr_cp0.
 have difflh : (p_x lr - p_x hr) < 0.
   by rewrite subr_cp0.
-rewrite -(ler_nmul2r difflh 0 _) mul0r mulrC -opprB mulNr (eqP pf) opprD.
+rewrite -(ler_nM2r difflh 0 _) mul0r mulrC -opprB mulNr (eqP pf) opprD.
 by rewrite addr_ge0 // -mulNr mulr_le0 // oppr_le0 subr_cp0.
 Qed.
 
@@ -1581,7 +1581,7 @@ have main : (0 < pue_formula (left_pt e1) (left_pt e2) (right_pt e2)) =
   by apply: edge_and_right_vertical; rewrite -px.
 have arith : forall (a b : R), a <= 0 -> b <= 0 -> a + b <= 0.
   clear=> a b al0 bl0.
-  by rewrite -ler_subr_addr (le_trans al0) // ler_subr_addr add0r.
+  by rewrite -lerBrDr (le_trans al0) // lerBrDr add0r.
 have case1 : left_pt e1 <<< e2 -> e1 <| e2.
   move=> below; case:(nc) => // /orP[]; last by rewrite below.
   move/andP=> []le2b re2b.
