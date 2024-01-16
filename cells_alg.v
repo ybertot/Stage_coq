@@ -1777,7 +1777,7 @@ by apply/disoc_i.
 Qed.
 
 (* Thanks to the disoc lemma, we only need to prove that the high edges
-  of all open cells satisfy the pairwise propserty for edge_below to
+  of all open cells satisfy the pairwise property for edge_below to
   obtain disjointness of cells. *)
 
 Lemma opening_cells_aux_absurd_case le he (s : seq edge) :
@@ -2833,19 +2833,6 @@ rewrite -/nc nceq=> /(_ _ c2in) /andP[].
 by rewrite inE=> /orP[/eqP -> | /subo //] _; rewrite lein'.
 Qed.
 
-Lemma middle_disj_last fc cc lcc lc nos lno:
- open = fc ++ cc ++ lcc :: lc ->
-  adjacent_cells (fc ++ nos ++ lno :: lc) ->
-  s_right_form  (fc ++ nos ++ lno :: lc)->
-  low (head lno nos) =low (head lcc cc) ->
-  high lno = high lcc ->
-  {in [seq high c | c <- nos], forall g, left_pt g == (point e)} ->
-  {in rcons nos lno &, disjoint_open_cells R} ->
-   {in fc ++ nos ++ lno :: lc &, disjoint_open_cells R}.
-Proof.
-move=> ocd adjn rfon lecnct hecnct lefts ndisj.
-Admitted.
-
 Lemma opening_cells_aux_pairwise le he :
    point e >>> le ->
    point e <<< he ->
@@ -3736,34 +3723,6 @@ Qed.
 Lemma head_rcons [A : Type](def : A) (s : seq A) (a : A) :
   head def (rcons s a) = head a s.
 Proof. by case: s. Qed.
-
-Lemma disjoint_open_parts fc cc lcc lc nos lno :
-   open = fc ++ cc ++ lcc :: lc ->
-  close_alive_edges (fc ++ nos ++ lno :: lc) future_events ->
-  low (head lcc cc) <| high lcc ->
-   low (head lcc cc) = low (head lno nos) ->
-   high lcc = high lno ->
-  {in rcons nos lno &, disjoint_open_cells R} ->
-  {in fc ++ nos ++ lno :: lc &, disjoint_open_cells R}.
-Proof.
-move=> ocd clae_new low_high.
-have lfcbot : fc != [::] -> low (head dummy_cell fc) = bottom.
-  move: cbtom; rewrite ocd.
-  by case: (fc) => [// | /= ca ?] /andP[] /andP[] _ /=/eqP.
-have higfc : fc != nil -> high (last dummy_cell fc) = low (head lcc cc).
-  elim/last_ind : (fc) ocd => [// |s c' _] /= ocd.
-  move: adj; rewrite ocd cat_rcons last_rcons =>/adjacent_catW[] _ /=.
-  by case: (cc) => [ | cc0 cc'] /= /andP[] /eqP ->.
-move=> le_cnct.
-move=> he_cnct.
-have adjnew : adjacent_cells (fc ++ nos ++ lno :: lc).
-  rewrite (_ : fc ++ nos ++ lno :: lc = fc ++ (rcons nos lno) ++ lc);last first.
-    by rewrite -cats1 -!catA.
-  admit.
-have rfnew : s_right_form (fc ++ nos ++ lno :: lc).
-  admit.
-apply: (@middle_disj_last _ cc lcc)=> //.
-Admitted.
 
 Lemma pairwise_subst {T : Type} [leT : rel T] (os ns s1 s2 : seq T) :
   pairwise leT (s1 ++ os ++ s2) ->
@@ -7336,5 +7295,50 @@ move: gev; rewrite mem_cat=> /orP[gout | gev].
   by apply: Ih; left; apply: step_edge_covering; right.
 by apply: Ih; right.
 Qed.
+
+Lemma middle_disj_last fc cc lcc lc nos lno:
+ open = fc ++ cc ++ lcc :: lc ->
+  adjacent_cells (fc ++ nos ++ lno :: lc) ->
+  s_right_form  (fc ++ nos ++ lno :: lc)->
+  low (head lno nos) =low (head lcc cc) ->
+  high lno = high lcc ->
+  {in [seq high c | c <- nos], forall g, left_pt g == (point e)} ->
+  {in rcons nos lno &, disjoint_open_cells R} ->
+   {in fc ++ nos ++ lno :: lc &, disjoint_open_cells R}.
+Proof.
+move=> ocd adjn rfon lecnct hecnct lefts ndisj.
+move: pwo=> /= /andP[] _ pwo'.
+have:= disoc adj pwo'.
+
+Admitted.
+
+
+Lemma disjoint_open_parts fc cc lcc lc nos lno :
+   open = fc ++ cc ++ lcc :: lc ->
+  close_alive_edges (fc ++ nos ++ lno :: lc) future_events ->
+  low (head lcc cc) <| high lcc ->
+   low (head lcc cc) = low (head lno nos) ->
+   high lcc = high lno ->
+  {in rcons nos lno &, disjoint_open_cells R} ->
+  {in fc ++ nos ++ lno :: lc &, disjoint_open_cells R}.
+Proof.
+move=> ocd clae_new low_high.
+have lfcbot : fc != [::] -> low (head dummy_cell fc) = bottom.
+  move: cbtom; rewrite ocd.
+  by case: (fc) => [// | /= ca ?] /andP[] /andP[] _ /=/eqP.
+have higfc : fc != nil -> high (last dummy_cell fc) = low (head lcc cc).
+  elim/last_ind : (fc) ocd => [// |s c' _] /= ocd.
+  move: adj; rewrite ocd cat_rcons last_rcons =>/adjacent_catW[] _ /=.
+  by case: (cc) => [ | cc0 cc'] /= /andP[] /eqP ->.
+move=> le_cnct.
+move=> he_cnct.
+have adjnew : adjacent_cells (fc ++ nos ++ lno :: lc).
+  rewrite (_ : fc ++ nos ++ lno :: lc = fc ++ (rcons nos lno) ++ lc);last first.
+    by rewrite -cats1 -!catA.
+  admit.
+have rfnew : s_right_form (fc ++ nos ++ lno :: lc).
+  admit.
+apply: (@middle_disj_last _ cc lcc)=> //.
+Admitted.
 
 End working_environment.
