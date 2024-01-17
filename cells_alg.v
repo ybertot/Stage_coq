@@ -6326,13 +6326,37 @@ have [ocd [lcc_ctn [_ [all_nct [flcnct [heq [leq [lein hein]]]]]]]] :=
 have [pal puh vl vp nc]:=
    decomposition_connect_properties rfo sval adj cbtom
     (inside_box_between inbox_e) oe.
+have := last_step_situation oe' pxhere (negbT enolsthe) ebelow'.
+move=> [fc'0 [leo [cc' ccq]]].
 case ogq : (outgoing e) => [ | fog ogs]; last first.
-  rewrite -ogq.
+  move: uoctq; rewrite /update_open_cell_top.
   case oca_eq : (opening_cells_aux _ _ _ _) => [ [ | fno nos'] lno'].
     have ogn : outgoing e != [::] by rewrite ogq.
     have := opening_cells_aux_absurd_case vlo vp ogn oute.
     by rewrite oca_eq.
-
+  rewrite ogq.
+  have := step_keeps_subset_default; rewrite oe.
+  rewrite leo oca_eq fc'0 cats0 /= -ogq.
+  move=> main [] nosq lnoq; apply: main.
+  move: cin; rewrite mem_cat map_cat=> /orP[cin |cin].
+    by rewrite mem_cat map_f.
+  rewrite 2!mem_cat inE fc'0 /= -nosq inE -orbA in cin.
+  rewrite mem_cat /=; apply/orP; right.
+  move: cin=> /orP[/eqP -> | cin].
+    by rewrite high_set_left_pts inE eqxx.
+  rewrite inE; apply/orP; right.
+  by apply/map_f; rewrite mem_cat inE lnoq.
+move: uoctq; rewrite /update_open_cell_top ogq => -[] nosq lnoq.
+move: cin; rewrite /open ocd fc'0 -nosq !cats0 /= mem_cat.
+rewrite map_cat inE mem_cat.
+move=> /orP[cin | cin].
+  by rewrite map_f.
+apply/orP; right.
+rewrite map_cat mem_cat; apply/orP; right.
+move: cin=> /orP[/eqP -> | cin].
+  by rewrite -lnoq /= heq inE eqxx.
+by rewrite /= inE map_f ?orbT.
+Qed.
 
 Lemma above_point_in_closing open p q fc cc lc le he:
    cells_bottom_top open -> adjacent_cells open -> inside_box p ->
