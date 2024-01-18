@@ -1438,64 +1438,6 @@ apply/andP; split.
 by rewrite le_min in lemin; move: lemin=>/andP[].
 Qed.
 
-Lemma opening_cells_aux_disjoint (oe : seq edge) p le he s' c' :
-    p >>> le -> p <<< he -> valid_edge le p -> valid_edge he p ->
-    {in oe, forall g : edge, left_pt g == p} ->
-    path (@edge_below R) le oe ->
-    opening_cells_aux p oe le he = (s', c') ->
-    {in rcons s' c' &, disjoint_open_cells R}.
-Proof.
-move=> pl ph vl vh leftg soe.
-have {}pl : p >>= le by apply/negP=> pule; case/negP: pl; apply: underW.
-elim: oe s' c' leftg le pl vl soe=> [ | og oe Ih] s' c' leftg le pl vl soe /=.
-  have := pvertE vl; set p1 := Bpt _ _ => /[dup] vip1 ->.
-  have := pvertE vh; set p2 := Bpt _ _ => /[dup] vip2 -> [] <- <- /=.
-  by move=> c1 c2; rewrite !inE /= => /eqP -> /eqP ->; left.
-have := pvertE vl; set p1 := Bpt _ _ => /[dup] vip ->.
-set W := Bcell _ _ _ _.
-case oca_eq : (opening_cells_aux _ _ _ _) => [so co] [] <- <-.
-have /eqP logp : left_pt og == p by apply/leftg; rewrite inE eqxx.
-suff main : forall c, c \in rcons so co -> o_disjoint_e W c.
-  move=> c1 c2; rewrite !inE => /orP[/eqP c1W |c1in] /orP[/eqP c2W | c2in].
-  - by left; rewrite c1W c2W.
-  - by rewrite c1W; apply: main.
-  - by rewrite c2W; apply/o_disjoint_eC/main.
-have leftg' : {in oe, forall g, left_pt g == p}.
-  by move=> x xin; rewrite leftg // inE xin orbT.
-have paog : p >>= og.
-  by rewrite -(eqP (leftg og _)) ?left_pt_above // inE eqxx.
-have vog : valid_edge og p.
-  by rewrite valid_edge_extremities // leftg ?inE ?eqxx.
-have soe' : path (@edge_below _) og oe.
-  by move: soe=> /=/andP[] _.
-by apply: (Ih so co leftg' og paog vog soe' oca_eq).
-move=> c cin; right=> q.
-have oc0q : opening_cells_aux p (og :: oe) le he = (W :: so, co).
-  by rewrite /= oca_eq pvertE.
-have /allP cok :=
-   opening_cells_aux_side_limit vl vh (* lowhigh *) pl ph (* noc' *) leftg oc0q.
-have Wk : open_cell_side_limit_ok W by apply: cok; rewrite /= inE eqxx.
-apply/negP=> /andP[] /andP[] /[dup] /(inside_open_cell_valid Wk) /andP[] _.
-move=> vhWq /andP[] /andP[] _ bhw _ _.
-have leftg' : {in oe, forall g, left_pt g == p}.
-  by move=> g gin; apply leftg; rewrite inE gin orbT.
-have vog : valid_edge og p.
-  by apply: valid_edge_extremities; rewrite leftg // inE eqxx.
-have Wbc : high W <| low c.
-  have /andP[lcin _] := opening_cells_aux_subset vog vh leftg' oca_eq cin.
-  have loc_trans : {in og :: oe & &, transitive (@edge_below _)}.
-    by apply: (@fan_edge_below_trans _ p).
-  move: (soe); rewrite /= (path_sorted_inE loc_trans); last by apply/allP=> x.
-  move=> /andP[] _ /andP[] /allP allbelow _.
-  move: lcin; rewrite inE=> /orP[/eqP -> | ]; first by apply: edge_below_refl.
-  by apply: allbelow.
-move=> /andP[] qin /andP[] qalc _.
-have vlcq : valid_edge (low c) q.
-  have ck : open_cell_side_limit_ok c by apply: cok=> /=; rewrite inE cin orbT.
-  by have /andP[] := (inside_open_cell_valid ck qin).
-by move: qalc; rewrite (order_edges_viz_point' vhWq vlcq Wbc bhw).
-Qed.
-
 End opening_cells.
 
 Lemma open_cells_decomposition_cat f l p :
@@ -1672,7 +1614,7 @@ Hypothesis inbox_p : inside_box p.
 Hypothesis noc : {in all_edges open (e :: future_events) &, no_crossing R}.
 (* TODO : remove the following hypothesis, which should be a consequence
   of lex_open_edge *)
-Hypothesis gs : edge_side  (e :: future_events) open.
+Hypothesis edge_side_e_o : edge_side  (e :: future_events) open.
 Hypothesis sort_evs : path (@lexPtEv _) e future_events.
 Hypothesis pwo : pairwise (@edge_below _) (bottom :: [seq high c | c <- open]).
 Hypothesis btom_left_corners :
@@ -2965,6 +2907,18 @@ have nocyx : below_alt y x.
 by have := edge_below_from_point_under nocyx vy vx puy pax.
 Qed.
 
+Lemma lexPt_left_pt_strict_under_edge_to_p_x (pt : pt) g:
+  valid_edge g pt -> lexPt (left_pt g) pt -> pt <<< g ->
+  p_x (left_pt g) < p_x pt.
+Proof.
+move=> vg.
+rewrite /lexPt eq_sym=> /orP[ | /andP[] samex]; first by [].
+have := same_pvert_y vg samex.
+rewrite (on_pvert (left_on_edge g))=> /eqP <-.
+rewrite ltNge le_eqVlt negb_or andbC.
+by move=> /[swap]; rewrite strict_under_pvert_y // => ->.
+Qed.
+
 Lemma in_new_cell_not_in_last_old fc cc lcc lc le he:
   open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
   {in opening_cells (point e) (outgoing e) le he & lc,
@@ -3061,8 +3015,11 @@ have c1c2 : high c1 <| low c2.
         move=> /(_ (lcc :: lc) isT adjlc') /= => - [] tmp.
         move=> g; rewrite inE => /orP[/eqP -> | ].
           have lcco : lcc \in open by rewrite ocd; subset_tac.
-          have := allP gs (high lcc) (map_f _ lcco); rewrite /edge_side_prop.
-          by rewrite -heq vhe ltNge le_eqVlt orbC lt1 /=.
+          have /lex_open_edges/andP[ll _] :
+            (high lcc) \in [seq high c | c <- open].
+            by exact: (map_f _ lcco).
+          apply: lexPt_left_pt_strict_under_edge_to_p_x=> //.
+          by rewrite heq.
         move: tmp; set s5 := rcons _ _ => tmp gin.
         have : g \in s5 by rewrite tmp; subset_tac.
         rewrite /s5 mem_rcons inE orbC=> /orP[/mapP[c' c'in gc'] | ].
@@ -3071,7 +3028,12 @@ have c1c2 : high c1 <| low c2.
           have := lelow _ c'in; rewrite strict_under_pvert_y // => ga.
           move: gin=> /mapP[c'' c''in gc''].
           have c''o : c'' \in open by rewrite ocd; subset_tac.
-          have := allP gs (high c'') (map_f _ c''o); rewrite /edge_side_prop.
+          have /lex_open_edges/andP[ll _] :
+            (high c'') \in [seq high c | c <- open].
+            by exact: (map_f _ c''o).
+          apply: lexPt_left_pt_strict_under_edge_to_p_x=> //.
+          have := allP edge_side_e_o (high c'') (map_f _ c''o).
+          rewrite /edge_side_prop.
           rewrite (seq_valid_high sval); last by apply/map_f.
           by rewrite -gc'' gc' ltNge le_eqVlt ga orbT /=.
         move: cbtom=> /andP[] _; rewrite ocd !last_cat /= => /eqP -> /eqP ->.
@@ -3258,7 +3220,7 @@ have : pvert_y (point e') (high c) < p_y (point e'); last move=> /[dup] ye'g ->.
   move: sort_evs; rewrite futq /= /lexPtEv /lexPt => /andP[] + _.
   by rewrite (eqP samex) lt_irreflexive eqxx.
 rewrite -(eqP samex).
-have := allP gs (high c) (map_f _ cino); rewrite /edge_side_prop.
+have := allP edge_side_e_o (high c) (map_f _ cino); rewrite /edge_side_prop.
 by rewrite vg eabove.
 Qed.
 
@@ -3278,7 +3240,7 @@ have vg' : valid_edge (high c) (point e') by rewrite -(same_x_valid _ samex) vg.
 rewrite /edge_side_prop vg'.
 case: ifP=> [ e'above | _ ]; [ | case: ifP=> [ e'below | //]]; last first.
   rewrite strict_under_pvert_y -?gq // in ebelow.
-  have := allP gs (high c) (map_f _ cino).
+  have := allP edge_side_e_o (high c) (map_f _ cino).
   rewrite /edge_side_prop vg ltNge le_eqVlt ebelow ?orbT /=.
   by rewrite (eqP samex).
 have := allP clae _ cino=> /andP[] _; rewrite /end_edge /= orbCA=> /orP[].
@@ -3405,7 +3367,7 @@ have case_lsto : edge_side_prop e' (high lsto).
   have := sort_evs; rewrite futq /= path_sortedE; last first.
     by apply: lexPtEv_trans.
   move=>/andP[] _ /andP[] + _ => /allP /(_ ev2 ev2in).
-  have := allP gs (high lsto); rewrite map_f // => /(_ isT) => side_e.
+  have := allP edge_side_e_o (high lsto); rewrite map_f // => /(_ isT) => side_e.
   move=>/orP[ | /andP[samex2 ev2above]].
     case: ifP => // _ ev2right.
     case: ifP=> // e'belowhighlsto.
@@ -3810,51 +3772,6 @@ have : allrel (@edge_below _) [seq high x | x <- rcons nos lno]
    have := new_edges_below_last_old ocd vhocd pwo2 (underWC pal) puh' vle.
    by rewrite -heq oc_eq.
 by rewrite allrel_mapl allrel_mapr.
-Qed.
-
-Lemma step_keeps_disjoint_open_default :
-  let '(fc, cc, lcc, lc, le, he) :=
-    open_cells_decomposition open (point e) in
-    let '(nos, lno) :=
-      opening_cells_aux (point e)
-       (sort (@edge_below _) (outgoing e)) le he in
-  {in (fc ++ nos ++ lno :: lc) &, disjoint_open_cells R}.
-Proof.
-case oe: (open_cells_decomposition open (point e)) =>
-  [[[[[fc cc] lcc] lc] le] he].
-
-have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]]
-  := decomposition_main_properties oe exi.
-have [pal puh vle vhe allnct] :=
-  decomposition_connect_properties rfo sval adj cbtom bet_e oe.
-case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
-have adjnew : adjacent_cells (fc ++ nos ++ lno :: lc).
-  rewrite -cat_rcons.
-  have cclccn0 : rcons cc lcc != nil by apply /eqP/rcons_neq0.
-  have noslnon0 : rcons nos lno != nil by apply/eqP/rcons_neq0.
-  have [adjn lle] : adjacent_cells (rcons nos lno) /\
-              low (head dummy_cell (rcons nos lno)) = le.
-    by apply: (adjacent_opening_aux' vle vhe oute' oca_eq).
-  have lnlo : low (head dummy_cell (rcons cc lcc)) =
-              low (head dummy_cell (rcons nos lno)).
-    by rewrite lle; rewrite head_rcons.
-  have hnho : high (last dummy_cell (rcons cc lcc)) =
-        high (last dummy_cell (rcons nos lno)).
-    rewrite !last_rcons -heq.
-    have := opening_cells_aux_high_last vle vhe oute'.
-    by rewrite oca_eq /=.
-  have adjocd : adjacent_cells (fc ++ rcons cc lcc ++ lc).
-    by rewrite cat_rcons -ocd.
-  by apply (replacing_seq_adjacent cclccn0).
-have oc_eq : opening_cells (point e) (outgoing e) le he = rcons nos lno.
-  by rewrite /opening_cells oca_eq.
-have newok : all open_cell_side_limit_ok (fc ++ nos ++ lno :: lc).
-  rewrite -cat_rcons -oc_eq !all_cat.
-  move: open_side_limit; rewrite ocd -cat_rcons !all_cat=> /andP[] ->.
-  move=> /andP[] _ ->; rewrite /= andbT.
-  by apply opening_cells_side_limit=> //; apply/underWC.
-apply: disoc=> //.
-by have := step_keeps_pw_default; rewrite oe oca_eq.
 Qed.
 
 Lemma step_keeps_pw :
