@@ -6026,11 +6026,8 @@ have inclosing : forall c, c \in cc -> inside_open' q c ->
      (valid_edge (high c) (point e))) ->
   exists2 c', c' \in closing_cells (point e) cc & inside_closed' q c'.
   move=> c cin ins allval.
-  have /allP ctps : forall c, c \in cc -> contains_point (point e) c.
-    by move=> ?; apply: (open_cells_decomposition_contains exi oe).
   exists (close_cell (point e) c).
     by apply: map_f.
-  rewrite /inside_closed_cell.
   move: ins; rewrite inside_open'E andbA=>/andP[] ctn /andP[liml _] /=.
   move: ctn=>/andP [qlc qhc].
   rewrite /contains_point/close_cell /=.
@@ -6040,6 +6037,17 @@ have inclosing : forall c, c \in cc -> inside_open' q c ->
   have [onh x2] := intersection_on_edge vip2.
   by rewrite inside_closed'E vip1 vip2 qlc qhc; case: ifP=> [p1e | p1ne];
     case: ifP=> [p2e | p2ne]; rewrite liml /right_limit /= -?x2 -?x1.
+have inclosel : inside_open' q lcc ->
+  inside_closed' q (close_cell (point e) lcc).
+  rewrite inside_open'E andbA=> /andP[] /andP[qlc qhc] /andP[liml _] /=.
+  have lccin : lcc \in open by rewrite ocd !mem_cat inE eqxx ?orbT.
+  have [p1 vip1] := exists_point_valid (proj1 (andP (allP sval _ lccin))).
+  have [p2 vip2] := exists_point_valid (proj2 (andP (allP sval _ lccin))).
+  have [onl x1] := intersection_on_edge vip1.
+  have [onh x2] := intersection_on_edge vip2.
+  by rewrite inside_closed'E /close_cell vip1 vip2 qlc qhc /=;
+    case: ifP=> [p1e | p1ne]; case: ifP=> [p2e | p2ne];
+    rewrite liml /right_limit /= -?x2 -?x1.
 move: qleft; rewrite -lexePtNgt lexePt_eqVlt.
 have svalcc :
    forall c : cell,
@@ -6054,17 +6062,38 @@ move=> /orP[/eqP qe' | qlte ].
     by rewrite /opc; case: (cc)=> [ | ? ?]; rewrite /= inE eqxx.
   have adjcc : adjacent_cells cc.
     by move: adj; rewrite ocd => /adjacent_catW[] _ /adjacent_catW[].
-  have [leftb | nleftb] :=
+  have opc_ctn' : contains_point' (point e) opc.
+    rewrite /contains_point' -leq pal /=.
+    case ccq : cc => [ | c1 cc']; rewrite /opc ccq /=.
+      by rewrite -heq; apply underW.
+    by have /allct/andP[] : c1 \in cc by rewrite ccq inE eqxx.
+  have [leftb | ] :=
     boolP(p_x (last dummy_pt (left_pts opc)) < p_x (point e)); last first.
+    move=> nleftb.
+    have := btom_left_corners opcin';rewrite /bottom_left_corner.
+    rewrite /lexPt (negbTE nleftb) /= => /andP[/eqP sx yl].
+    have /hasP[x xin xP] :=
+      left_limit_has_right_limit opcin' inbox_e sx opc_ctn'.
+    exists x=> //.
+    by rewrite closeeq -cat_rcons mem_cat xin.
+(*
+      rewrite /contains_point.
+      have := allct; have := lcc_ctn.
     have notinopen : {in open, forall c, ~~ inside_open' (point e) c}.
-      move=> c; rewrite ocd !mem_cat orbCA => /orP[]; last first.
-        rewrite inside_open'E; move=> cold; apply/negP=> inec; move: cold.
-        move=> /(decomposition_not_contain rfo sval adj cbtom inbox_e oe)[].
-        by rewrite /contains_point; move: inec=> /andP[] -> /andP[] /underWC ->.
-      rewrite ccq inE=> /orP[/eqP -> | ].
-        rewrite inside_open'E; apply/negP=> inlec; case/negP: nleftb.
+      move=> c; rewrite ocd -cat_rcons !mem_cat orbCA => /orP[]; last first.
+        move/nc; rewrite /contains_point=> /negP.
+        rewrite negb_and negbK inside_open'E !negb_and !negbK.
+        move=> /orP[ | ->]; last by rewrite ?orbT.
+        by move=> /underW ->; rewrite ?orbT.
+      rewrite mem_rcons inE.
+      move=> /orP[ | cincc].
+        admit.
+(*
+      rewrite inside_open'E; apply/negP=> inlec; case/negP: nleftb.
         move: inlec=> /andP[] _ /andP[] _ /andP[] + _.
+        rewrite /left_limit /opc.
         by rewrite /left_limit /opc ccq.
+*)
       move/mem_seq_split=> [s1 [s2 cc'q]].
       have hls1q : high (last lec s1) = low c.
         move: adjcc; rewrite /adjacent_cells ccq cc'q /= cat_path=> /andP[] _.
@@ -6079,27 +6108,35 @@ move=> /orP[/eqP qe' | qlte ].
     move: (cov (point e) inbox_e (lexePt_refl _)) => /orP[] /hasP [x xin Px].
       by have := notinopen x xin; rewrite Px.
     by exists x => //; rewrite -closed'eq mem_cat xin.
+*)
   have : inside_open' (point e) opc.
-    have elt : all (lexePt (point e)) [seq point e0 | e0 <- e :: evs].
+    have elt : all (lexePt (point e)) [seq point e0 | e0 <- e :: future_events].
       rewrite /=; rewrite lexePt_eqVlt eqxx /=.
-      move: sortevs; rewrite /=; rewrite path_sortedE; last exact: lexPt_trans.
-      by move=> /andP[+ _]; apply: sub_all; move=> y; apply: lexPtW.
-    have : contains_point' (point e) opc.
-      have := open_cells_decomposition_contains oe opcin.
-      rewrite /contains_point'=> /andP[] _ ->.
-      rewrite /opc ccq /= leq.
-      by have [-> _] := l_h_above_under_strict cbtom adj inbox_e sval rfo oe.
+      move: sort_evs; rewrite path_sortedE; last exact: lexPtEv_trans.
+      move=> /andP[cmpE _]; apply/allP=> x /mapP[ev evin ->].
+      by apply/lexPtW/(allP cmpE).
     by apply: (contains_to_inside_open' sval clae inbox_e leftb).
-  rewrite -qe'=> einopc.
-  have [it it1 it2]:= inclosing _ opcin einopc svalcc.
-  by exists it=> //; rewrite -closed'eq mem_cat it1 orbT.
-have := cov q inbox_q (lexPtW qlte)=> /orP[ | already_closed]; last first.
-  by rewrite -closed'eq has_cat already_closed orbT.
-rewrite -open'eq (decomposition_preserve_cells oe).
-rewrite 2!has_cat orbCA=> /orP[/hasP [opc opcin qinopc] | keptopen].
-  have [it it1 it2] := inclosing _ opcin qinopc svalcc.
-  apply/orP; right; apply/hasP.
-  by exists it=> //; rewrite -closed'eq mem_cat it1 orbT.
+  move: (opc_ctn').
+  rewrite -qe'=> einopc einop'.
+  case ccq : cc => [ | cc1 cc'] /=.
+    exists (close_cell (point e) lcc).
+      by rewrite closeeq !(mem_cat, inE, mem_rcons) eqxx ?orbT.
+    by apply: inclosel; move: einop'; rewrite /opc ccq.
+  have opcincc : opc \in cc by rewrite /opc ccq /= inE eqxx.
+  have [it itin itP]:= inclosing opc opcincc einop' svalcc.
+  exists it; last by [].
+  by rewrite closeeq mem_cat inE mem_rcons inE itin ?orbT.
+have /orP[| already_closed]:= cover_left_of_e inbox_q (lexPtW qlte); last first.
+  by rewrite closeeq -cat_rcons has_cat already_closed orbT.
+rewrite openeq ocd -2!cat_rcons 2!has_cat orbCA.
+move=> /orP[/hasP[opc opcin qinopc] | keptopen].
+  move: opcin; rewrite mem_rcons inE=> /orP[opclcc | opcin]; last first.
+    have [it it1 it2] := inclosing _ opcin qinopc svalcc.
+    apply/orP; right; apply/hasP.
+    by exists it=> //; rewrite closeeq !(inE, mem_cat, mem_rcons) it1 ?orbT.
+  apply/orP; right; apply/hasP; exists (close_cell (point e) lcc).
+    by rewrite closeeq !(mem_cat, inE, mem_rcons) eqxx ?orbT. 
+  by apply: inclosel; rewrite -(eqP opclcc).
 apply/orP; left; apply/hasP.
 move: keptopen; rewrite -has_cat=>/hasP[it + it2].
 by rewrite mem_cat=> infclc; exists it=> //; rewrite !mem_cat orbCA infclc orbT.
