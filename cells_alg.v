@@ -6037,6 +6037,9 @@ have inclosing : forall c, c \in cc -> inside_open' q c ->
   have [onh x2] := intersection_on_edge vip2.
   by rewrite inside_closed'E vip1 vip2 qlc qhc; case: ifP=> [p1e | p1ne];
     case: ifP=> [p2e | p2ne]; rewrite liml /right_limit /= -?x2 -?x1.
+(* TODO : inclosing and inclosel could probably be instances of a single
+  statement. maybe replacing cc with rcons cc lcc in the statement of
+  inclosing. *)
 have inclosel : inside_open' q lcc ->
   inside_closed' q (close_cell (point e) lcc).
   rewrite inside_open'E andbA=> /andP[] /andP[qlc qhc] /andP[liml _] /=.
