@@ -6076,39 +6076,6 @@ move=> /orP[/eqP qe' | qlte ].
       left_limit_has_right_limit opcin' inbox_e sx opc_ctn'.
     exists x=> //.
     by rewrite closeeq -cat_rcons mem_cat xin.
-(*
-      rewrite /contains_point.
-      have := allct; have := lcc_ctn.
-    have notinopen : {in open, forall c, ~~ inside_open' (point e) c}.
-      move=> c; rewrite ocd -cat_rcons !mem_cat orbCA => /orP[]; last first.
-        move/nc; rewrite /contains_point=> /negP.
-        rewrite negb_and negbK inside_open'E !negb_and !negbK.
-        move=> /orP[ | ->]; last by rewrite ?orbT.
-        by move=> /underW ->; rewrite ?orbT.
-      rewrite mem_rcons inE.
-      move=> /orP[ | cincc].
-        admit.
-(*
-      rewrite inside_open'E; apply/negP=> inlec; case/negP: nleftb.
-        move: inlec=> /andP[] _ /andP[] _ /andP[] + _.
-        rewrite /left_limit /opc.
-        by rewrite /left_limit /opc ccq.
-*)
-      move/mem_seq_split=> [s1 [s2 cc'q]].
-      have hls1q : high (last lec s1) = low c.
-        move: adjcc; rewrite /adjacent_cells ccq cc'q /= cat_path=> /andP[] _.
-        by rewrite /= => /andP[] /eqP.
-      have llecin : last lec s1 \in cc.
-        rewrite ccq cc'q -[_ :: _]/((lec :: s1)++ (c :: s2)).
-        by rewrite mem_cat mem_last.
-      have : point e <<= low c.
-        have := open_cells_decomposition_contains oe llecin=> /andP[] _.
-        by rewrite hls1q.
-      by rewrite inside_open'E => ->; rewrite !andbF.
-    move: (cov (point e) inbox_e (lexePt_refl _)) => /orP[] /hasP [x xin Px].
-      by have := notinopen x xin; rewrite Px.
-    by exists x => //; rewrite -closed'eq mem_cat xin.
-*)
   have : inside_open' (point e) opc.
     have elt : all (lexePt (point e)) [seq point e0 | e0 <- e :: future_events].
       rewrite /=; rewrite lexePt_eqVlt eqxx /=.
@@ -6141,6 +6108,8 @@ apply/orP; left; apply/hasP.
 move: keptopen; rewrite -has_cat=>/hasP[it + it2].
 by rewrite mem_cat=> infclc; exists it=> //; rewrite !mem_cat orbCA infclc orbT.
 Qed.
+
+End step.
 
 End proof_environment.
 
