@@ -6184,10 +6184,10 @@ have adj0: adjacent_cells ops0 by rewrite /ops0 op0q.
 have rf0: s_right_form ops0 by rewrite /ops0 op0q /= boxwf.
 have clae0 : close_alive_edges bottom top ops0 (ev :: future_events).
   by rewrite /ops0 op0q /=/end_edge !inE !eqxx !orbT.
-have noc0 : {in cell_edges ops0 ++ flatten [seq outgoing i | i <- evs] &,
-         no_crossing R}.
+have noc0 : {in all_edges ops0 (ev :: future_events) &, no_crossing R}.
   rewrite /=; move: nocs; apply sub_in2.
-  move=> x; rewrite op0q !inE => /orP[ -> // | /orP[-> // | ]]; rewrite ?orbT //.
+  move=> x; rewrite /ops0 op0q -evsq !inE.
+  move=> /orP[ -> // | /orP[-> // | ]]; rewrite ?orbT //.
   by move=> /evsub ->; rewrite !orbT.
 have evsin0 : all (inside_box bottom top) [seq point ev | ev <- evs].
   exact: evin.
@@ -6270,13 +6270,17 @@ have right_lims0 :
   move=> ev'in; apply/lexPtW.
   move: lexev; rewrite evsq /= path_sortedE; last by apply: lexPtEv_trans.
   by move=> /andP[] /allP + _; apply.
-have := invariant1_default_case _ oute rf0 cbtom0 adj0 sval0 _ clae0.
-have : all (inside_box bottom top)
-             ([seq left_pt g | g <- cell_edges ([::] ++ [:: op0])] ++
-             [seq right_pt g | g <- cell_edges ([::] ++ [:: op0])] ++
-             [seq point x | x <- ev :: future_events]).
-  rewrite 2!all_cat; apply/andP; split.
-    move: leftin; apply: all_sub.
+have inbox_all0:  all (fun g => (g \in [:: bottom; top]) ||
+        (inside_box bottom top (left_pt g) && 
+        (inside_box bottom top (right_pt g))))
+      (cell_edges ([::] ++ [:: op0])) &&
+  all (inside_box bottom top) [seq point x | x <- (ev :: future_events)].
+  apply/andP; split; first by rewrite op0q /= !inE !eqxx !orbT.
+  by move: evin; rewrite evsq.
+have := cle; rewrite evsq=> cle0.
+have := invariant1_default_case
+          inbox_all0 oute rf0 cbtom0 adj0 sval0 cle0 clae0 noc0.
+
 move: op0sok op_dis0 dis0 evsin0 sval0 edges_sub evin lexev
  evsub cle claev0 out_evs rf0 adj0 cbtom0 noc0 right_lims0.
 elim: evs op0 cl0 => [ | ev evs' Ih] /=.
