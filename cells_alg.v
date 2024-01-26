@@ -372,7 +372,7 @@ rewrite /=; case: ifP => [ctpcc | nctpcc] //.
 case occ_eq : (open_cells_decomposition_contact _ _)
        (@open_cells_decomposition_contact_none q p)
     => [[[cc1 lc1] c1] | ] nonecase [] <- <- <-; last first.
-  split;[ by [] | split; [by [] | split; [by [] | ] ]].  
+  split;[ by [] | split; [by [] | split; [by [] | ] ]].
   by case: (q) nonecase => [// | c2 q2] ; apply.
 have [eqls [ctc1 [allct nctlc1]]] := Ih _ _  _ occ_eq.
 split; first by rewrite /=; congr (_ :: _).
@@ -395,7 +395,7 @@ Lemma decomposition_main_properties open_cells p fc cc lcc lc le he:
   he \in cell_edges open_cells.
 Proof.
 rewrite /open_cells_decomposition.
-elim : open_cells fc cc lcc lc le he => [ | c q Ih] fc cc lcc lc le he.  
+elim : open_cells fc cc lcc lc le he => [ | c q Ih] fc cc lcc lc le he.
   by rewrite /= => _ [] w.
 rewrite /=; case: ifP=> ctc.
   case ocdc_eq : (open_cells_decomposition_contact q p) => [ [[cc0 lc0] c0] | ].
@@ -405,16 +405,10 @@ rewrite /=; case: ifP=> ctc.
     split; first by rewrite /= qeq.
     split; first by [].
     split; first by move=> c1 /orP[/eqP -> | ] //; apply: allct.
-    split; first by [].
-    split; first by [].
-    split; first by [].
-    split; first by [].
+    repeat (split; first by []).
     by rewrite -qeq !mem_cat !map_f ?orbT // !(mem_cat, inE) eqxx ?orbT.
   move=> [] <- <- <- <- <- <- _.
-  split; first by [].
-  split; first by [].
-  split; first by [].
-  split; first by [].
+  repeat (split; first by []).
   split.
     by move: (open_cells_decomposition_contact_none ocdc_eq); case: (q).
   split; first by [].
@@ -434,11 +428,8 @@ split; first by [].
 split; first by [].
 split.
   by move=> c0; rewrite inE=> /orP[/eqP -> // | c0in]; rewrite ?ctc ?allnct.
-split; first by [].
-split; first by [].
-split; first by [].
-by rewrite qeq !mem_cat !map_f ?orbT //; case: (cc1) => [ | a b] /=;
- rewrite !(mem_cat, inE) eqxx ?orbT.
+repeat (split; first by []).
+by rewrite qeq !mem_cat !map_f ?orbT //; case: (cc1) => [ | a b] /=; subset_tac.
 Qed.
 
 Lemma decomposition_preserve_cells open_cells pt 
@@ -1583,7 +1574,7 @@ Hypothesis inbox_all :
         (inside_box (left_pt g) && inside_box (right_pt g)))
       (cell_edges open) &&
   all inside_box [seq point x | x <- (e :: future_events)].
-      
+
 #[clearbody]
 Let inbox_e : inside_box (point e).
 Proof.
@@ -1615,7 +1606,7 @@ Hypothesis noc : {in all_edges open (e :: future_events) &, no_crossing R}.
 Hypothesis sort_evs : path (@lexPtEv _) e future_events.
 Hypothesis pwo : pairwise (@edge_below _) (bottom :: [seq high c | c <- open]).
 Hypothesis btom_left_corners :
-  {in open, forall c, lexPt (bottom_left_corner c) (point e)}.  
+  {in open, forall c, lexPt (bottom_left_corner c) (point e)}.
 Hypothesis open_side_limit : all open_cell_side_limit_ok open.
 Hypothesis close_side_limit : all (@closed_cell_side_limit_ok _)
    (rcons cls lstc).
@@ -2316,7 +2307,7 @@ move=> -[] <- <- /= x; rewrite inE=> /orP[/eqP -> | xin].
    subset_tac.
 by apply: (allP cllsto); rewrite /opening_cells ogeq oca_eq /= inE xin orbT.
 Qed.
-  
+
 Lemma update_open_cell_end_edge' c nos lno :
   valid_edge (low c) (point e) ->
   valid_edge (high c) (point e) ->
@@ -2396,7 +2387,7 @@ case: ifP=> [pxaway | /negbFE/eqP/[dup] pxhere /abovelstle palstol].
   move: invariant1_default_case.
   case oe: (open_cells_decomposition _ _) => [[[[[fc cc ] lcc] lc] le] he].
   case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno] def_case.
-  rewrite /inv1_seq /= in def_case.  
+  rewrite /inv1_seq /= in def_case.
   move=> [] <- <- <- _ _ _ _.
   by apply: def_case.
 have infop : {subset fop <= open} by rewrite /open; subset_tac.
@@ -6321,6 +6312,7 @@ have := @step_keeps_disjoint_default bottom top ev [::]
             op0 [::] future_events inbox_all0 oute rf0 cbtom0 adj0 sval0
             oks0 ocdis0 [::] op0_cl0_dis cl0_dis rl0.
 rewrite oe lop0q hop0q oca_eq cats1 /= => -[] cl1_dis op1_cl1_dis.
+
 
 move: op0sok op_dis0 dis0 evsin0 sval0 edges_sub evin lexev
  evsub cle claev0 out_evs rf0 adj0 cbtom0 noc0 right_lims0.
