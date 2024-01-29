@@ -6202,7 +6202,13 @@ Lemma not_bottom_or_top bottom top (evs : seq event) :
   {in evs, forall ev, out_left_event ev} ->
   {in evs, forall ev, {in outgoing ev, forall g, g \notin [:: bottom; top]}}.
 Proof.
-Admitted.
+move=> inboxes outes ev evin g gin; apply/negP=> abs.
+have lgq : left_pt g = point ev by apply/eqP/outes.
+have /andP[] : inside_box bottom top (point ev) by apply: inboxes.
+rewrite -lgq; move: abs; rewrite !inE=> /orP[] /eqP ->.
+  by rewrite (left_pt_below _).
+by rewrite (negbTE (left_pt_above _)) !andbF.
+Qed.
 
 Lemma start_disjoint bottom top s closed open evs :
   bottom <| top ->
@@ -6631,83 +6637,6 @@ have right_limit_closed' :
   by rewrite (right_limit_close_cell vlc' vhc') le_refl.
 apply: (Ih (fc ++ nos) lno lc (cls ++ lstc :: closing_cells (point ev') cc)
         (close_cell (point ev') lcc) he (p_x (point ev'))) => //.
-Qed.
-
-elim: evs op0 cl0 => [ | ev evs' Ih] /=.
-  rewrite /= => op cl opsok op_disj disj _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
-  move=> [] <- <-; exact: disj.
-move=> op cl osok odis [cdis ocdis] /andP[] inbox_e inbox
-  /(_ isT) sval edges_sub /andP[] evin evsin lexev sub_all clee clae
-  out_evs rfo adj cbtom noc esp right_lims_evs.
-case stepeq : (step ev op cl)=> [open' closed'].
-have noc2: {in [seq low c | c <- op] ++ [seq high c | c <- op] ++ outgoing ev &,
-        forall e1 e2, inter_at_ext e1 e2}.
-  apply: (sub_in2 _ nocs') => g gin; apply: edges_sub; rewrite mem_cat.
-  move: gin; rewrite catA mem_cat=> /orP[-> // | /=].
-  by rewrite /events_to_edges /= [X in _ || X]mem_cat orbCA => ->.
-have noc3: {in cell_edges op ++ outgoing ev &, no_crossing R}.
-  by apply: (sub_in2 _ noc)=> c cin; rewrite catA mem_cat cin.
-have out_e : out_left_event ev by apply: out_evs; rewrite inE eqxx.
-have lexv' : all [eta lexPtEv ev] evs'.
-  by apply: (order_path_min (@lexPtEv_trans _)).
-have right_lims : {in cl, forall c, right_limit c <= p_x (point ev)}.
-  by move=> c; apply: right_lims_evs; rewrite inE eqxx.
-have allin : all (inside_box bottom top) [seq point e | e <- evs'].
-  by apply/allP=> g gin; apply: (allP inbox g).
-have hdin : evs' != [::] -> inside_box bottom top 
-   (head dummy_pt [seq point e | e <- evs']).
-  case evs'eq : evs' => [ // | ev1 evs'' /=] _.
-  by apply: (allP evsin); rewrite evs'eq /= inE eqxx.
-have sval1 : evs' != [::] ->
-    seq_valid open' (head dummy_pt [seq point ev0 | ev0 <- evs']).
-  move=> /[dup] evs'n0; case evs'eq : evs' => [ // | ev1 evs''] _.
-  have := (step_keeps_valid (hdin evs'n0) _ _ _ _ _ _ _ clae _ _ stepeq).
-  rewrite -evs'eq; apply => //.
-  * rewrite evs'eq /=.
-    have := allP (order_path_min (@lexPtEv_trans _) lexev).
-    by move=> /(_ ev1); rewrite evs'eq inE eqxx => /(_ isT).
-  * move=> e2; rewrite evs'eq inE=> /orP[/eqP -> | ].
-    ** by rewrite lexePt_refl.
-    move=> e2in; apply: lexPtW.
-    move: lexev=> /path_sorted; rewrite evs'eq.
-    by move=>/(order_path_min (@lexPtEv_trans _))/allP /(_ _ e2in).
-have clae' : close_alive_edges bottom top open' evs'.
-  exact: (step_keeps_closeness inbox_e out_e rfo cbtom adj sval _ _ stepeq).
-apply: Ih => //.
-- by apply: (step_keeps_open_cell_side_limit cbtom adj inbox_e sval
-             out_e rfo noc3  stepeq osok).
-- by apply: (step_keeps_disjoint_open cbtom adj inbox_e sval rfo noc2
-        odis out_e osok esp clae lexv' stepeq).
-- exact: (step_keeps_disjoint cbtom adj _ _ _ _ _ _ _ _ _ _ _ clae _ stepeq).
-- move=> g; rewrite mem_cat=> /orP[]; last first.
-    move=> gin; apply: edges_sub; rewrite mem_cat orbC /events_to_edges /=.
-    by rewrite mem_cat gin !orbT.
-  move/(step_keeps_subset cbtom adj sval out_e inbox_e stepeq)=> gin.
-  apply: edges_sub; rewrite mem_cat /events_to_edges /= [X in _ || X]mem_cat.
-  by rewrite orbA -mem_cat gin.
-- exact: (path_sorted lexev).
-- by move=> g gin; apply: sub_all; rewrite mem_cat gin orbT.
-- by move: clee=> /andP[].
-- by move=> e ein; apply: out_evs; rewrite inE ein orbT.
-- exact: (step_keeps_right_form cbtom adj inbox_e sval _ _ _ stepeq).
-- exact: (step_keeps_adjacent inbox_e out_e sval cbtom stepeq).
-- exact: (step_keeps_bottom_top inbox_e sval adj cbtom out_e stepeq).
-- move=> g1 g2; rewrite mem_cat=> g1in; rewrite mem_cat=> g2in; apply: noc;
-  rewrite mem_cat [X in _ || X]mem_cat.
-    move: g1in=> /orP[ | ->]; last by rewrite !orbT.
-    move/(step_keeps_subset cbtom adj sval out_e inbox_e stepeq)=> gin.
-    by rewrite orbA -mem_cat gin.
-  move: g2in=> /orP[ | ->]; last by rewrite !orbT.
-  move/(step_keeps_subset cbtom adj sval out_e inbox_e stepeq)=> gin.
-  by rewrite orbA -mem_cat gin.
-- apply:(step_keeps_edge_side stepeq _ out_e _ cbtom)=> //.
-  * by rewrite /= evin.
-have right_lims' := step_keeps_closed_to_the_left cbtom adj sval inbox_e rfo
-         stepeq right_lims.
-move=> ev1 c ev1in cin.
-apply: (le_trans (right_lims' c cin)).
-have : lexPtEv ev ev1 by exact: (allP lexv' _ ev1in).
-by move=>/orP[ | /andP[] + _]; rewrite ?le_eqVlt=> ->; rewrite ?orbT.
 Qed.
 
 Lemma start_edge_covering bottom top s (evs : seq event) open closed :
