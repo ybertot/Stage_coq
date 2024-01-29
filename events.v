@@ -159,6 +159,10 @@ Qed.
 
 Definition events_to_edges := flatten \o (map outgoing).
 
+Lemma events_to_edges_cons e evs :
+  events_to_edges (e :: evs) = outgoing e ++ events_to_edges evs.
+Proof. by []. Qed.
+
 Lemma out_left_event_on e :
   out_left_event e -> {in outgoing e, forall g, point e === g}.
 Proof.
