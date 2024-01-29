@@ -110,7 +110,7 @@ Definition event_close_edge ed ev : bool :=
 right_pt ed == point ev.
 
 Definition end_edge edge events : bool :=
-(edge \in [:: bottom; top]) || has (event_close_edge edge) events.
+  has (event_close_edge edge) events.
 
 Definition close_out_from_event ev future : bool :=
   all (fun edge => end_edge edge future) (outgoing ev).
@@ -286,34 +286,32 @@ Qed.
 
 End proof_environment.
 
-Lemma add_event_preserve_ends bottom top p e inc evs ed :
-  end_edge bottom top ed evs ->
-  end_edge bottom top ed (add_event p e inc evs).
+Lemma add_event_preserve_ends p e inc evs ed :
+  end_edge ed evs ->
+  end_edge ed (add_event p e inc evs).
 Proof.
-have [excp | norm ] := boolP(ed \in [:: bottom; top]).
-  by rewrite /end_edge excp.
-rewrite /end_edge (negbTE norm) /=.
+rewrite /end_edge /=.
 elim: evs => [// | ev evs Ih] /= /orP[|];
   repeat (case: ifP => _);
    rewrite /=/event_close_edge /=; try (move=> -> //); rewrite ?orbT //.
 by move=> ?; rewrite Ih ?orbT.
 Qed.
 
-Lemma add_event_inc bottom top evs ed :
-  end_edge bottom top ed (add_event (right_pt ed) ed true evs).
+Lemma add_event_inc evs ed :
+  end_edge ed (add_event (right_pt ed) ed true evs).
 Proof.
 elim: evs => [ | ev evs Ih] /=.
-  by rewrite /end_edge /= /event_close_edge /= eqxx orbT.
+  by rewrite /end_edge /event_close_edge eqxx.
 case: ifP=> [/eqP <- | ].
-  by rewrite /end_edge /= /event_close_edge /= eqxx orbT.
-repeat (case: ifP=> _); rewrite /end_edge/=/event_close_edge ?eqxx ?orbT //.
-move=> _; move: Ih; rewrite /end_edge/=/event_close_edge => /orP [] -> //.
+  by rewrite /end_edge /= /event_close_edge /= eqxx.
+repeat (case: ifP=> _); rewrite /end_edge/=/event_close_edge ?eqxx //.
+move=> _; move: Ih; rewrite /end_edge/=/event_close_edge => ->.
 by rewrite !orbT.
 Qed.
 
-Lemma close_edges_from_events_inc bottom top evs p ed :
- close_edges_from_events bottom top evs ->
- close_edges_from_events bottom top (add_event p ed true evs).
+Lemma close_edges_from_events_inc evs p ed :
+ close_edges_from_events evs ->
+ close_edges_from_events (add_event p ed true evs).
 Proof.
 elim: evs => /= [ // | ev evs Ih /andP [clev clevs]].
 move: Ih=> /(_ clevs) Ih.
@@ -322,30 +320,30 @@ case: ifP=> _ /=; first by rewrite clevs andbT; exact clev.
 case: ifP=> _ /=; first by rewrite clevs andbT; exact clev.
 rewrite Ih andbT.
 apply/allP=> ed' edin'.
-move: (allP clev ed' edin')=> /orP[]; first by rewrite /end_edge => ->.
-by move=> it; rewrite add_event_preserve_ends // /end_edge it ?orbT.
+move: (allP clev ed' edin').
+by move=> it; rewrite add_event_preserve_ends // /end_edge it.
 Qed.
 
-Lemma add_edge_close_edges_from_events bottom top evs ed :
-  close_edges_from_events bottom top evs ->
-  close_edges_from_events bottom top
+Lemma add_edge_close_edges_from_events evs ed :
+  close_edges_from_events evs ->
+  close_edges_from_events
     (add_event (left_pt ed) ed false (add_event (right_pt ed) ed true evs)).
 Proof.
 have no_eq : left_pt ed == right_pt ed = false.
     by apply/negP=> /eqP abs_eq; have := edge_cond ed; rewrite abs_eq ltxx.
 elim: evs => [/= _ | ev evs Ih].
   rewrite no_eq edge_cond /=.
-  by rewrite /close_out_from_event /= /end_edge/=/event_close_edge eqxx orbT.
+  by rewrite /close_out_from_event /= /end_edge/=/event_close_edge eqxx.
 move=> tmp; rewrite /= in tmp; case/andP: tmp=> [clev clevs].
 move: Ih=> /(_ clevs) Ih.
-have : end_edge bottom top ed (add_event (right_pt ed) ed true (ev :: evs)).
+have : end_edge ed (add_event (right_pt ed) ed true (ev :: evs)).
   by apply: add_event_inc.
 rewrite [add_event (right_pt _) _ _ _]add_event_step.
 lazy zeta.
 case: ifP=> [/eqP <- /= | cnd1].
   rewrite no_eq edge_cond /=.
   rewrite /close_out_from_event /= /end_edge/=/event_close_edge.
-  rewrite eqxx orbT /= clevs andbT=> _; exact: clev.
+  rewrite eqxx /= clevs andbT=> _; exact: clev.
 case: ifP=> cnd2 /=.
   rewrite no_eq edge_cond /=.
   rewrite /close_out_from_event /= => -> /=; rewrite clevs andbT; exact: clev.
@@ -353,7 +351,7 @@ case: ifP=> cnd3 ended /=.
   rewrite no_eq edge_cond.
   rewrite close_edges_from_events_step.
   apply/andP; split; last by rewrite /= clev clevs.
-  by rewrite /close_out_from_event/= ended.
+  by move: ended; rewrite /= /close_out_from_event /= andbT.
 case: ifP=> cnd4.
   rewrite close_edges_from_events_step /close_out_from_event/=.
   rewrite close_edges_from_events_inc ?andbT ?clevs //.
@@ -364,14 +362,14 @@ case: ifP=> cnd4.
   by rewrite add_event_inc.
 case: ifP=> cnd5.
   rewrite close_edges_from_events_step; apply/andP; split.
-    by rewrite /close_out_from_event /= ended.
+    by move: ended; rewrite /= /close_out_from_event /= andbT.
   rewrite close_edges_from_events_step; apply/andP; split.
     apply/allP=> x xin; apply: add_event_preserve_ends.
     by move/allP: clev=> /(_ x xin).
   by apply: close_edges_from_events_inc.
 case: ifP=> cnd6.
   rewrite close_edges_from_events_step; apply/andP; split.
-    by rewrite /close_out_from_event /= ended.
+    by move: ended; rewrite /close_out_from_event /= andbT.
   rewrite close_edges_from_events_step; apply/andP; split.
     apply/allP=> x xin; apply: add_event_preserve_ends.
     by move/allP: clev=> /(_ x xin).
@@ -385,7 +383,7 @@ by apply: Ih.
 Qed.
 
 Lemma edges_to_events_wf (bottom top : edge)(s : seq edge) :
-  close_edges_from_events bottom top (edges_to_events s).
+  close_edges_from_events (edges_to_events s).
 Proof.
 elim : s => [ // | e s Ih /=].
 by apply: add_edge_close_edges_from_events.

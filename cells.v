@@ -127,11 +127,6 @@ Qed.
 Section proof_environment.
 Variable bottom top : edge.
 
-Notation end_edge := (end_edge bottom top).
-Notation close_out_from_event := (close_out_from_event bottom top).
-Notation close_edges_from_events :=
-  (close_edges_from_events bottom top).
-
 Definition between_edges (l h : edge) (p : pt) :=
   (p >>> l) && (p <<< h).
 
@@ -151,8 +146,15 @@ move=>/andP[] _ /andP[] /andP[] /ltW a /ltW b /andP[] /ltW c /ltW d.
 by rewrite /valid_edge !inE=> /orP[] /eqP ->; rewrite ?(a, b, c, d).
 Qed.
 
+Definition end_edge_ext (g : edge) (evs : seq event) :=
+  (g \in [:: bottom; top]) || end_edge g evs.
+
+Lemma end_edgeW g evs : end_edge g evs -> end_edge_ext g evs.
+Proof. by rewrite /end_edge_ext=> ->; rewrite orbT. Qed.
+
 Definition close_alive_edges open future_events : bool :=
-all (fun c => (end_edge (low c) future_events) && (end_edge (high c) future_events)) open.
+all (fun c => (end_edge_ext (low c) future_events) &&
+    (end_edge_ext (high c) future_events)) open.
 
 Lemma insert_opening_all (first_cells  new_open_cells last_cells : seq cell) p :
 all p first_cells  -> all p new_open_cells  ->
@@ -434,8 +436,8 @@ rewrite /=.
 apply/andP; split; last first.
   apply: IH=> //.
   by move=> c cin; apply condition; rewrite inE cin orbT.
-move: cae; rewrite /= /end_edge /= => /andP[] /andP[] /orP[].
-  move=> -> C; rewrite orTb; move: C=> /orP[].
+move: cae; rewrite /= /end_edge_ext /= => /andP[] /andP[] /orP[].
+  move=> -> +; rewrite orTb=> /orP[].
     by move=> ->.
   move=> /orP [abs | ].
   case: (condition c').
@@ -459,7 +461,7 @@ Qed.
 Lemma valid_between_events g e p future :
 lexePt e p ->
 (forall e', e' \in future -> lexePt p (point e')) ->
-valid_edge g e -> inside_box p -> end_edge g future ->
+valid_edge g e -> inside_box p -> end_edge_ext g future ->
 valid_edge g p.
 Proof.
 move => einfp pinffut vale.
@@ -566,7 +568,8 @@ Proof.
 rewrite inside_open'E /contains_point'.
 move=> val clae inbox_p leftb rightb cin /andP[] -> ->.
 rewrite leftb.
-have cledge g : end_edge g evs -> p_x p <= p_x (right_pt g).
+have cledge g : (g \in [:: bottom; top]) || end_edge g evs ->
+        p_x p <= p_x (right_pt g).
   have [/ltW pbot /ltW ptop] : p_x p < p_x (right_pt bottom) /\
              p_x p < p_x (right_pt top).
     by apply/andP; move:inbox_p=> /andP[] _ /andP[] /andP[] _ -> /andP[] _ ->.
@@ -885,7 +888,7 @@ Lemma fc_lc_right_pt s ev events :
   {in s, forall c b, lexPt (point ev) (right_pt (any_edge b c))}.
 Proof.
 move=> /allP clae inbox_e /allP lexev c cin b.
-have : end_edge (any_edge b c) events.
+have : ((any_edge b c) \in [:: bottom; top]) || end_edge (any_edge b c) events.
   by have := clae _ cin; rewrite /end_edge /any_edge; case: b=> /= /andP[].
 move=> /orP[ | ].
   move: inbox_e => /andP[] _ /andP[]/andP[] _ botP /andP[] _ topP.
@@ -1055,6 +1058,12 @@ have btmon : bottom_left_corner c' === low c'.
   by move: c'ok=> /andP[] _ /andP[] _ /andP[] _ /andP[] _.
 have := lexePt_lexPt_trans (on_edge_lexePt_left_pt btmon) lexbtme.
 by rewrite cc'.
+Qed.
+
+Lemma inside_box_valid_bottom x : inside_box x -> valid_edge bottom x.
+Proof.
+move=> /andP[] _ /andP[] /andP[] /ltW + /ltW + _; rewrite /valid_edge.
+by move=> -> ->.
 Qed.
 
 Section open_cells_decomposition.
@@ -1269,6 +1278,25 @@ by apply: (proj1 (andP (allct c2in))).
 Qed.
 
 End open_cells_decomposition.
+
+Lemma inside_open_cell_valid c p1 : 
+  open_cell_side_limit_ok c ->
+  inside_open_cell p1 c -> 
+  valid_edge (low c) p1 && valid_edge (high c) p1.
+Proof.
+move=> /andP[] ne /andP[] sxl /andP[] _ /andP[] /andP[] _ onh /andP[] _ onl.
+move=> /andP[] _; rewrite /left_limit /open_limit=> /andP[] ge lemin.
+apply/andP; split.
+  apply/andP; split.
+    by apply: le_trans ge; move: onl=> /andP[].
+  apply: (le_trans lemin).
+  by rewrite ge_min lexx.
+apply/andP; split.
+ apply: le_trans ge; move: onh=> /andP[].
+ rewrite (eqP (allP sxl (head dummy_pt (left_pts c))_)) //.
+ by apply: head_in_not_nil.
+by rewrite le_min in lemin; move: lemin=>/andP[].
+Qed.
 
 End proof_environment.
 
