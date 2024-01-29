@@ -6210,13 +6210,23 @@ rewrite -lgq; move: abs; rewrite !inE=> /orP[] /eqP ->.
 by rewrite (negbTE (left_pt_above _)) !andbF.
 Qed.
 
-Lemma start_disjoint bottom top s closed open evs :
+(* This lemma only provides a partial correctness statement in the case
+  where the events are never aligned vertically.  This condition is
+  expressed by the very first hypothesis.  TODO: it relies on the assumption
+  that the first open cell is well formed.  This basically means that the
+  two edges have a vertical overlap.  This statement should be probably
+  be made clearer in a different way.
+
+  TODO: one should probably also prove that the final sequence of open
+  cells, here named "open", should be reduced to only one element. *)
+Lemma start_disjoint_general_position bottom top s closed open evs :
+  sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) evs ->
   bottom <| top ->
+  (* TODO: rephrase this statement in a statement that easier to understand. *)
   open_cell_side_limit_ok (start_open_cell bottom top) ->
   {in bottom :: top :: s &, forall e1 e2, inter_at_ext e1 e2} ->
   all (inside_box bottom top) [seq point e | e <- evs] ->
   sorted (@lexPtEv _) evs ->
-  sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) evs ->
   {subset flatten [seq outgoing e | e <- evs] <= s} ->
   {in evs, forall ev, out_left_event ev} ->
   close_edges_from_events bottom top evs ->
@@ -6224,7 +6234,7 @@ Lemma start_disjoint bottom top s closed open evs :
   {in closed &, disjoint_closed_cells R} /\
   {in open & closed, disjoint_open_closed_cells R}.
 Proof.
-move=> boxwf startok nocs' evin lexev ltev evsub out_evs cle.
+move=> ltev boxwf startok nocs' evin lexev evsub out_evs cle.
 have nocs : {in bottom :: top :: s &, no_crossing R}.
   by apply: inter_at_ext_no_crossing.
 rewrite /start.
@@ -6638,7 +6648,7 @@ have right_limit_closed' :
 apply: (Ih (fc ++ nos) lno lc (cls ++ lstc :: closing_cells (point ev') cc)
         (close_cell (point ev') lcc) he (p_x (point ev'))) => //.
 Qed.
-
+(*
 Lemma start_edge_covering bottom top s (evs : seq event) open closed :
   bottom <| top ->
   open_cell_side_limit_ok (start_open_cell bottom top) ->
@@ -6998,5 +7008,5 @@ have rfnew : s_right_form (fc ++ nos ++ lno :: lc).
   admit.
 apply: (@middle_disj_last _ cc lcc)=> //.
 Admitted.
-
+*)
 End working_environment.
