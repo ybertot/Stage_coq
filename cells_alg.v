@@ -3526,10 +3526,6 @@ rewrite geq; apply.
 by rewrite fcteq -fcteq' map_f // fcteq' last_cat /= mem_last.
 Qed.
 
-Lemma head_rcons [A : Type](def : A) (s : seq A) (a : A) :
-  head def (rcons s a) = head a s.
-Proof. by case: s. Qed.
-
 Lemma opening_cells_first_left_pts le he :
   valid_edge le (point e) ->
   outgoing e != nil ->
