@@ -25,6 +25,10 @@ rewrite /=.
 by case: ifP => [] ?; rewrite !inE=> /orP[ | /Ih /orP[] ] ->; rewrite ?orbT.
 Qed.
   
+Lemma seq_subst_eq0  {A : eqType} (l : seq A) b c :
+  (seq_subst l b c == [::]) = (l == [::]).
+Proof. by case : l => [ | a l] //=; case: ifP. Qed.
+
 Lemma seq_subst_cat {A : eqType} (l1 l2 : seq A) b c : 
   seq_subst (l1 ++ l2) b c = seq_subst l1 b c ++ seq_subst l2 b c.
 Proof.

@@ -1005,7 +1005,8 @@ Definition edge_covered (e : edge) (os : seq cell) (cs : seq cell) :=
     connect_limits (rcons pcc opc) /\
     opc \in os /\
     left_limit (head_cell (rcons pcc opc)) = p_x (left_pt e)) \/
-  (exists pcc, {subset pcc <= cs} /\
+  (exists pcc, pcc != [::] /\ 
+    {subset pcc <= cs} /\
     {in pcc, forall c, high c = e} /\
     connect_limits pcc /\
     left_limit (head_cell pcc) = p_x (left_pt e) /\
