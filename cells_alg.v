@@ -6111,7 +6111,7 @@ have rl_closed1 : {in [:: cl0] & future_events,
   move=> /andP[] + _=> /allP /[apply].
   rewrite cl0q rlcl0=> /orP[]; first by move/ltW.
   by move=> /andP[] /eqP -> _; apply: le_refl.
-constructor=> //.
+by constructor.
 Qed.
 
 Lemma start_disjoint_general_position bottom top s closed open evs :
@@ -6240,7 +6240,7 @@ have right_limit_closed' :
   have:= step_keeps_right_limit_closed_default inbox_all_events' cbtom adj
     sval lexevs cl_at_left'.
   by rewrite oe oca_eq /=.
-constructor=> //.
+by constructor.
 Qed.
 
 Record edge_covered_general_position_invariant (bottom top : edge)
