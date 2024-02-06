@@ -5589,7 +5589,7 @@ Qed.
 
 (* This statement is the normal lifting of the previous statement from
  the default case to the complete step function.  However, this proof
- is not use for now, so we make it a definition just to keep in records what
+ is not used for now, so we make it a definition just to keep in records what
  should be the lemma statement. *)
 Definition TODO_step_keeps_cover_left_border :=
   let s' :=  step e (Bscan fop lsto lop cls lstc lsthe lstx) in
@@ -6473,11 +6473,10 @@ rewrite /initial_state evsq /=.
 case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
 set istate := Bscan _ _ _ _ _ _ _.
 move=> istateP req.
-suff : forall events op cl st cov_set, 
+suff main : forall events op cl st cov_set, 
   edge_covered_general_position_invariant bottom top s cov_set st events ->
   scan events st = (op, cl) ->
   {in cov_set ++ events_to_edges events, forall g, edge_covered g op cl}.
-  move=> main; rewrite /events_to_edges /=.
   by move: req; apply: main.
 move=> {req istateP istate oca_eq lno nos evsn0 evsq future_events ev}.
 move=> {uniq_edges n_inner out_evs evsub lexev evin startok ltev}.
@@ -6597,6 +6596,103 @@ have cle' : close_edges_from_events evs by move: cle=> /andP[].
 have lexevs' : sorted (@lexPtEv _) evs by move: lexev => /path_sorted.
 constructor=> //; rewrite /state_open_seq /=.
 Qed.
+
+Record safe_side_general_position_invariant (bottom top : edge)
+ (edge_set : seq edge) (processed_set : seq event)
+ (s : scan_state) (future_events : seq event) :=
+ { inv1_ss : inv1_seq bottom top future_events (state_open_seq s);
+   edges_sub_ss : {subset all_edges (state_open_seq s) future_events <=
+                    bottom :: top :: edge_set};
+    non_in_ss : 
+      {in edge_set & future_events, forall g e, non_inner g (point e)};
+   out_events_ss : {in future_events, forall e, out_left_event e};
+   inbox_events_ss : 
+       all (inside_box bottom top) [seq point x | x <- future_events];
+   sides_ok_ss : all open_cell_side_limit_ok (state_open_seq s);
+   cle_ss : close_edges_from_events future_events;
+   lexev_ss : sorted (@lexPtEv _) future_events;
+   uniq_ss : {in future_events, forall e, uniq (outgoing e)};
+   inj_high_ss : {in state_open_seq s &, injective (@high _)};
+   bot_left_cells_ss : 
+       {in state_open_seq s & future_events, 
+          forall c e, lexPt (bottom_left_corner c) (point e)};
+   general_pos_ss :
+     all (fun ev => lst_x s < p_x (point ev)) future_events &&
+     sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) future_events;
+   safe_side_closed_edges :
+     {in events_to_edges processed_set & state_closed_seq s, forall g c p,
+         in_safe_side_left p c || in_safe_side_right p c -> ~ p === g};
+   safe_side_open_edges :
+     {in events_to_edges processed_set & state_open_seq s, forall g c p,
+         in_safe_side_left p c -> ~p === g};
+   safe_side_closed_points :
+     {in processed_set & state_closed_seq s, forall e c p,
+         in_safe_side_left p c || in_safe_side_right p c -> p != point e};
+   safe_side_open_points :
+     {in processed_set & state_open_seq s, forall e c p,
+         in_safe_side_left p c -> p != point e};
+
+  }.
+
+Lemma start_safe_sides bottom top s closed open evs :
+  sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) evs ->
+  bottom <| top ->
+  (* TODO: rephrase this statement in one that is easier to understand. *)
+  open_cell_side_limit_ok (start_open_cell bottom top) ->
+  {in bottom :: top :: s &, forall e1 e2, inter_at_ext e1 e2} ->
+  {in s, forall g, inside_box bottom top (left_pt g) &&
+                   inside_box bottom top (right_pt g)} ->
+  all (inside_box bottom top) [seq point e | e <- evs] ->
+  sorted (@lexPtEv _) evs ->
+  {subset events_to_edges evs <= s} ->
+  {in evs, forall ev, out_left_event ev} ->
+  close_edges_from_events evs ->
+  {in s & evs, forall g e, non_inner g (point e)} ->
+  {in evs, forall e, uniq (outgoing e)} ->
+  start evs bottom top = (open, closed) ->
+ {in closed, forall c p,
+     in_safe_side_left p c || in_safe_side_right p c ->
+     {in events_to_edges evs, forall g, ~ p === g} /\
+     {in evs, forall ev, p != point ev}}.
+Proof.
+move=> ltev boxwf startok nocs' inbox_s evin lexev evsub out_evs cle
+  n_inner uniq_edges.
+have nocs : {in bottom :: top :: s &, no_crossing R}.
+  by apply: inter_at_ext_no_crossing.
+rewrite /start.
+case evsq : evs => [ | ev future_events]; first by move=> r_eq g.
+have evsn0 : evs != [::] by rewrite evsq.
+case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+set istate := Bscan _ _ _ _ _ _ _.
+have : safe_side_general_position_invariant bottom top s [:: ev]
+  istate future_events.
+  by admit.
+move=> invss req.
+suff main: forall events op cl st processed_set, 
+  safe_side_general_position_invariant bottom top s processed_set st events ->
+  scan events st = (op, cl) ->
+  {in cl, forall c p, in_safe_side_left p c || in_safe_side_right p c ->
+    {in events_to_edges (processed_set ++ events), forall g, ~ p === g} /\
+         {in processed_set ++ events, forall e', p != point e'}} /\
+  {in op, forall c p, in_safe_side_left p c ->
+         {in events_to_edges (processed_set ++ events), forall g, ~ p === g} /\
+         {in processed_set ++ events, forall e', p != point e'}}.
+  have [A B] := main _ _ _ _ _ invss req.
+ by move=> c cin p pside; have := A c cin p pside.
+elim=> [ | {evsq oca_eq istate invss}ev {req}future_events Ih] op cl st p_set.
+  case stq : st => [fop lsto lop cls lstc lsthe lstx] /= [].
+  rewrite /state_open_seq/state_closed_seq /=.
+  move=> inv2 sub_edges _ _ _ sok _ _ _ inj_high _ _.
+  move=> main_closed_edges main_open_edges main_closed_points main_open_points.
+  move=> -[] <- <-.
+  rewrite cats0; split; move=> c cin p pin; split.
+        move=> g gin.
+        by apply: (main_closed_edges g c gin); rewrite // mem_rcons.
+      move=> e ein.
+      by apply: (main_closed_points e c ein); rewrite // mem_rcons.
+    move=> g gin.
+    by apply: (main_open_edges g c gin); rewrite //.
+  by move=> e ein; apply: (main_open_points e c ein); rewrite //.
 
 (*
 Lemma start_cover (bottom top : edge) (s : seq edge) closed open :

@@ -124,6 +124,12 @@ rewrite [in _ >>> low c]/point_under_edge -ltNge.
 by case: (0 < _); case: (_ < p_x p); rewrite ?andbF ?orbT ?andbT.
 Qed.
 
+Definition in_safe_side_left p c :=
+  [&& p_x p == left_limit c, p <<< high c, p >>> low c & p \notin left_pts c].
+
+Definition in_safe_side_right p c :=
+  [&& p_x p == right_limit c, p <<< high c, p >>> low c & p \notin right_pts c].
+
 Section proof_environment.
 Variable bottom top : edge.
 
