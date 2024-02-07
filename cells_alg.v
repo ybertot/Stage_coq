@@ -5862,6 +5862,24 @@ Lemma cell_edges_start bottom top :
   cell_edges [::(start_open_cell bottom top)] = [:: bottom; top].
 Proof. by []. Qed.
 
+Record common_general_position_invariant bottom top edge_set s
+  (ev : event) events :=
+  { inv1 : inv1_seq bottom top events (state_open_seq s);
+   lstx_eq : lst_x s = left_limit (lst_open s);
+   high_lsto_eq : high (lst_open s) = lst_high s;
+   edges_sub : {subset all_edges (state_open_seq s) events <=
+                    bottom :: top :: edge_set};
+   closed_events : close_edges_from_events events;
+   out_events : {in events, forall e, out_left_event e};
+   inbox_events : all (inside_box bottom top)
+           [seq point x | x <- events];
+   lex_future : sorted (@lexPtEv _) events;
+   sides_ok : all open_cell_side_limit_ok (state_open_seq s);
+   general_pos :
+     all (fun ev => lst_x s < p_x (point ev)) events &&
+     sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) events;
+}.
+
 (* This lemma only provides a partial correctness statement in the case
   where the events are never aligned vertically.  This condition is
   expressed by the very first hypothesis.  TODO: it relies on the assumption
@@ -5878,27 +5896,13 @@ Record disjoint_general_position_invariant (bottom top : edge)
      {in state_open_seq s & state_closed_seq s,
        disjoint_open_closed_cells R};
    cl_dis : {in state_closed_seq s &, disjoint_closed_cells R};
-   inv1 : inv1_seq bottom top future_events (state_open_seq s);
-   sval_fut : (future_events = [::]) \/
-                seq_valid (state_open_seq s)
-                   (point (head (@dummy_event _) future_events));
-   lstx_eq : lst_x s = left_limit (lst_open s);
-   high_lsto_eq : high (lst_open s) = lst_high s;
-   edges_sub : {subset all_edges (state_open_seq s) future_events <=
-                    bottom :: top :: edge_set};
-   closed_events : close_edges_from_events future_events;
-   out_events : {in future_events, forall e, out_left_event e};
-   inbox_events : all (inside_box bottom top) [seq point x | x <- future_events];
-   lex_future : sorted (@lexPtEv _) future_events;
+   common_inv_dis : common_general_position_invariant bottom top
+        edge_set s ev future_events;
    pairwise_open : pairwise (@edge_below _)
        (bottom :: [seq high c | c <- state_open_seq s]);
-   sides_ok : all open_cell_side_limit_ok (state_open_seq s);
    closed_at_left :
        {in state_closed_seq s & future_events,
           forall c e, right_limit c <= p_x (point e)};
-   general_pos :
-     all (fun ev => lst_x s < p_x (point ev)) future_events &&
-     sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) future_events;
    }.
 
 Definition dummy_state :=
@@ -5920,6 +5924,175 @@ Definition initial_state bottom top (events : seq event) :=
          lst_x := p_x (point ev) |}
   end.
 
+Lemma initial_intermediate bottom top s events :
+  sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) events ->
+  bottom <| top ->
+  (* TODO: rephrase this statement in a statement that easier to understand. *)
+  open_cell_side_limit_ok (start_open_cell bottom top) ->
+  {in bottom :: top :: s &, forall e1 e2, inter_at_ext e1 e2} ->
+  all (inside_box bottom top) [seq point e | e <- events] ->
+  sorted (@lexPtEv _) events ->
+  {subset flatten [seq outgoing e | e <- events] <= s} ->
+  {in events, forall ev, out_left_event ev} ->
+  close_edges_from_events events ->
+  events != [::] ->
+  let op0 := (* close_cell (point (head (dummy_event _) events))  *)
+               (start_open_cell bottom top) in
+  all open_cell_side_limit_ok [:: op0] /\
+  cells_bottom_top bottom top [:: op0] /\
+  adjacent_cells [:: op0] /\
+  seq_valid [:: op0] (point (head (dummy_event _) events)) /\
+  s_right_form [:: op0] /\
+  all (inside_box bottom top) [seq point e | e <- behead events] /\
+  close_edges_from_events (behead events) /\
+  {in behead events, forall e, out_left_event e} /\
+  close_alive_edges bottom top [:: op0] events  /\
+  valid_edge bottom (point (head (dummy_event _) events)) /\
+  valid_edge top (point (head (dummy_event _) events)) /\
+  open_cells_decomposition ([::] ++ [:: op0])
+        (point (head (dummy_event _) events)) =
+       ([::], [::], op0, [::], low op0, high op0) /\
+  {in bottom :: top :: s &, no_crossing R} /\
+  {in all_edges [:: op0] events &, no_crossing R} /\
+  pairwise (@edge_below _) (bottom :: [seq high c | c <- [:: op0]]) /\
+  sorted (@lexPtEv _) (behead events).
+Proof.
+move=> ltev boxwf startok nocs' evin lexev evsub out_evs cle.
+have nocs : {in bottom :: top :: s &, no_crossing R}.
+  by apply: inter_at_ext_no_crossing.
+case evsq : events => [ | ev future_events]; [by [] | move=> _ /=].
+set op0 := (start_open_cell bottom top).
+have op0sok : all open_cell_side_limit_ok ([::] ++ [::op0]).
+  by rewrite /= /op0 startok.
+have cbtom0 : cells_bottom_top bottom top [:: op0].
+  by rewrite /op0 /cells_bottom_top/cells_low_e_top/= !eqxx.
+have adj0: adjacent_cells [:: op0] by [].
+have sval0 : seq_valid [:: op0] (point ev).
+  move: evin; rewrite evsq /= => /andP[] /andP[] _ /andP[] ebot etop _.
+  have betW : forall a b c : R, a < b < c -> a <= b <= c.
+    by move=> a b c /andP[] h1 h2; rewrite !ltW.
+  by rewrite /= /valid_edge /= !betW.
+have rf0: s_right_form [:: op0] by rewrite /= boxwf.
+have inbox0 : all (inside_box bottom top) [seq point e | e <- future_events].
+  by move: evin; rewrite evsq map_cons /= => /andP[].
+have cle0 : close_edges_from_events future_events.
+  by move: cle; rewrite evsq /= => /andP[].
+have oute0 : {in future_events, forall e, out_left_event e}.
+  by move=> e ein; apply: out_evs; rewrite evsq inE ein orbT.
+have clae0 : close_alive_edges bottom top [:: op0] (ev :: future_events).
+  by rewrite /=/end_edge_ext !inE !eqxx !orbT.
+have noc0 : {in all_edges [:: op0] (ev :: future_events) &, no_crossing R}.
+  rewrite /=; move: nocs; apply sub_in2.
+  move=> x; rewrite -evsq !inE.
+  move=> /orP[ -> // | /orP[-> // | ]]; rewrite ?orbT //.
+  by move=> /evsub ->; rewrite !orbT.
+have [vb vt] : valid_edge bottom (point ev) /\ valid_edge top (point ev).
+  have /(allP sval0) : start_open_cell bottom top \in [:: op0].
+    by rewrite inE eqxx.
+  by rewrite /= => /andP[].
+have /andP[/andP[pal puh] _] : inside_box bottom top (point ev).
+   by apply:(allP evin); rewrite evsq map_f// inE eqxx.
+have : open_cells_decomposition [:: op0] (point ev) =
+  ([::], [::], op0, [::], bottom, top).
+  apply: (open_cells_decomposition_single
+           (isT : adjacent_cells ([::] ++ [:: op0])) rf0 sval0 pal puh).
+have pw0 : pairwise (@edge_below _) (bottom :: [seq high c | c <- [::op0]]).
+  by rewrite /= !andbT /=.
+have lexev0 : sorted (@lexPtEv _) future_events.
+  by move: lexev; rewrite evsq=> /path_sorted.
+do 15 (split; first by []).
+by [].
+Qed.
+
+Lemma initial_common_general_position_invariant bottom top s events:
+  sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) events ->
+  bottom <| top ->
+  (* TODO: rephrase this statement in a statement that easier to understand. *)
+  open_cell_side_limit_ok (start_open_cell bottom top) ->
+  {in bottom :: top :: s &, forall e1 e2, inter_at_ext e1 e2} ->
+  all (inside_box bottom top) [seq point e | e <- events] ->
+  sorted (@lexPtEv _) events ->
+  {subset flatten [seq outgoing e | e <- events] <= s} ->
+  {in events, forall ev, out_left_event ev} ->
+  close_edges_from_events events ->
+  events != [::] ->
+  common_general_position_invariant bottom top s
+    (initial_state bottom top events)
+    (head (dummy_event _) events) (behead events).
+Proof.
+move=> ltev boxwf startok nocs' evin lexev evsub out_evs cle evsn0.
+have :=
+  initial_intermediate ltev boxwf startok nocs' evin lexev evsub out_evs cle
+    evsn0.
+case evsq : events evsn0 => [ | ev future_events]; [by [] | move=> _].
+move=> [op0sok [cbtom0 [adj0 /=
+           [sval0 [rf0 [inbox0 [cle0 [oute0 [clae0 [vb 
+             [vt [oe [nocs [noc0 [pw0 lexev0]]]]]]]]]]]]]]].
+have evins : ev \in events by rewrite evsq inE eqxx.
+set op0 := start_open_cell bottom top.
+case oca_eq:  (opening_cells_aux _ _ _ _) => [nos lno].
+set w := Bscan _ _ _ _ _ _ _.
+have [state1 ] : exists state1, state1 = w by exists w.
+rewrite /w => {w} st1q.
+set cl0 := lst_closed state1.
+set ops0 := [::] ++ [:: op0].
+have evsin0 : all (inside_box bottom top) [seq point ev | ev <- events].
+  exact: evin.
+have oute : out_left_event ev by apply: out_evs.
+have oute' : {in sort (@edge_below _) (outgoing ev), forall g,
+                  left_pt g == point ev}.
+  by move=> g; rewrite mem_sort; apply: oute.
+have edges_sub1 : {subset all_edges (rcons nos lno) 
+        future_events <= [:: bottom, top & s]}.
+  move=> g; rewrite mem_cat=> /orP[ | gfut ]; last first.
+    have /evsub {}gfut : g \in events_to_edges events.
+      by rewrite evsq events_to_edges_cons mem_cat gfut orbT.
+    by rewrite !inE gfut; rewrite !orbT.
+  have := opening_cells_subset vb vt oute.
+  rewrite /opening_cells oca_eq=> main.
+  rewrite mem_cat=> /orP[] /mapP [c /main + ->] => /andP[]; rewrite !inE.
+    move=> /orP[-> | +] _; first by rewrite ?orbT.
+    move=> {}main; apply/orP; right; apply/orP; right.
+    by apply/evsub/flattenP; exists (outgoing ev); rewrite // map_f.
+  move=> _ /orP[-> |]; first by rewrite ?orbT.
+  move=> {}main; apply/orP; right; apply/orP; right.
+  by apply/evsub/flattenP; exists (outgoing ev); rewrite // map_f.
+have pin : inside_box bottom top (point ev).
+  by apply: (allP evin); rewrite evsq /= inE eqxx.
+have inbox_all_events0 :
+  all (inside_box bottom top) [seq point x | x <- (ev :: future_events)].
+  by move: evin; rewrite evsq.
+have evlexfut : path (@lexPtEv _) ev future_events.
+  by move: lexev; rewrite evsq.
+have rf0' : s_right_form ([::] ++ [:: start_open_cell bottom top]) by [].
+have cle0' : close_edges_from_events (ev :: future_events) by rewrite -evsq.
+have := invariant1_default_case
+          inbox_all_events0 oute rf0' cbtom0 adj0 sval0 cle0' clae0 noc0
+          evlexfut.
+rewrite oe oca_eq /=.
+move=> /[dup] inv1 -[] clae1 [] sval' [] adj1 [] cbtom1 rf1.
+have rl0 : {in [::], forall c : cell, right_limit c <= p_x (point ev)} by [].
+have cl0q : cl0 = close_cell (point ev) op0 by rewrite /cl0 st1q.
+rewrite -cats1 in edges_sub1 sval'.
+have lstx1op : lst_x state1 = left_limit (lst_open state1).
+  have := opening_cells_left oute vb vt; rewrite /opening_cells.
+  by rewrite oca_eq st1q => -> //=; rewrite mem_rcons inE eqxx.
+have sh1 : all (fun ev => lst_x state1 < p_x (point ev)) future_events &&
+          sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) future_events.
+  move: ltev; rewrite evsq /= path_sortedE /=; last first.
+    by move=> x y z; apply: lt_trans. 
+  by rewrite st1q.
+have he1q' : high (lst_open state1) = lst_high state1.
+  rewrite st1q /=.
+  by have := opening_cells_aux_high_last vb vt oute'; rewrite oca_eq.
+move: lstx1op he1q' sh1; rewrite st1q=> lstx1op he1q' sh1.
+have oks1 : all open_cell_side_limit_ok (nos ++ [:: lno]).
+  have := pin => /andP[] /andP[] /underWC pal puh _.
+  have := opening_cells_side_limit vb vt pal puh oute.
+  by rewrite /opening_cells oca_eq cats1.
+by constructor.
+Qed.
+
 Lemma initial_disjoint_general_position_invariant
     bottom top s events:
    sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) events ->
@@ -5937,179 +6110,45 @@ Lemma initial_disjoint_general_position_invariant
    (initial_state bottom top events)
    (head (dummy_event _) events) (behead events).
 Proof.
-move=> ltev boxwf startok nocs' evin lexev evsub out_evs cle.
-have nocs : {in bottom :: top :: s &, no_crossing R}.
-  by apply: inter_at_ext_no_crossing.
-rewrite /start.
-case evsq : events => [ | ev future_events]; first by [].
-move=> _.
+move=> ltev boxwf startok nocs' evin lexev evsub out_evs cle evsn0.
+have := initial_common_general_position_invariant ltev boxwf startok
+  nocs' evin lexev evsub out_evs cle evsn0.
+have := initial_intermediate ltev boxwf startok nocs' evin lexev evsub
+   out_evs cle evsn0.
+move: evsn0; case evsq : events => [ | ev evs];[by [] | move=> _].
+lazy zeta; rewrite [head _ _]/= [behead _]/=.
+move=> -[] op0sok [cbtom0 [adj0 [sval0 [rf0 [inbox0 
+[cle0 [oute0 [clae0 [vb [vt [oe [nocs [noc0 [pw0 lexev0]]]]]]]]]]]]]].
 have evins : ev \in events by rewrite evsq inE eqxx.
-rewrite /initial_state.
-have [op0 op0q] : exists op0, op0 = start_open_cell bottom top.
-  by exists (start_open_cell bottom top).
-case oca_eq:  (opening_cells_aux _ _ _ _) => [nos lno].
-set w := Bscan _ _ _ _ _ _ _.
-have [state1 ] : exists state1, state1 = w by exists w.
-rewrite /w => {w} st1q.
-set cl0 := lst_closed state1.
-set ops0 := [::] ++ [:: op0].
-have op0sok : all open_cell_side_limit_ok ([::] ++ [::op0]).
-  by rewrite /= op0q startok.
-have cbtom0 : cells_bottom_top bottom top ops0.
-  by rewrite /ops0 op0q /cells_bottom_top/cells_low_e_top/= !eqxx.
-have adj0: adjacent_cells ops0 by rewrite /ops0 op0q.
-have rf0: s_right_form ops0 by rewrite /ops0 op0q /= boxwf.
-have clae0 : close_alive_edges bottom top ops0 (ev :: future_events).
-  by rewrite /ops0 op0q /=/end_edge_ext !inE !eqxx !orbT.
-have noc0 : {in all_edges ops0 (ev :: future_events) &, no_crossing R}.
-  rewrite /=; move: nocs; apply sub_in2.
-  move=> x; rewrite /ops0 op0q -evsq !inE.
-  move=> /orP[ -> // | /orP[-> // | ]]; rewrite ?orbT //.
-  by move=> /evsub ->; rewrite !orbT.
-have evsin0 : all (inside_box bottom top) [seq point ev | ev <- events].
-  exact: evin.
-have sval0 : seq_valid ops0 (point ev).
-  move: evsin0; rewrite evsq /= => /andP[] /andP[] _ /andP[] ebot etop _.
-  have betW : forall a b c : R, a < b < c -> a <= b <= c.
-    by move=> a b c /andP[] h1 h2; rewrite !ltW.
-  by rewrite op0q /= /valid_edge /= !betW.
-have [vb vt] : valid_edge bottom (point ev) /\ valid_edge top (point ev).
-  have /(allP sval0) : start_open_cell bottom top \in ops0.
-    by rewrite /ops0 op0q inE eqxx.
-  by rewrite /= => /andP[].
-have oute : out_left_event ev by apply: out_evs.
-have oute' : {in sort (@edge_below _) (outgoing ev), forall g,
-                  left_pt g == point ev}.
-  by move=> g; rewrite mem_sort; apply: oute.
-have edges_sub1 : {subset all_edges (rcons nos lno) 
-        future_events <= [:: bottom, top & s]}.
-  move=> g; rewrite mem_cat=> /orP[ | gfut ]; last first.
-    have /evsub {}gfut : g \in events_to_edges events.
-      by rewrite evsq events_to_edges_cons mem_cat gfut orbT.
-    by rewrite !inE gfut; rewrite !orbT.
-  have := opening_cells_subset vb vt oute; rewrite /opening_cells oca_eq=> main.
-  rewrite mem_cat=> /orP[] /mapP [c /main + ->] => /andP[]; rewrite !inE.
-    move=> /orP[-> | +] _; first by rewrite ?orbT.
-    move=> {}main; apply/orP; right; apply/orP; right.
-    by apply/evsub/flattenP; exists (outgoing ev); rewrite // map_f.
-  move=> _ /orP[-> |]; first by rewrite ?orbT.
-  move=> {}main; apply/orP; right; apply/orP; right.
-  by apply/evsub/flattenP; exists (outgoing ev); rewrite // map_f.
-have pin : inside_box bottom top (point ev).
-  by apply: (allP evsin0); rewrite evsq /= inE eqxx.
-have right_lims0 :
-    {in events & [:: cl0], forall ev c, right_limit c  <= p_x (point ev)}.
-  have it := @right_limit_close_cell _ (start_open_cell bottom top) vb vt.
-  move=> ev' ? ev'in; rewrite inE /cl0/= => /eqP ->.
-  rewrite st1q /= it; apply/lexePt_xW.
-  move: ev'in; rewrite evsq inE => /orP[/eqP ->|]; first by apply: lexePt_refl.
-  move=> ev'in; apply/lexPtW.
-  move: lexev; rewrite evsq /= path_sortedE; last by apply: lexPtEv_trans.
-  by move=> /andP[] /allP + _; apply.
-have inbox_all_events0 :
-  all (inside_box bottom top) [seq point x | x <- (ev :: future_events)].
-  by move: evin; rewrite evsq.
-have := cle; rewrite evsq=> cle0.
-have [pal puh]: point ev >>> low op0 /\ point ev <<< high op0.
-  by move: pin=> /andP[] /andP + _; rewrite op0q.
-have lop0q : low op0 = bottom by rewrite op0q.
-have hop0q : high op0 = top by rewrite op0q.
-have evlexfut : path (@lexPtEv _) ev future_events.
-  by move: lexev; rewrite evsq.
-have oe := open_cells_decomposition_single adj0 rf0 sval0 pal puh.
-have := invariant1_default_case
-          inbox_all_events0 oute rf0 cbtom0 adj0 sval0 cle0 clae0 noc0
-          evlexfut.
-rewrite oe lop0q hop0q oca_eq /=.
-move=> /[dup] inv1 -[] clae1 [] sval' [] adj1 [] cbtom1 rf1.
-have oks0 : all open_cell_side_limit_ok ops0.
-  by move: startok; rewrite /ops0 op0q /= andbT.
-have op0_cl0_dis : {in ops0 & [::], disjoint_open_closed_cells R} by [].
+rewrite /initial_state /state_open_seq/state_closed_seq/= => Cinv.
+case oca_eq:  (opening_cells_aux _ _ _ _) Cinv => [nos lno] Cinv.
+move: (Cinv)=> -[]; rewrite /state_open_seq/state_closed_seq/=.
+move=> inv1 pxe hlno edges_sub1 cle1 oute1 inbox1 lexevs sok1 gen_pos.
+set op0 := start_open_cell bottom top.
+have op0_cl0_dis : {in [:: op0] & [::], disjoint_open_closed_cells R} by [].
+have inbox0' : all (inside_box bottom top) [seq point e | e <- ev :: evs].
+  by rewrite -evsq.
 have cl0_dis : {in [::] &, disjoint_closed_cells R} by [].
 have rl0 : {in [::], forall c : cell, right_limit c <= p_x (point ev)} by [].
-have pw0 : pairwise (@edge_below _) (bottom :: [seq high c | c <- ops0]).
-  by rewrite /= !andbT op0q /=.
 have := @step_keeps_disjoint_default bottom top ev [::]
-            op0 [::] future_events inbox_all_events0 oute rf0 cbtom0 adj0
-            sval0 pw0 oks0 [::] op0_cl0_dis cl0_dis rl0.
-rewrite oe lop0q hop0q oca_eq /= => -[] cl1_dis op1_cl1_dis.
-have [he1 he1q] : exists g, g = top by exists top.
-have [le1 le1q] : exists g, g = bottom by exists bottom.
-have [lstx1 lstx1q] : exists x, x = p_x (point ev) by exists (p_x (point ev)).
-have cl0q : cl0 = close_cell (point ev) op0 by rewrite /cl0 st1q op0q.
-rewrite -cl0q in rf1 adj1 cbtom1 clae1 op1_cl1_dis.
-rewrite -cats1 in edges_sub1 sval'.
-have lnoin : lno \in rcons nos lno by rewrite mem_rcons inE eqxx.
-have lstx1op : lstx1 = left_limit lno.
-  have := opening_cells_left oute vb vt; rewrite /opening_cells.
-  by rewrite oca_eq=> /(_ _ lnoin) ->.
-have : state1 = {| sc_open1 := nos; lst_open := lno; sc_open2 := [::];
-        sc_closed := [::]; lst_closed := cl0; lst_high := he1; lst_x := lstx1 |}.
-  by rewrite /cl0 st1q /= he1q lstx1q.
-move: op1_cl1_dis cl1_dis.
-rewrite -cl0q.
-move=> op1_cl1_dis cl1_dis.
-rewrite -st1q => ->.
-have he1q' : high lno = he1.
-  rewrite he1q. 
-  by have := opening_cells_aux_high_last vb vt oute'; rewrite oca_eq.
-have sh1 : all (fun ev => lstx1 < p_x (point ev)) future_events &&
-          sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) future_events.
-  move: ltev; rewrite evsq /= path_sortedE /=; last first.
-    by move=> x y z; apply: lt_trans. 
-  by rewrite lstx1q.  
-have cle1 : close_edges_from_events future_events.
-  by move: cle0=> /= /andP[].
-have out_fut : {in future_events, forall e',  out_left_event e'}.
-  by move=> e' e'in; apply: out_evs; rewrite evsq inE e'in orbT.
-have evin' : {in events, forall e, inside_box bottom top (point e)}.
-  by move=> e ein; apply/(allP evin)/map_f.
-have inbox_all_edges1 : all (fun g => (g \in [:: bottom; top]) ||
-                  (inside_box bottom top (left_pt g) &&
-                 inside_box bottom top (right_pt g)))
-               (cell_edges (nos ++ [:: lno])).
-  apply/allP=> /= g.
-  have := opening_cells_subset vb vt oute.
-  rewrite /opening_cells oca_eq=> opsub.
-  rewrite mem_cat=> /orP[]/mapP[c]; rewrite cats1=> /opsub/andP[] cin1 cin2 ->.
-    move: cin1; rewrite inE=> /orP[/eqP -> | ]; first by rewrite !inE eqxx ?orbT.
-    move=> lowcnew; apply/orP; right.
-    move: inbox_all_events0=> /andP[] + _.
-    move: (oute _ lowcnew)=> /eqP -> -> /=.
-    have := cle0=> /= /andP[] /allP /(_ _ lowcnew) + _; rewrite /end_edge.
-    move=> /= /hasP[] e' e'in /eqP ->.
-    by apply: evin'; rewrite evsq inE e'in orbT.
-  move: cin2; rewrite inE=> /orP[/eqP -> | ]; first by rewrite !inE eqxx ?orbT.
-  move=> highcnew; apply/orP; right.
-  move: inbox_all_events0=> /= /andP[] + _.
-  move: (oute _ highcnew)=> /eqP -> -> /=.
-  have := cle0=> /= /andP[] /allP /(_ _ highcnew) + _; rewrite /end_edge.
-  move=> /= /hasP[] e' e'in /eqP ->.
-  by apply: evin'; rewrite evsq inE e'in orbT.
-have inbox_all_events1 :
-        all (inside_box bottom top) [seq point x | x <- future_events].
-  by have := inbox_all_events0=> /= /andP[].
-have lexev1 : sorted (@lexPtEv _) (future_events).
-  by have := lexev; rewrite evsq /= => /path_sorted.
+            op0 [::] evs inbox0' (out_evs _ evins) rf0 cbtom0 adj0
+            sval0 pw0 op0sok [::] op0_cl0_dis cl0_dis rl0.
+  rewrite oe oca_eq /= => -[] cl_dis1 op_cl_dis1.
 have pw1 : pairwise (@edge_below _)
      (bottom:: [seq high c | c <- (nos ++ [:: lno ])]).
-  have := step_keeps_pw_default inbox_all_events0 oute rf0 cbtom0 adj0
+  have rf0' : s_right_form ([::] ++ [:: op0]) by [].
+  have := step_keeps_pw_default inbox0' (out_evs _ evins) rf0' cbtom0 adj0
     sval0 noc0 pw0.
-  by rewrite oe lop0q hop0q oca_eq /= => ->.
-have oks1 : all open_cell_side_limit_ok (nos ++ [:: lno]).
-  have := pal => /underWC; rewrite lop0q => pal'.
-  have := puh; rewrite hop0q=> puh'.
-  have := opening_cells_side_limit vb vt pal' puh' oute.
-  by rewrite /opening_cells oca_eq cats1.
-have rl_closed1 : {in [:: cl0] & future_events,
+  by rewrite oe oca_eq.
+have rl_closed1 : {in [:: close_cell (point ev) op0] & evs,
   forall c e, right_limit c <= p_x (point e)}.
-  have vho : valid_edge (high op0) (point ev) by rewrite op0q /= vt.
-  have vlo : valid_edge (low op0) (point ev) by rewrite op0q /= vb.
+  have vho : valid_edge (high op0) (point ev) by []. 
+  have vlo : valid_edge (low op0) (point ev) by [].
   have := right_limit_close_cell vlo vho=> rlcl0 c e.
   rewrite inE=> /eqP ->.
   move: lexev; rewrite evsq /= path_sortedE; last by apply: lexPtEv_trans.
   move=> /andP[] + _=> /allP /[apply].
-  rewrite cl0q rlcl0=> /orP[]; first by move/ltW.
+  rewrite rlcl0=> /orP[]; first by move/ltW.
   by move=> /andP[] /eqP -> _; apply: le_refl.
 by constructor.
 Qed.
@@ -6153,13 +6192,12 @@ move=> {evs ltev evin lexev evsub out_evs cle evsn0}.
 move=> [fop lsto lop cls lstc lsthe lstx].
 case; set ops' := (state_open_seq _); set (cls' := state_closed_seq _).
 rewrite /=.
-move=> dis_open_closed dis_cl inv1 sval' lstxq lstheq edges_sub.
+move=> dis_open_closed dis_cl [] inv1 lstxq lstheq edges_sub.
 move=> /[dup] cle /andP[cl_e_fut' cle'] out_fut'.
-move=> /[dup]  inbox_all_events' /andP[inbox_e inbox_all_events].
-move=> lexevs edges_pairwise oks cl_at_left.
-move=> /andP[] /andP[] lstxlte lstx_fut' ltfut'.
+move=> /[dup]  inbox_all_events' /andP[inbox_e inbox_all_events] lexevs oks.
+move=> /andP[] /andP[] lstxlte lstx_fut' ltfut' edges_pairwise cl_at_left.
 move: (inv1)=> [] clae [] pre_sval [] adj [] cbtom rfo.
-have {sval'}sval : seq_valid (fop ++ lsto :: lop) (point ev') by case: sval'.
+have sval : seq_valid (fop ++ lsto :: lop) (point ev') by case: pre_sval.
 rewrite /=/simple_step; case: ifP=> [_ | ]; last first.
   move=> /negbFE; rewrite eq_sym=> /eqP abs; suff: False by [].
   by move : lstxlte; rewrite abs lt_irreflexive.
@@ -6226,7 +6264,8 @@ have out_evs' : {in fut', forall e, out_left_event e}.
   by move=> e ein; apply: out_fut'; rewrite inE ein orbT.
 have gen_case' : all (fun e => p_x (point ev') <  p_x (point e)) fut' &&
                   sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) fut'.
-  by move: ltfut'; rewrite path_sortedE; last (move=> x y z; apply: lt_trans).
+  move: ltfut'.
+  by rewrite /= path_sortedE; last (move=> x y z; apply: lt_trans).
 have pwo' : pairwise (@edge_below _)
            (bottom :: [seq high c | c <- (fc ++ nos) ++ lno :: lc]).
   have := step_keeps_pw_default inbox_all_events' oute_rec rfo cbtom adj sval
@@ -6245,28 +6284,18 @@ Qed.
 
 Record edge_covered_general_position_invariant (bottom top : edge)
  (edge_set covered_set : seq edge)
- (s : scan_state) (future_events : seq event) :=
- { inv1_ec : inv1_seq bottom top future_events (state_open_seq s);
-   edges_sub_ec : {subset all_edges (state_open_seq s) future_events <=
-                    bottom :: top :: edge_set};
-    non_in_ec : 
+ (s : scan_state) (ev : event) (future_events : seq event) :=
+ { edge_covered_ec : {in covered_set, forall g,
+       edge_covered g (state_open_seq s) (state_closed_seq s)};
+   common_inv_ec : common_general_position_invariant bottom top edge_set
+     s ev future_events;
+   non_in_ec : 
       {in edge_set & future_events, forall g e, non_inner g (point e)};
-   out_events_ec : {in future_events, forall e, out_left_event e};
-   inbox_events_ec : 
-       all (inside_box bottom top) [seq point x | x <- future_events];
-   sides_ok_ec : all open_cell_side_limit_ok (state_open_seq s);
-   cle_ec : close_edges_from_events future_events;
-   lexev_ec : sorted (@lexPtEv _) future_events;
    uniq_ec : {in future_events, forall e, uniq (outgoing e)};
    inj_high : {in state_open_seq s &, injective (@high _)};
    bot_left_cells : 
        {in state_open_seq s & future_events, 
           forall c e, lexPt (bottom_left_corner c) (point e)};
-   general_pos_ec :
-     all (fun ev => lst_x s < p_x (point ev)) future_events &&
-     sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) future_events;
-   edge_covered_ec : {in covered_set, forall g,
-     edge_covered g (state_open_seq s) (state_closed_seq s)}
    }.
 
 Lemma in_cell_edges_has_cell (s : seq cell) (g : edge) :
@@ -6312,7 +6341,8 @@ Lemma initial_edge_covering_general_position
   events != [::] ->
   edge_covered_general_position_invariant bottom top s
    (outgoing (head (@dummy_event _) events))
-   (initial_state bottom top events) (behead events).
+   (initial_state bottom top events) (head (@dummy_event _) events)
+       (behead events).
 Proof.
 move=> gen_pos lexev wf cle startok nocs n_inner inbox_es sub_es out_es 
   uniq_out_es evsn0.
@@ -6415,6 +6445,7 @@ have cov1 : {in outgoing e, forall g, (edge_covered g (nos ++ [:: lno])
   rewrite startok => /(_ isT [::] _ _ _ _ _ _ _ _ oe0 oca_eq).
   move=> main g gin.
   by apply: main; right.
+constructor=> //.
 constructor=> //.
 Qed.
 
