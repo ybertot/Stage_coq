@@ -6691,6 +6691,55 @@ Lemma events_to_edges_rcons evs (e : event) :
   events_to_edges (rcons evs e) = events_to_edges evs ++ outgoing e.
 Proof. by rewrite /events_to_edges /= map_rcons flatten_rcons. Qed.
 
+Lemma close_cell_in p c :  
+  valid_cell c p ->
+  p \in right_pts (close_cell p c).
+Proof.
+move=> [] vl vh.
+rewrite /close_cell; rewrite (pvertE vl) (pvertE vh) /=.
+by case: ifP=> [/eqP <- | ]; 
+  case: ifP=> [/eqP <- // | _ ]; rewrite !inE eqxx ?orbT.
+Qed.
+
+Lemma opening_cell_in e le he :
+   valid_edge le (point e) -> valid_edge he (point e) ->
+   out_left_event e ->
+   {in opening_cells (point e) (outgoing e) le he,
+     forall c, (point e) \in left_pts c}.
+Proof.
+move=> vl vh oute; rewrite /opening_cells.
+have oute' : 
+ {in sort (@edge_below _) (outgoing e), forall g, left_pt g == point e}.
+  by move=> g; rewrite mem_sort; apply: oute.
+move: oute' {oute} ; elim: (sort _ _) le vl => [ | g gs Ih] le vl.
+  move=> _; rewrite /= (pvertE vl) (pvertE vh) /=.
+  move=> c; rewrite inE => /eqP ->.
+  by case: ifP=> [/eqP <- | ]; 
+    case: ifP=> [/eqP <- // | _ ]; rewrite !inE eqxx ?orbT.
+rewrite /= => oute.
+case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+have vg : valid_edge g (point e).
+  rewrite -(eqP (oute g _)); last by rewrite inE eqxx.
+  by apply: valid_edge_left.
+have outegs : {in gs, forall g, left_pt g == point e}.
+  by move=> g' g'in; apply: oute; rewrite inE g'in orbT.
+move=> c; rewrite (pvertE vl) mem_rcons inE=> /orP[/eqP -> | ].
+  apply: (Ih g vg outegs).
+  by rewrite oca_eq; rewrite mem_rcons inE eqxx.
+rewrite inE=> /orP[/eqP -> /= | cin]; last first.
+  apply: (Ih g vg outegs).
+  by rewrite oca_eq; rewrite mem_rcons inE cin orbT.
+case: ifP=> [/eqP <- | ]; first by rewrite inE eqxx.
+by rewrite inE eqxx.
+Qed.
+
+Lemma valid_open_limit (c : cell) p  :
+  valid_edge (low c) p -> valid_edge (high c) p -> p_x p <= open_limit c.
+Proof.
+move=> /andP[] _ lp /andP[] _ hp; rewrite /open_limit.
+by have [A | B] := lerP (p_x (right_pt (low c))) (p_x (right_pt (high c))).
+Qed.
+
 Lemma start_safe_sides bottom top s closed open evs :
   sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) evs ->
   bottom <| top ->
@@ -6753,7 +6802,7 @@ elim=> [ | {evsq oca_eq istate invss}ev {req}future_events Ih] op cl st p_set.
 move=> [] d_inv e_inv lolt rllt clok rl A B C D.
 set c_inv := common_inv_dis d_inv.
 simpl [scan]; rewrite /step.
-case stq : st => [fop lsto lop cls lstc lsthe lstx] [].
+case stq : st => [fop lsto lop cls lstc lsthe lstx].
 have /andP[/andP[+ _] _] := general_pos c_inv.
 rewrite lt_neqAle=> /andP[] + _.
 rewrite stq eq_sym /= => ->.
@@ -6862,9 +6911,120 @@ move: cin; rewrite -cats1 -catA /= -cat_rcons mem_cat=> /orP[cold | cnew].
     by rewrite /in_safe_side_right => /andP[] /eqP -> _.
   rewrite /in_safe_side_left=> /andP[] /eqP -> _.
   by apply/ltW/rllt.
+move: cnew pin; rewrite cats1 /closing_cells -map_rcons.
+move=> /mapP[c' c'in ->].
+have c'in' : c' \in state_open_seq st.
+  by rewrite ocd -cat_rcons !mem_cat c'in orbT.
+move=> /orP[ | pin].
+  move=> /andP[]; rewrite left_limit_close_cell=> pl pdif.
+  have pin' : in_safe_side_left p c'.
+    rewrite /in_safe_side_left pl.
+    move: pdif.
+    by have [-> -> ->] := close_cell_preserve_3sides (point ev) c' => ->.
+  move: gin; rewrite mem_cat=> /orP[gin | ].
+    by apply: B pin'.
+  move=> /oute /eqP lgq /andP[] _ /andP[]; rewrite lgq leNgt=> /negP[].
+  by rewrite (eqP pl); apply: lolt; rewrite // inE eqxx.
+have vc' : valid_cell c' (point ev) by apply/andP/(allP sval).
+have samex : p_x p == p_x (point ev).
+  by move: pin=> /andP[] + _; rewrite close_cell_right_limit.
+move: gin; rewrite mem_cat=> /orP[gin | /oute/eqP lgq ]; last first.
+  have peg : point ev === g by rewrite -lgq left_on_edge.
+  move: pin=> /andP[/eqP pxq /andP[] _ /andP[] _ it] abs.
+  have samey := on_edge_same_point abs peg samex.
+  move: it=> /negP; apply.
+  have -> : p = point ev by apply/eqP; rewrite pt_eqE samex samey.
+  by rewrite close_cell_in.
+have := edge_covered_ec e_inv gin=> -[]; last first.
+  move=> [[ | pcc0 pcc] []]; first by []. 
+  move=> _ /= [pccsub [pcchigh [_ [_ rlpcc]]]] /andP[] _ /andP[] _.
+  rewrite leNgt=> /negP; apply.
+  rewrite (eqP samex).
+  rewrite -rlpcc; apply:rl; last by rewrite inE eqxx.
+  by apply/pccsub; rewrite /last_cell /= mem_last.
+move=> [] opc [] pcc [] _ [] opch [] _ [] opco _ abs.
+have [vlc'p vhc'p] : valid_edge (low c') p /\ valid_edge (high c') p.
+  by move: vc'; rewrite /valid_cell !(same_x_valid _ samex).
+have pinc' : contains_point' p c'.
+  rewrite /contains_point'.
+  have [<- <- _] := close_cell_preserve_3sides (point ev) c'.
+  by have /andP[_ /andP[] /underW -> /andP[] ->] := pin.
+have {}opch : high opc = g by apply: opch; rewrite mem_rcons inE eqxx.
+have [vplc vphc] : valid_edge (low opc) p /\ valid_edge (high opc) p.
+  by rewrite !(same_x_valid _ samex); apply/andP/(allP sval).
+have rfc : low opc <| high opc by apply: (allP rfo).
+have cnt : contains_point p opc.
+  apply/andP; rewrite under_onVstrict; last first.
+    by have := (allP sval _ opco) => /andP[].
+  rewrite opch abs; split; last by [].
+  apply/negP=> pun.
+  have := order_edges_strict_viz_point' vplc vphc rfc pun.
+  by apply/negP/onAbove; rewrite opch.
+have pw : pairwise (@edge_below _) [seq high c | c <- state_open_seq st].
+  by move: (pairwise_open d_inv)=> /= /andP[].
+have [puhc' palc'] : p <<< high c' /\ p >>> low c'.
+  apply/andP;  move: pin=> /andP[] _ /andP[] + /andP[] + _.
+  by have [-> -> _] := close_cell_preserve_3sides (point ev) c' => ->.
+have : p >>= low opc by move: cnt=> /andP[].
+rewrite strict_nonAunder // negb_and negbK=> /orP[ | stricter]; last first.
+  have := disoc adj pw (sides_ok c_inv)=> /(_ opc c' opco c'in') [ab' | ].
+    by move: puhc'; rewrite strict_nonAunder // -ab' opch abs.
+  move=> /(_ p) + ; move=>/negP.
+  rewrite inside_open'E stricter valid_open_limit // (proj2 (andP cnt)).
+  rewrite (eqP samex) lolt //=; last by rewrite inE eqxx.
+  rewrite inside_open'E (underW puhc') palc' valid_open_limit //.
+  by rewrite (eqP samex) lolt // inE eqxx.
+move=> ponl.
+have ldifh : low opc != high opc.
+  have  [s1 [s2]] := mem_seq_split opco.
+  elim/last_ind: s1 => [ | s1 op' _] /= => odec.
+    have pab : p >>> bottom by admit.
+    have blo : bottom = low opc by admit.
+    by move: pab; rewrite -blo under_onVstrict blo // ponl.
+  have diff : high op' != high opc by admit.
+  have same : high op' = low opc by admit.
+  by rewrite -same.
+have low_opc_s : low opc \in [:: bottom, top & s].
+  by apply: (edges_sub c_inv); rewrite !mem_cat map_f.
+have high_opc_s : high opc \in [:: bottom, top & s].
+  by apply: (edges_sub c_inv); rewrite !mem_cat map_f ?orbT.
+have := nocs' (low opc) (high opc) low_opc_s high_opc_s.
+move=> [Q | ]; first by rewrite Q eqxx in ldifh.
+have ponh : p === high opc by rewrite opch.
+have opcok : open_cell_side_limit_ok opc by apply: (allP (sides_ok c_inv)).
+move=> /(_ _ ponl ponh); rewrite !inE=> /orP[]/eqP.
+  move=> pleft.
+  have : left_limit opc < p_x p.
+    by rewrite (eqP samex); apply: lolt; rewrite // inE eqxx.
+  have := left_limit_max opcok.
+  have [_ | ] := lerP (p_x (left_pt (high opc)))(p_x (left_pt (low opc))).
+    by move=> /le_lt_trans /[apply]; rewrite pleft lt_irreflexive.
+  move=> /lt_le_trans /[apply]=> /lt_trans /[apply].
+  by rewrite pleft lt_irreflexive.
+(* Here p is vertically aligned with p_x, but it must be an event,
+   because it is the end of an arrow. *)
+move=> prl.
+have := (allP clae _ opco)=> /andP[] + _ => /orP[].
+  (* low opc cannot be in [:: bottom; top], why? *) admit.
+move=> /hasP[e' + /eqP pe']; rewrite inE=> /orP[/eqP e'ev | ].
+  (* if e' cannot be ev, because p cannot be ev because of pin *)
+  admit.
+(* if e' is in future_events, then e' and p cannot have the same p_x,
+  because e' and ev don't, but p and e' are at the same point *)
+Fail.
+
+(* if opc <> c', then we must have
+   contains_point p opc and ~contains_point' p opc, 
+   then p_x p = p_x ev = left_limit opc, contradiction. *)
+(* if opc = c', then p <<< high c' = high opc, c'est contradictoire
+   avec p === g (through opch : high opc = g *)
+
+move: opco; rewrite ocd -cat_rcons !mem_cat orbCA=> /orP[ | cout]; last first.
+  move: cout=> /orP[/allnct | ].
   
   
-(*
+(*  
+
 Lemma start_cover (bottom top : edge) (s : seq edge) closed open :
   bottom <| top ->
   open_cell_side_limit_ok (start_open_cell bottom top) ->
