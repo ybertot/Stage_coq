@@ -6504,7 +6504,6 @@ Qed.
 Lemma simple_step_edge_covered_general_position
   bottom top s cov_set fop lsto lop fc cc lcc lc le he cls lstc ev
   lsthe lstx evs :
-  sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) evs ->
   bottom <| top ->
   {in bottom :: top :: s &, forall e1 e2, inter_at_ext e1 e2} ->
   {in s, forall g, inside_box bottom top (left_pt g) &&
@@ -6518,7 +6517,7 @@ Lemma simple_step_edge_covered_general_position
     (cov_set ++ outgoing ev) (simple_step fc cc lc lcc le he cls lstc ev)
     evs.
 Proof.
-move=> ltev boxwf nocs' inbox_s.
+move=> boxwf nocs' inbox_s.
 have nocs : {in bottom :: top :: s &, no_crossing R}.
   by apply: inter_at_ext_no_crossing.
 set st := Bscan _ _ _ _ _ _ _.
@@ -6650,33 +6649,30 @@ rewrite lt_neqAle eq_sym => /andP[] lstxneq _.
 rewrite stq /=in lstxneq; rewrite lstxneq.
 case oe : (open_cells_decomposition _ _) => [[[[[fc cc] lcc] lc] le] he].
 move: (inv0); rewrite stq=> inv1.
-move: (general_pos (common_inv_ec inv0)) => /andP[] _ /path_sorted ltev'.
-by have := simple_step_edge_covered_general_position ltev' boxwf nocs'
+by have := simple_step_edge_covered_general_position boxwf nocs'
     inbox_s oe inv1.
 Qed.
 
 Record safe_side_general_position_invariant (bottom top : edge)
  (edge_set : seq edge) (processed_set : seq event)
- (s : scan_state) (future_events : seq event) :=
- { inv1_ss : inv1_seq bottom top future_events (state_open_seq s);
-   edges_sub_ss : {subset all_edges (state_open_seq s) future_events <=
-                    bottom :: top :: edge_set};
-    non_in_ss : 
-      {in edge_set & future_events, forall g e, non_inner g (point e)};
-   out_events_ss : {in future_events, forall e, out_left_event e};
-   inbox_events_ss : 
-       all (inside_box bottom top) [seq point x | x <- future_events];
-   sides_ok_ss : all open_cell_side_limit_ok (state_open_seq s);
-   cle_ss : close_edges_from_events future_events;
-   lexev_ss : sorted (@lexPtEv _) future_events;
-   uniq_ss : {in future_events, forall e, uniq (outgoing e)};
-   inj_high_ss : {in state_open_seq s &, injective (@high _)};
-   bot_left_cells_ss : 
-       {in state_open_seq s & future_events, 
-          forall c e, lexPt (bottom_left_corner c) (point e)};
-   general_pos_ss :
-     all (fun ev => lst_x s < p_x (point ev)) future_events &&
-     sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) future_events;
+ (s : scan_state) (events : seq event) :=
+ { disjoint_ss :
+     disjoint_general_position_invariant bottom top edge_set s events;
+   covered_ss :
+     edge_covered_general_position_invariant bottom top edge_set
+       (events_to_edges processed_set) s events;
+   (* TODO : move this to the common invariant. *)
+   left_o_lt :
+        {in state_open_seq s & events, 
+          forall c e, left_limit c < p_x (point e)};
+   closed_lt : 
+        {in state_closed_seq s, forall c, left_limit c < right_limit c};
+   closed_ok :
+        all (@closed_cell_side_limit_ok R) (state_closed_seq s);
+   (* TODO : move this to the disjoint invariant. *)
+   cl_at_left_ss :
+     {in state_closed_seq s & events, 
+        forall c e, right_limit c < p_x (point e)};
    safe_side_closed_edges :
      {in events_to_edges processed_set & state_closed_seq s, forall g c p,
          in_safe_side_left p c || in_safe_side_right p c -> ~ p === g};
@@ -6689,8 +6685,11 @@ Record safe_side_general_position_invariant (bottom top : edge)
    safe_side_open_points :
      {in processed_set & state_open_seq s, forall e c p,
          in_safe_side_left p c -> p != point e};
+}.
 
-  }.
+Lemma events_to_edges_rcons evs (e : event) :
+  events_to_edges (rcons evs e) = events_to_edges evs ++ outgoing e.
+Proof. by rewrite /events_to_edges /= map_rcons flatten_rcons. Qed.
 
 Lemma start_safe_sides bottom top s closed open evs :
   sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) evs ->
@@ -6736,23 +6735,135 @@ suff main: forall events op cl st processed_set,
          {in events_to_edges (processed_set ++ events), forall g, ~ p === g} /\
          {in processed_set ++ events, forall e', p != point e'}}.
   have [A B] := main _ _ _ _ _ invss req.
- by move=> c cin p pside; have := A c cin p pside.
+  by move=> c cin p pside; have := A c cin p pside.
 elim=> [ | {evsq oca_eq istate invss}ev {req}future_events Ih] op cl st p_set.
-  case stq : st => [fop lsto lop cls lstc lsthe lstx] /= [].
-  rewrite /state_open_seq/state_closed_seq /=.
-  move=> inv2 sub_edges _ _ _ sok _ _ _ inj_high _ _.
-  move=> main_closed_edges main_open_edges main_closed_points main_open_points.
-  move=> -[] <- <-.
-  rewrite cats0; split; move=> c cin p pin; split.
-        move=> g gin.
-        by apply: (main_closed_edges g c gin); rewrite // mem_rcons.
-      move=> e ein.
-      by apply: (main_closed_points e c ein); rewrite // mem_rcons.
-    move=> g gin.
-    by apply: (main_open_edges g c gin); rewrite //.
-  by move=> e ein; apply: (main_open_points e c ein); rewrite //.
-
-
+  case stq : st => [fop lsto lop cls lstc lsthe lstx] [].
+  move=> d_inv e_inv.
+  set c_inv := common_inv_dis d_inv.
+  rewrite /state_open_seq/state_closed_seq/= => lolt rllt clok rl A B C D.
+  rewrite /= => -[] <- <-; rewrite !cats0.
+  split.
+    move=> c cin p pin; split.
+      by move=> g gin; apply: (A g c gin); rewrite // mem_rcons.
+    by move=> e ein; apply: (C e c ein); rewrite // mem_rcons.
+  move=> c cin p pin.
+  split.
+    by move=> g gin; apply: (B g c gin).
+  by move=> g gin; apply: (D g c gin).
+move=> [] d_inv e_inv lolt rllt clok rl A B C D.
+set c_inv := common_inv_dis d_inv.
+simpl [scan]; rewrite /step.
+case stq : st => [fop lsto lop cls lstc lsthe lstx] [].
+have /andP[/andP[+ _] _] := general_pos c_inv.
+rewrite lt_neqAle=> /andP[] + _.
+rewrite stq eq_sym /= => ->.
+case oe : (open_cells_decomposition _ _) => [[[[[fc cc] lcc] lc] le] he].
+rewrite /simple_step.
+case oca_eq : (opening_cells_aux _ _ _ _) => [{}nos {}lno].
+rewrite -(cat_rcons ev).
+apply: Ih.
+have [clae [pre_sval [adj [cbtom rfo]]]] := inv1 c_inv.
+move: pre_sval=> [| sval]; first by[].
+have inbox_es := inbox_events c_inv.
+have inbox_e : inside_box bottom top (point ev) by move: inbox_es=>/andP[].
+move: (oe); rewrite (_ : fop ++ lsto :: lop = state_open_seq st); last first.
+  by rewrite stq.
+move=> oe'.
+have exi' := exists_cell cbtom adj (inside_box_between inbox_e).
+move: (exi'); rewrite stq => exi.
+have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
+  decomposition_main_properties oe' exi'.
+have [{}pal {}puh vl vp nc]:=
+  decomposition_connect_properties rfo sval adj cbtom
+    (inside_box_between inbox_e) oe'.
+have oute : out_left_event ev.
+  by apply: (out_events c_inv); rewrite inE eqxx.
+constructor.
+    move: (d_inv); rewrite stq=> d_inv'.
+    have := simple_step_disjoint_general_position_invariant boxwf nocs'
+        inbox_s oe d_inv'.
+    by rewrite /simple_step oca_eq.
+  move: e_inv; rewrite stq=> e_inv.
+  have := simple_step_edge_covered_general_position boxwf nocs'
+      inbox_s oe e_inv.
+  by rewrite /simple_step oca_eq events_to_edges_rcons.
+(* Proving that open cells have a left side that is smaller than any
+   event first coordinate. *)
+move=> c e; rewrite /state_open_seq/= -catA -cat_rcons => cin ein.
+move: cin; rewrite !mem_cat orbCA => /orP[ | cold ]; last first.
+  apply: lolt; first by rewrite ocd -cat_rcons !mem_cat orbCA cold orbT.
+  by rewrite inE ein orbT.
+have := opening_cells_left oute vl vp; rewrite /opening_cells oca_eq=> main.
+move=> /main=> ->.
+move: (proj2 (andP (general_pos c_inv))).
+rewrite /= path_sortedE; last by move=> x y z; apply: lt_trans.
+by move=> /andP[] /allP /(_ _ ein).
+(* Proving that cells have distinct left and right sides. *)
+rewrite /state_closed_seq/= -cats1 -catA /= -cat_rcons.
+move=> c; rewrite mem_cat=> /orP[cold | ].
+  by apply: rllt; rewrite stq.
+rewrite cats1 -map_rcons=> /mapP [c' c'in ->].
+have [vlc' vhc'] : valid_edge (low c') (point ev) /\
+                         valid_edge (high c')(point ev).
+   apply/andP; have := allP sval; rewrite ocd -cat_rcons=> /(_ c'); apply.
+   by rewrite !mem_cat c'in orbT.
+have := right_limit_close_cell vlc' vhc'=> ->.
+rewrite left_limit_close_cell lolt //; last by rewrite inE eqxx.
+by rewrite ocd -cat_rcons !mem_cat c'in orbT.
+(* proving a closed_cell ok invariant. *)
+apply/allP; rewrite /state_closed_seq/= -cats1 -catA /= -cat_rcons.
+  move=> c; rewrite mem_cat=> /orP[cin | cin].
+  by apply: (allP clok); rewrite stq.
+move: cin; rewrite /closing_cells cats1 -map_rcons=> /mapP[c' c'in ->].
+have ccont : contains_point (point ev) c'.
+  by move: c'in; rewrite mem_rcons inE => /orP[/eqP -> | /allct].
+have c'in' : c' \in state_open_seq st.
+  by rewrite ocd -cat_rcons !mem_cat c'in orbT.
+have /(allP sval) /= /andP[vlc' vhc'] := c'in'.
+have c'ok : open_cell_side_limit_ok c'.
+  by apply: (allP (sides_ok c_inv)).
+by apply close_cell_ok.
+(* proving a right_limit stronger invariant. *)
+rewrite /state_closed_seq/=.
+move=> c e cin ein.
+move: cin; rewrite -cats1 -catA /= -cat_rcons mem_cat=> /orP[cold | cnew].
+  by apply: rl; rewrite ?stq // inE ein orbT.
+have in_es := inbox_events c_inv.
+have := closing_cells_to_the_left in_es rfo cbtom adj sval.
+rewrite stq=> /(_ _ _ _ _ _ _ oe)=> -[] main1 main2.
+have eve : p_x (point ev) < p_x (point e).
+  have:= general_pos c_inv=> /andP[] _ /=.
+  rewrite path_sortedE; last by move=> x y z; apply: lt_trans.
+  by move=> /andP[] /allP /(_ e ein).
+apply: le_lt_trans eve.
+move: cnew; rewrite mem_cat=> /orP[cin | ]; last first.
+  by rewrite inE=> /eqP ->.
+by apply: (main1 _ cin).
+(* finished proving the right_limit stronger invariant. *)
+rewrite events_to_edges_rcons /state_closed_seq/=.
+move=> g c gin cin p pin.
+move: cin; rewrite -cats1 -catA /= -cat_rcons mem_cat=> /orP[cold | cnew].
+  move: gin; rewrite mem_cat=> /orP[gold | gnew].
+    (* the edge and the cell are old *)
+    by apply: (A g c); rewrite // stq /state_closed_seq/=.
+  (* the edge is new, the cell is old, I need to prove the events would
+     need to be vertically aligned here. *)
+  have cin' : c \in state_closed_seq st by rewrite stq.
+  have evins : ev \in ev :: future_events by rewrite inE eqxx.
+  have abs := rl _ _ cin' evins.
+  move=> /andP[] _ /andP[] + _.
+  have := out_events c_inv evins gnew=> /eqP ->.
+  (* TODO : have the same condition, but for the right side of closed cells. *)
+  suff prl : p_x p <= right_limit c.
+    rewrite leNgt=> /negP; apply.
+    by apply: le_lt_trans abs.
+  have cold' : c \in state_closed_seq st by rewrite stq.
+  move: pin => /orP[]; last first.
+    by rewrite /in_safe_side_right => /andP[] /eqP -> _.
+  rewrite /in_safe_side_left=> /andP[] /eqP -> _.
+  by apply/ltW/rllt.
+  
+  
 (*
 Lemma start_cover (bottom top : edge) (s : seq edge) closed open :
   bottom <| top ->
