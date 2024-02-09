@@ -6569,7 +6569,7 @@ have nocs : {in bottom :: top :: s &, no_crossing R}.
 set st := Bscan _ _ _ _ _ _ _.
 move=> oe.
 move=> [] covered /[dup] Cinv [] /[dup] inv_s [] clae [] []; first by [].
-rewrite /state_open_seq/state_closed_seq /= => sval [] adj [] cbtom [] rfo.
+rewrite /state_open_seq/state_closed_seq /= => sval [] adj [] cbtom rfo.
 move=> lstxq lstheq sub_edges cle out_es.
 move=> /[dup] inbox0 /andP[] inbox_e inbox_es lexev.
 move=> oks /andP[] lstxlt pathlt n_inner uniq_evs inj_high btm_left_lex.
@@ -7001,10 +7001,11 @@ case evsq : evs => [ | ev future_events]; first by move=> r_eq g.
 have evsn0 : evs != [::] by rewrite evsq.
 case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
 set istate := Bscan _ _ _ _ _ _ _.
-
 have : safe_side_general_position_invariant bottom top s [:: ev]
   istate future_events.
-  by admit.
+  have := initial_safe_side_general_position ltev lexev boxwf cle startok
+    nocs' n_inner evin evsub out_evs uniq_edges evsn0.
+  by rewrite evsq /= oca_eq.
 move=> invss req.
 suff main: forall events op cl st processed_set, 
   safe_side_general_position_invariant bottom top s processed_set st events ->
@@ -7062,226 +7063,271 @@ have oute : out_left_event ev.
 have oute' :
   {in (sort (@edge_below _) (outgoing ev)), forall g, left_pt g == point ev}.
   by move=> g; rewrite mem_sort; apply: oute.
-constructor.
-    move: (d_inv); rewrite stq=> d_inv'.
-    have := simple_step_disjoint_general_position_invariant boxwf nocs'
-        inbox_s oe d_inv'.
-    by rewrite /simple_step oca_eq.
+set rstate := Bscan _ _ _ _ _ _ _.
+have d_inv': 
+  disjoint_general_position_invariant bottom top s rstate future_events.
+  move: (d_inv); rewrite stq=> d_inv'.
+  have := simple_step_disjoint_general_position_invariant boxwf nocs'
+      inbox_s oe d_inv'.
+  by rewrite /simple_step oca_eq.
+have e_inv' :edge_covered_general_position_invariant bottom top s
+    (events_to_edges (rcons p_set ev)) rstate future_events.
   move: e_inv; rewrite stq=> e_inv.
   have := simple_step_edge_covered_general_position boxwf nocs'
       inbox_s oe e_inv.
   by rewrite /simple_step oca_eq events_to_edges_rcons.
 (* Proving that low and high edges of every open cell are distinct. *)
-move=> c; rewrite /state_open_seq /= -catA -cat_rcons !mem_cat orbCA.
-move=> /orP[ | cold]; last first.
-  by apply: d_e; rewrite ocd -cat_rcons !mem_cat orbCA cold orbT.
-have uo : uniq (outgoing ev) by apply: (uniq_ec e_inv) (mem_head _ _).
-have := opening_cells_low_diff_high oute uo vl vp pal puh.
-by rewrite /opening_cells oca_eq; apply.
+have low_diff_high' :
+  {in state_open_seq rstate, forall c : cell, low c != high c}.
+  move=> c; rewrite /state_open_seq /= -catA -cat_rcons !mem_cat orbCA.
+  move=> /orP[ | cold]; last first.
+    by apply: d_e; rewrite ocd -cat_rcons !mem_cat orbCA cold orbT.
+  have uo : uniq (outgoing ev) by apply: (uniq_ec e_inv) (mem_head _ _).
+  have := opening_cells_low_diff_high oute uo vl vp pal puh.
+  by rewrite /opening_cells oca_eq; apply.
 (* Proving that open cells have a left side that is smaller than any
    event first coordinate. *)
-move=> c e; rewrite /state_open_seq/= -catA -cat_rcons => cin ein.
-move: cin; rewrite !mem_cat orbCA => /orP[ | cold ]; last first.
-  apply: lolt; first by rewrite ocd -cat_rcons !mem_cat orbCA cold orbT.
-  by rewrite inE ein orbT.
-have := opening_cells_left oute vl vp; rewrite /opening_cells oca_eq=> main.
-move=> /main=> ->.
-move: (proj2 (andP (general_pos c_inv))).
-rewrite /= path_sortedE; last by move=> x y z; apply: lt_trans.
-by move=> /andP[] /allP /(_ _ ein).
+have loplte : {in state_open_seq rstate & future_events,
+    forall (c : cell) (e : event), left_limit c < p_x (point e)}.
+  move=> c e; rewrite /state_open_seq/= -catA -cat_rcons => cin ein.
+  move: cin; rewrite !mem_cat orbCA => /orP[ | cold ]; last first.
+    apply: lolt; first by rewrite ocd -cat_rcons !mem_cat orbCA cold orbT.
+    by rewrite inE ein orbT.
+  have := opening_cells_left oute vl vp; rewrite /opening_cells oca_eq=> main.
+  move=> /main=> ->.
+  move: (proj2 (andP (general_pos c_inv))).
+  rewrite /= path_sortedE; last by move=> x y z; apply: lt_trans.
+  by move=> /andP[] /allP /(_ _ ein).
 (* Proving that cells have distinct left and right sides. *)
-rewrite /state_closed_seq/= -cats1 -catA /= -cat_rcons.
-move=> c; rewrite mem_cat=> /orP[cold | ].
-  by apply: rllt; rewrite stq.
-rewrite cats1 -map_rcons=> /mapP [c' c'in ->].
-have [vlc' vhc'] : valid_edge (low c') (point ev) /\
+have lltr :
+ {in state_closed_seq rstate, forall c : cell, left_limit c < right_limit c}.
+  rewrite /state_closed_seq/= -cats1 -catA /= -cat_rcons.
+  move=> c; rewrite mem_cat=> /orP[cold | ].
+    by apply: rllt; rewrite stq.
+  rewrite cats1 -map_rcons=> /mapP [c' c'in ->].
+  have [vlc' vhc'] : valid_edge (low c') (point ev) /\
                          valid_edge (high c')(point ev).
-   apply/andP; have := allP sval; rewrite ocd -cat_rcons=> /(_ c'); apply.
-   by rewrite !mem_cat c'in orbT.
-have := right_limit_close_cell vlc' vhc'=> ->.
-rewrite left_limit_close_cell lolt //; last by rewrite inE eqxx.
-by rewrite ocd -cat_rcons !mem_cat c'in orbT.
-(* proving a closed_cell ok invariant. *)
-apply/allP; rewrite /state_closed_seq/= -cats1 -catA /= -cat_rcons.
-  move=> c; rewrite mem_cat=> /orP[cin | cin].
-  by apply: (allP clok); rewrite stq.
-move: cin; rewrite /closing_cells cats1 -map_rcons=> /mapP[c' c'in ->].
-have ccont : contains_point (point ev) c'.
-  by move: c'in; rewrite mem_rcons inE => /orP[/eqP -> | /allct].
-have c'in' : c' \in state_open_seq st.
+     apply/andP; have := allP sval; rewrite ocd -cat_rcons=> /(_ c'); apply.
+     by rewrite !mem_cat c'in orbT.
+  have := right_limit_close_cell vlc' vhc'=> ->.
+  rewrite left_limit_close_cell lolt //; last by rewrite inE eqxx.
   by rewrite ocd -cat_rcons !mem_cat c'in orbT.
-have /(allP sval) /= /andP[vlc' vhc'] := c'in'.
-have c'ok : open_cell_side_limit_ok c'.
-  by apply: (allP (sides_ok c_inv)).
-by apply close_cell_ok.
+(* proving a closed_cell ok invariant. *)
+have clok' : all (@closed_cell_side_limit_ok _) (state_closed_seq rstate).
+  apply/allP; rewrite /state_closed_seq/= -cats1 -catA /= -cat_rcons.
+    move=> c; rewrite mem_cat=> /orP[cin | cin].
+    by apply: (allP clok); rewrite stq.
+  move: cin; rewrite /closing_cells cats1 -map_rcons=> /mapP[c' c'in ->].
+  have ccont : contains_point (point ev) c'.
+    by move: c'in; rewrite mem_rcons inE => /orP[/eqP -> | /allct].
+  have c'in' : c' \in state_open_seq st.
+    by rewrite ocd -cat_rcons !mem_cat c'in orbT.
+  have /(allP sval) /= /andP[vlc' vhc'] := c'in'.
+  have c'ok : open_cell_side_limit_ok c'.
+    by apply: (allP (sides_ok c_inv)).
+  by apply close_cell_ok.
 (* proving a right_limit stronger invariant. *)
-rewrite /state_closed_seq/=.
-move=> c e cin ein.
-move: cin; rewrite -cats1 -catA /= -cat_rcons mem_cat=> /orP[cold | cnew].
-  by apply: rl; rewrite ?stq // inE ein orbT.
-have in_es := inbox_events c_inv.
-have := closing_cells_to_the_left in_es rfo cbtom adj sval.
-rewrite stq=> /(_ _ _ _ _ _ _ oe)=> -[] main1 main2.
-have eve : p_x (point ev) < p_x (point e).
-  have:= general_pos c_inv=> /andP[] _ /=.
-  rewrite path_sortedE; last by move=> x y z; apply: lt_trans.
-  by move=> /andP[] /allP /(_ e ein).
-apply: le_lt_trans eve.
-move: cnew; rewrite mem_cat=> /orP[cin | ]; last first.
-  by rewrite inE=> /eqP ->.
-by apply: (main1 _ cin).
-(* finished proving the right_limit stronger invariant. *)
-rewrite events_to_edges_rcons /state_closed_seq/=.
-move=> g c gin cin p pin.
-move: cin; rewrite -cats1 -catA /= -cat_rcons mem_cat=> /orP[cold | cnew].
-  move: gin; rewrite mem_cat=> /orP[gold | gnew].
-    (* the edge and the cell are old *)
-    by apply: (A g c); rewrite // stq /state_closed_seq/=.
+have rllte :   {in state_closed_seq rstate & future_events,
+    forall (c : cell) (e : event), right_limit c < p_x (point e)}.
+  rewrite /state_closed_seq/=.
+  move=> c e cin ein.
+  move: cin; rewrite -cats1 -catA /= -cat_rcons mem_cat=> /orP[cold | cnew].
+    by apply: rl; rewrite ?stq // inE ein orbT.
+  have in_es := inbox_events c_inv.
+  have := closing_cells_to_the_left in_es rfo cbtom adj sval.
+  rewrite stq=> /(_ _ _ _ _ _ _ oe)=> -[] main1 main2.
+  have eve : p_x (point ev) < p_x (point e).
+    have:= general_pos c_inv=> /andP[] _ /=.
+    rewrite path_sortedE; last by move=> x y z; apply: lt_trans.
+    by move=> /andP[] /allP /(_ e ein).
+  apply: le_lt_trans eve.
+  move: cnew; rewrite mem_cat=> /orP[cin | ]; last first.
+    by rewrite inE=> /eqP ->.
+  by apply: (main1 _ cin).
+
+have not_safe_event : {in rcons (closing_cells (point ev) cc)
+                                 (close_cell (point ev) lcc), forall c,
+   ~~ (in_safe_side_left  (point ev) c || in_safe_side_right (point ev) c)}.
+  move=> c cin; apply/negP.
+  move: cin; rewrite -map_rcons=> /mapP[c' c'in cq].
+  have c'in' : c' \in state_open_seq st.
+    by rewrite ocd -cat_rcons !mem_cat c'in orbT.
+  move=> /orP[ /andP[] + _ | /andP[] _ /andP[] _ /andP[] _ ].
+    rewrite cq left_limit_close_cell=> /eqP abs.
+    have := lolt c' _ c'in' (mem_head _ _).
+    by rewrite  abs lt_irreflexive.
+  by rewrite cq close_cell_in //; apply/andP/(allP sval).
+(* Now comes the real important property. *)
+have cl_safe_edge :
+  {in events_to_edges (rcons p_set ev) & state_closed_seq rstate,
+    forall (g : edge) (c : cell) (p : pt),
+    in_safe_side_left p c || in_safe_side_right p c -> ~ p === g}.
+  rewrite events_to_edges_rcons /state_closed_seq/=.
+  move=> g c gin cin p pin.
+  move: cin; rewrite -cats1 -catA /= -cat_rcons mem_cat=> /orP[cold | cnew].
+    move: gin; rewrite mem_cat=> /orP[gold | gnew].
+      (* the edge and the cell are old *)
+      by apply: (A g c); rewrite // stq /state_closed_seq/=.
   (* the edge is new, the cell is old, I need to prove the events would
      need to be vertically aligned here. *)
-  have cin' : c \in state_closed_seq st by rewrite stq.
-  have evins : ev \in ev :: future_events by rewrite inE eqxx.
-  have abs := rl _ _ cin' evins.
-  move=> /andP[] _ /andP[] + _.
-  have := out_events c_inv evins gnew=> /eqP ->.
+    have cin' : c \in state_closed_seq st by rewrite stq.
+    have abs := rl _ _ cin' (mem_head _ _).
+    move=> /andP[] _ /andP[] + _.
+    have := out_events c_inv (mem_head _ _) gnew=> /eqP ->.
   (* TODO : have the same condition, but for the right side of closed cells. *)
-  suff prl : p_x p <= right_limit c.
+    suff prl : p_x p <= right_limit c.
+      rewrite leNgt=> /negP; apply.
+      by apply: le_lt_trans abs.
+    have cold' : c \in state_closed_seq st by rewrite stq.
+    move: pin => /orP[]; last first.
+      by rewrite /in_safe_side_right => /andP[] /eqP -> _.
+    rewrite /in_safe_side_left=> /andP[] /eqP -> _.
+    by apply/ltW/rllt.
+  (* now the cells are newly closed. *)
+  move: cnew pin; rewrite cats1 /closing_cells -map_rcons.
+  move=> /mapP[c' c'in ->].
+  have c'in' : c' \in state_open_seq st.
+    by rewrite ocd -cat_rcons !mem_cat c'in orbT.
+  move=> /orP[ | pin].
+    move=> /andP[]; rewrite left_limit_close_cell=> pl pdif.
+    have pin' : in_safe_side_left p c'.
+      rewrite /in_safe_side_left pl.
+      move: pdif.
+      by have [-> -> ->] := close_cell_preserve_3sides (point ev) c' => ->.
+    move: gin; rewrite mem_cat=> /orP[gin | ].
+      by apply: B pin'.
+    move=> /oute /eqP lgq /andP[] _ /andP[]; rewrite lgq leNgt=> /negP[].
+    by rewrite (eqP pl); apply: lolt; rewrite // inE eqxx.
+  have vc' : valid_cell c' (point ev) by apply/andP/(allP sval).
+  have samex : p_x p == p_x (point ev).
+    by move: pin=> /andP[] + _; rewrite close_cell_right_limit.
+  move: gin; rewrite mem_cat=> /orP[gin | /oute/eqP lgq ]; last first.
+    have peg : point ev === g by rewrite -lgq left_on_edge.
+    move=> pong.
+    have samey := on_edge_same_point pong peg samex.
+    have pev : p = point ev by apply/eqP; rewrite pt_eqE samex samey.
+    have := not_safe_event (close_cell (point ev) c').
+    rewrite -[e in in_safe_side_right e _]pev pin orbT.
+    by rewrite /closing_cells -map_rcons map_f // => /(_ isT).
+  have := edge_covered_ec e_inv gin=> -[]; last first.
+    move=> [[ | pcc0 pcc] []]; first by []. 
+    move=> _ /= [pccsub [pcchigh [_ [_ rlpcc]]]] /andP[] _ /andP[] _.
     rewrite leNgt=> /negP; apply.
-    by apply: le_lt_trans abs.
-  have cold' : c \in state_closed_seq st by rewrite stq.
-  move: pin => /orP[]; last first.
-    by rewrite /in_safe_side_right => /andP[] /eqP -> _.
-  rewrite /in_safe_side_left=> /andP[] /eqP -> _.
-  by apply/ltW/rllt.
-move: cnew pin; rewrite cats1 /closing_cells -map_rcons.
-move=> /mapP[c' c'in ->].
-have c'in' : c' \in state_open_seq st.
-  by rewrite ocd -cat_rcons !mem_cat c'in orbT.
-move=> /orP[ | pin].
-  move=> /andP[]; rewrite left_limit_close_cell=> pl pdif.
-  have pin' : in_safe_side_left p c'.
-    rewrite /in_safe_side_left pl.
-    move: pdif.
-    by have [-> -> ->] := close_cell_preserve_3sides (point ev) c' => ->.
-  move: gin; rewrite mem_cat=> /orP[gin | ].
-    by apply: B pin'.
-  move=> /oute /eqP lgq /andP[] _ /andP[]; rewrite lgq leNgt=> /negP[].
-  by rewrite (eqP pl); apply: lolt; rewrite // inE eqxx.
-have vc' : valid_cell c' (point ev) by apply/andP/(allP sval).
-have samex : p_x p == p_x (point ev).
-  by move: pin=> /andP[] + _; rewrite close_cell_right_limit.
-move: gin; rewrite mem_cat=> /orP[gin | /oute/eqP lgq ]; last first.
-  have peg : point ev === g by rewrite -lgq left_on_edge.
-  move: pin=> /andP[/eqP pxq /andP[] _ /andP[] _ it] abs.
-  have samey := on_edge_same_point abs peg samex.
-  move: it=> /negP; apply.
-  have -> : p = point ev by apply/eqP; rewrite pt_eqE samex samey.
-  by rewrite close_cell_in.
-have := edge_covered_ec e_inv gin=> -[]; last first.
-  move=> [[ | pcc0 pcc] []]; first by []. 
-  move=> _ /= [pccsub [pcchigh [_ [_ rlpcc]]]] /andP[] _ /andP[] _.
-  rewrite leNgt=> /negP; apply.
-  rewrite (eqP samex).
-  rewrite -rlpcc; apply:rl; last by rewrite inE eqxx.
-  by apply/pccsub; rewrite /last_cell /= mem_last.
-move=> [] opc [] pcc [] _ [] opch [] _ [] opco _ abs.
-have [vlc'p vhc'p] : valid_edge (low c') p /\ valid_edge (high c') p.
-  by move: vc'; rewrite /valid_cell !(same_x_valid _ samex).
-have pinc' : contains_point' p c'.
-  rewrite /contains_point'.
-  have [<- <- _] := close_cell_preserve_3sides (point ev) c'.
-  by have /andP[_ /andP[] /underW -> /andP[] ->] := pin.
-have {}opch : high opc = g by apply: opch; rewrite mem_rcons inE eqxx.
-have [vplc vphc] : valid_edge (low opc) p /\ valid_edge (high opc) p.
-  by rewrite !(same_x_valid _ samex); apply/andP/(allP sval).
-have rfc : low opc <| high opc by apply: (allP rfo).
-have cnt : contains_point p opc.
-  apply/andP; rewrite under_onVstrict; last first.
-    by have := (allP sval _ opco) => /andP[].
-  rewrite opch abs; split; last by [].
-  apply/negP=> pun.
-  have := order_edges_strict_viz_point' vplc vphc rfc pun.
-  by apply/negP/onAbove; rewrite opch.
-have pw : pairwise (@edge_below _) [seq high c | c <- state_open_seq st].
-  by move: (pairwise_open d_inv)=> /= /andP[].
-have [puhc' palc'] : p <<< high c' /\ p >>> low c'.
-  apply/andP;  move: pin=> /andP[] _ /andP[] + /andP[] + _.
-  by have [-> -> _] := close_cell_preserve_3sides (point ev) c' => ->.
-have : p >>= low opc by move: cnt=> /andP[].
-rewrite strict_nonAunder // negb_and negbK=> /orP[ | stricter]; last first.
-  have := disoc adj pw (sides_ok c_inv)=> /(_ opc c' opco c'in') [ab' | ].
-    by move: puhc'; rewrite strict_nonAunder // -ab' opch abs.
-  move=> /(_ p) + ; move=>/negP.
-  rewrite inside_open'E stricter valid_open_limit // (proj2 (andP cnt)).
-  rewrite (eqP samex) lolt //=; last by rewrite inE eqxx.
-  rewrite inside_open'E (underW puhc') palc' valid_open_limit //.
-  by rewrite (eqP samex) lolt // inE eqxx.
-move=> ponl.
-have vbp : valid_edge bottom p.
-  by rewrite (same_x_valid _ samex) (inside_box_valid_bottom inbox_e).
-have vtp : valid_edge top p.
-  rewrite (same_x_valid _ samex) /valid_edge.
-  by move: inbox_e=> /andP[] _ /andP[] _ /andP[] /ltW -> /ltW ->.
-have bottom_b_c' : bottom <| low c'.
-  have [-> | ] := eqVneq bottom (low c'); first by apply: edge_below_refl.
-  have  [s1 [s2]] := mem_seq_split c'in'.
-  elim/last_ind: s1 => [ | s1 op' _] /= => odec.
-    by move: cbtom => /andP[]; rewrite odec /= => /eqP ->; rewrite eqxx.
-  have := adj.
-  rewrite odec cat_rcons=> /adjacent_catW /= [] _ /andP[] /eqP <- _ _.
-  have := pairwise_open d_inv=> /= /andP[] /allP /(_ (high op')) + _.
-  by apply; apply/mapP; exists op'; rewrite // odec !mem_cat mem_rcons inE eqxx.
-have pab : p >>> bottom.
-  apply/negP=> pub.
-  have:= order_edges_viz_point' vbp vlc'p bottom_b_c' pub.
+    rewrite (eqP samex).
+    rewrite -rlpcc; apply:rl; last by rewrite inE eqxx.
+    by apply/pccsub; rewrite /last_cell /= mem_last.
+  move=> [] opc [] pcc [] _ [] opch [] _ [] opco _ abs.
+  have [vlc'p vhc'p] : valid_edge (low c') p /\ valid_edge (high c') p.
+    by move: vc'; rewrite /valid_cell !(same_x_valid _ samex).
+  have pinc' : contains_point' p c'.
+    rewrite /contains_point'.
+    have [<- <- _] := close_cell_preserve_3sides (point ev) c'.
+    by have /andP[_ /andP[] /underW -> /andP[] ->] := pin.
+  have {}opch : high opc = g by apply: opch; rewrite mem_rcons inE eqxx.
+  have [vplc vphc] : valid_edge (low opc) p /\ valid_edge (high opc) p.
+    by rewrite !(same_x_valid _ samex); apply/andP/(allP sval).
+  have rfc : low opc <| high opc by apply: (allP rfo).
+  have cnt : contains_point p opc.
+    apply/andP; rewrite under_onVstrict; last first.
+      by have := (allP sval _ opco) => /andP[].
+    rewrite opch abs; split; last by [].
+    apply/negP=> pun.
+    have := order_edges_strict_viz_point' vplc vphc rfc pun.
+    by apply/negP/onAbove; rewrite opch.
+  have pw : pairwise (@edge_below _) [seq high c | c <- state_open_seq st].
+    by move: (pairwise_open d_inv)=> /= /andP[].
+  have [puhc' palc'] : p <<< high c' /\ p >>> low c'.
+    apply/andP;  move: pin=> /andP[] _ /andP[] + /andP[] + _.
+    by have [-> -> _] := close_cell_preserve_3sides (point ev) c' => ->.
+  have : p >>= low opc by move: cnt=> /andP[].
+  rewrite strict_nonAunder // negb_and negbK=> /orP[ | stricter]; last first.
+    have := disoc adj pw (sides_ok c_inv)=> /(_ opc c' opco c'in') [ab' | ].
+      by move: puhc'; rewrite strict_nonAunder // -ab' opch abs.
+    move=> /(_ p) + ; move=>/negP.
+    rewrite inside_open'E stricter valid_open_limit // (proj2 (andP cnt)).
+    rewrite (eqP samex) lolt //=; last by rewrite inE eqxx.
+    rewrite inside_open'E (underW puhc') palc' valid_open_limit //.
+    by rewrite (eqP samex) lolt // inE eqxx.
+  move=> ponl.
+  have vbp : valid_edge bottom p.
+    by rewrite (same_x_valid _ samex) (inside_box_valid_bottom inbox_e).
+  have vtp : valid_edge top p.
+    rewrite (same_x_valid _ samex) /valid_edge.
+    by move: inbox_e=> /andP[] _ /andP[] _ /andP[] /ltW -> /ltW ->.
+  have bottom_b_c' : bottom <| low c'.
+    have [-> | ] := eqVneq bottom (low c'); first by apply: edge_below_refl.
+    have  [s1 [s2]] := mem_seq_split c'in'.
+    elim/last_ind: s1 => [ | s1 op' _] /= => odec.
+      by move: cbtom => /andP[]; rewrite odec /= => /eqP ->; rewrite eqxx.
+    have := adj.
+    rewrite odec cat_rcons=> /adjacent_catW /= [] _ /andP[] /eqP <- _ _.
+    have := pairwise_open d_inv=> /= /andP[] /allP /(_ (high op')) + _.
+    apply; apply/mapP; exists op'=> //.
+    by rewrite // odec !mem_cat mem_rcons inE eqxx.
+  have pab : p >>> bottom.
+    apply/negP=> pub.
+    have:= order_edges_viz_point' vbp vlc'p bottom_b_c' pub.
   by move: palc'=> /[swap] => ->.
-have ldifh : low opc != high opc by apply: d_e.
-have low_opc_s : low opc \in [:: bottom, top & s].
-  by apply: (edges_sub c_inv); rewrite !mem_cat map_f.
-have high_opc_s : high opc \in [:: bottom, top & s].
-  by apply: (edges_sub c_inv); rewrite !mem_cat map_f ?orbT.
-have := nocs' (low opc) (high opc) low_opc_s high_opc_s.
-move=> [Q | ]; first by rewrite Q eqxx in ldifh.
-have ponh : p === high opc by rewrite opch.
-have opcok : open_cell_side_limit_ok opc by apply: (allP (sides_ok c_inv)).
-move=> /(_ _ ponl ponh); rewrite !inE=> /orP[]/eqP.
-  move=> pleft.
-  have : left_limit opc < p_x p.
-    by rewrite (eqP samex); apply: lolt; rewrite // inE eqxx.
-  have := left_limit_max opcok.
-  have [_ | ] := lerP (p_x (left_pt (high opc)))(p_x (left_pt (low opc))).
-    by move=> /le_lt_trans /[apply]; rewrite pleft lt_irreflexive.
-  move=> /lt_le_trans /[apply]=> /lt_trans /[apply].
-  by rewrite pleft lt_irreflexive.
+  have ldifh : low opc != high opc by apply: d_e.
+  have low_opc_s : low opc \in [:: bottom, top & s].
+    by apply: (edges_sub c_inv); rewrite !mem_cat map_f.
+  have high_opc_s : high opc \in [:: bottom, top & s].
+    by apply: (edges_sub c_inv); rewrite !mem_cat map_f ?orbT.
+  have := nocs' (low opc) (high opc) low_opc_s high_opc_s.
+  move=> [Q | ]; first by rewrite Q eqxx in ldifh.
+  have ponh : p === high opc by rewrite opch.
+  have opcok : open_cell_side_limit_ok opc by apply: (allP (sides_ok c_inv)).
+  move=> /(_ _ ponl ponh); rewrite !inE=> /orP[/eqP pleft | /eqP].
+    have : left_limit opc < p_x p.
+      by rewrite (eqP samex); apply: lolt; rewrite // inE eqxx.
+    have := left_limit_max opcok.
+    have [_ | ] := lerP (p_x (left_pt (high opc)))(p_x (left_pt (low opc))).
+      by move=> /le_lt_trans /[apply]; rewrite pleft lt_irreflexive.
+    move=> /lt_le_trans /[apply]=> /lt_trans /[apply].
+    by rewrite pleft lt_irreflexive.
 (* Here p is vertically aligned with p_x, but it must be an event,
-   because it is the end of an arrow. *)
-move=> prl.
-have put : p <<< top.
-  apply: (order_edges_strict_viz_point' vhc'p vtp _ puhc').
-  move: cbtom=> /andP[] _.
-  have := pw.
-  have [s1 [s2 s1q]] := mem_seq_split c'in'.
-  rewrite s1q last_cat /= map_cat pairwise_cat /=.
-  move=> /andP[] _ /andP[] _ /andP[] allabovec' _ /eqP highlast.
-  case s2q : s2 => [ | c2 s3].
-    by rewrite -highlast s2q edge_below_refl.
-  have /(allP allabovec') : (high (last c' s2)) \in [seq high c | c <- s2].
-    by rewrite map_f // s2q /= mem_last.
-  by rewrite highlast.
-have := (allP clae _ opco)=> /andP[] + _ => /orP[].
-  rewrite !inE => /orP[] /eqP=> ab'.
-    by move: pab; rewrite under_onVstrict // -ab' ponl.
-  by move: put; rewrite strict_nonAunder // -ab' ponl.
-move=> /hasP[e' + /eqP pe']; rewrite inE=> /orP[/eqP e'ev | e'in].
+   because it is the end of an edge. *)
+  move=> prl.
+  have put : p <<< top.
+    apply: (order_edges_strict_viz_point' vhc'p vtp _ puhc').
+    move: cbtom=> /andP[] _.
+    have := pw.
+    have [s1 [s2 s1q]] := mem_seq_split c'in'.
+    rewrite s1q last_cat /= map_cat pairwise_cat /=.
+    move=> /andP[] _ /andP[] _ /andP[] allabovec' _ /eqP highlast.
+    case s2q : s2 => [ | c2 s3].
+      by rewrite -highlast s2q edge_below_refl.
+    have /(allP allabovec') : (high (last c' s2)) \in [seq high c | c <- s2].
+      by rewrite map_f // s2q /= mem_last.
+    by rewrite highlast.
+  have := (allP clae _ opco)=> /andP[] + _ => /orP[].
+    rewrite !inE => /orP[] /eqP=> ab'.
+      by move: pab; rewrite under_onVstrict // -ab' ponl.
+    by move: put; rewrite strict_nonAunder // -ab' ponl.
+  move=> /hasP[e' + /eqP pe']; rewrite inE=> /orP[/eqP e'ev | e'in].
   (* if e' cannot be ev, because p cannot be ev because of pin *)
-  have := pin=> /andP[].
-  by rewrite prl pe' e'ev close_cell_in // ?andbF.
+    have := pin=> /andP[].
+    by rewrite prl pe' e'ev close_cell_in // ?andbF.
 (* if e' is in future_events, then e' and p cannot have the same p_x,
   because e' and ev don't, but p and e' are at the same point *)
-have /andP[_ /=]:= general_pos c_inv.
-rewrite path_sortedE; last by move=> ? ? ?; apply: lt_trans.
-move=> /andP[] /allP /(_ e' e'in).
-by rewrite -pe' -prl (eqP samex) lt_irreflexive.
+    have /andP[_ /=]:= general_pos c_inv.
+  rewrite path_sortedE; last by move=> ? ? ?; apply: lt_trans.
+  move=> /andP[] /allP /(_ e' e'in).
+  by rewrite -pe' -prl (eqP samex) lt_irreflexive.
+have op_safe_edge :
+  {in events_to_edges (rcons p_set ev) & state_open_seq rstate,
+    forall g c p, in_safe_side_left p c -> ~ p === g}.
+  admit.
+have cl_safe_event :
+  {in rcons p_set ev & state_closed_seq rstate, forall e c p, 
+     in_safe_side_left p c || in_safe_side_right p c -> p != point e}.
+  move=> e c; rewrite mem_rcons inE=> /orP[/eqP -> | ].
+    move=> cin p pin; apply/negP=> /eqP pev.
+    move: cin.
+    rewrite /rstate/state_closed_seq/= -cats1 -catA /= -cat_rcons mem_cat.
+    move=> /orP[]; last by rewrite cats1=> /not_safe_event; rewrite -pev pin.
+
+constructor=> //.
 Fail.
 
 (* if opc <> c', then we must have
