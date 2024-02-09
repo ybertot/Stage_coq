@@ -653,6 +653,34 @@ rewrite -(ler_nM2l difflh _ 0) mulr0 -opprB mulNr oppr_le0 (eqP pf).
 by rewrite addr_ge0 // mulr_ge0 // subr_ge0.
 Qed.
 
+Lemma point_on_edge_above_strict low_e high_e a :
+a === high_e ->
+(left_pt high_e >>> low_e) ->
+(right_pt high_e >>> low_e) ->
+(a >>> low_e).
+Proof.
+move : high_e => [lr hr inH] /=.
+rewrite /point_on_edge /valid_edge => /andP [] /= poea /andP [] linfa ainfr.
+have pf := pue_formula_on_edge (left_pt low_e) (right_pt low_e) poea.
+rewrite /point_under_edge -!ltNge => llrllh llrllrh.
+have diffa : (p_x lr - p_x a) <= 0.
+  by rewrite subr_cp0.
+have diffb : (p_x hr - p_x a) >= 0.
+  by rewrite subr_cp0.
+have difflh : (p_x lr - p_x hr) < 0.
+  by rewrite subr_cp0.
+rewrite -(ltr_nM2l difflh _ 0) mulr0 -opprB mulNr oppr_lt0 (eqP pf).
+have addr_le_gt0 (x y : R) : 0 <= x -> 0 < y -> 0 < x + y.
+  move=> xge0 ygt0; rewrite -(add0r 0).
+  by apply: ler_ltD.
+move: diffa; rewrite le_eqVlt=> /orP[ | diffa]; last first.
+  rewrite addrC addr_le_gt0 // ?mulr_gt0 ?mulr_ge0 //.
+    by rewrite ltW.
+  by rewrite subr_gt0 -subr_lt0.
+rewrite subr_eq0=> /eqP /[dup] lraq <-; rewrite subrr mul0r add0r.
+by rewrite mulr_gt0 // subr_gt0.
+Qed.
+
 Lemma point_on_edge_under low_e high_e a :
 a === (low_e) ->
  (left_pt low_e) <<= high_e ->
@@ -671,6 +699,34 @@ have difflh : (p_x lr - p_x hr) < 0.
   by rewrite subr_cp0.
 rewrite -(ler_nM2r difflh 0 _) mul0r mulrC -opprB mulNr (eqP pf) opprD.
 by rewrite addr_ge0 // -mulNr mulr_le0 // oppr_le0 subr_cp0.
+Qed.
+
+Lemma point_on_edge_under_strict high_e low_e a :
+a === low_e ->
+(left_pt low_e <<< high_e) ->
+(right_pt low_e <<< high_e) ->
+(a <<< high_e).
+Proof.
+move : low_e => [lr hr inH] /=.
+rewrite /point_on_edge /valid_edge => /andP [] /= poea /andP [] linfa ainfr.
+have pf := pue_formula_on_edge (left_pt high_e) (right_pt high_e) poea.
+rewrite /point_strictly_under_edge => llrllh llrllrh.
+have diffa : (p_x lr - p_x a) <= 0.
+  by rewrite subr_cp0.
+have diffb : (p_x hr - p_x a) >= 0.
+  by rewrite subr_cp0.
+have difflh : (p_x lr - p_x hr) < 0.
+  by rewrite subr_cp0.
+rewrite -(ltr_nM2l difflh 0) mulr0 -opprB mulNr oppr_gt0 (eqP pf).
+have addr_le_lt0 (x y : R) : x <= 0 -> y < 0 -> x + y < 0.
+  move=> xle0 ylt0; rewrite -(add0r 0).
+  by apply: ler_ltD.
+move: diffa; rewrite le_eqVlt=> /orP[ | diffa]; last first.
+  rewrite addrC addr_le_lt0 // ?nmulr_llt0 ?mulr_ge0_le0 //.
+      by rewrite ltW.
+  by rewrite subr_gt0 -subr_lt0.
+rewrite subr_eq0=> /eqP /[dup] lraq <-; rewrite subrr mul0r add0r.
+by rewrite nmulr_llt0 // subr_gt0.
 Qed.
 
 Lemma not_strictly_above' low_e high_e p':
