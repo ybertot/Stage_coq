@@ -2444,9 +2444,9 @@ Proof. by move=> /eqP xs; rewrite /valid_edge xs. Qed.
 
 Lemma same_pvert_y (p1 p2 : pt) (g : edge) :
   valid_edge g p1 ->
-  p_x p1 == p_x p2 -> pvert_y p1 g == pvert_y p2 g.
+  p_x p1 == p_x p2 -> pvert_y p1 g = pvert_y p2 g.
 Proof.
-move=> vg xs.
+move=> vg xs; apply/eqP.
 move: (vg) ; rewrite (same_x_valid _ xs) => vg2.
 by have := on_edge_same_point (pvert_on vg) (pvert_on vg2) xs.
 Qed.

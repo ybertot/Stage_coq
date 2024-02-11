@@ -2888,11 +2888,11 @@ have /eqP samex : p_x (point e) = p_x p1.
   by have := pxhere; rewrite lstxq /left_limit lptsq /=.
 suff : p_y (point e) < p_y (point e) by rewrite lt_irreflexive.
 have := same_pvert_y vho samex. 
-rewrite (on_pvert p1onh) => /eqP. 
+rewrite (on_pvert p1onh). 
 have := under_pvert_y vho; move: (puh)=> /[swap] -> /[swap] ->.
 move=> /le_lt_trans; apply.
 have := under_pvert_y vlo; move: (pal) => /[swap] ->.  
-have := same_pvert_y vlo samex => /eqP ->. 
+rewrite (same_pvert_y vlo samex).
 by rewrite -ltNge (on_pvert p1onl).
 Qed.
 
@@ -3409,7 +3409,7 @@ Proof.
 move=> vg.
 rewrite /lexPt eq_sym=> /orP[ | /andP[] samex]; first by [].
 have := same_pvert_y vg samex.
-rewrite (on_pvert (left_on_edge g))=> /eqP <-.
+rewrite (on_pvert (left_on_edge g))=> <-.
 rewrite ltNge le_eqVlt negb_or andbC.
 by move=> /[swap]; rewrite strict_under_pvert_y // => ->.
 Qed.
@@ -3926,7 +3926,7 @@ case ogq : (outgoing e) => [ | fog og]; last first.
   rewrite pxhere lstxq /left_limit lptsq /=.
   apply/eqP; rewrite pt_eqE /= eqxx /= eq_sym; apply/eqP.
   have -> : pvert_y (point e) (low lsto) = pvert_y (last sp lpts) (low lsto).
-    apply/eqP; apply: same_pvert_y=> //.
+    apply: same_pvert_y=> //.
     by rewrite pxhere lstxq /left_limit lptsq.
   by apply: on_pvert; move: onlow; rewrite lptsq.
 case oe : (open_cells_decomposition _ _) => [[[[[fc' cc] lcc] lc] le] he].
@@ -3994,7 +3994,7 @@ have /andP[] := allP open_side_limit lsto lstoin.
 case plstq : (left_pts lsto) => [ // | a l] _ /= /andP[] A /andP[] _ /andP[] _.
 move: lstxq; rewrite /left_limit plstq /= => sx one.
 apply/eqP; rewrite pt_eqE /= pxhere sx eqxx /=.
-rewrite -(on_pvert one); apply: same_pvert_y; first by case/andP: one.
+rewrite -(on_pvert one); apply/eqP; apply: same_pvert_y; first by case/andP: one.
 by rewrite pxhere sx.
 Qed.
 
@@ -4995,7 +4995,7 @@ have vhe : valid_edge lsthe (point e).
   by move=> /(_ isT)=> /andP[]; rewrite lstheq.
 move: puh; rewrite under_pvert_y //.
 move: (samex)=> /esym/eqP=> samex'.
-have /eqP -> := same_pvert_y vhe samex'.
+rewrite (same_pvert_y vhe samex').
 by rewrite (on_pvert (left_on_edge _)) leNgt lty.
 Qed.
 
@@ -5541,13 +5541,13 @@ have [yle | yabove] := lerP (p_y pt) (p_y (point e)).
       by apply: valid_edge_extremities; rewrite (oute lco).
     move: pin => /andP[] + _; rewrite under_pvert_y; last first.
       by move: vlce; rewrite /valid_edge ppe.
-    rewrite -(eqP (same_pvert_y vlce _)); last by apply/eqP.
+    rewrite -(same_pvert_y vlce); last by apply/eqP.
     by rewrite on_pvert ?yle // -(eqP (oute lco)) // left_on_edge.
   have plec : contains_point' pt lec.
     rewrite /contains_point' -leq pale.
     rewrite under_pvert_y //.
     apply: (le_trans yle).
-    rewrite -(eqP (same_pvert_y vhlece _)); last by apply/eqP.
+    rewrite -(same_pvert_y vhlece); last by apply/eqP.
     rewrite -under_pvert_y //.
     case ccq': cc => [ | cc0 ccs].
       by move: ccq; rewrite ccq' /= => -[] <- _; rewrite -heq; apply/underW.
@@ -5594,7 +5594,7 @@ have plcc : contains_point' pt lcc.
       by apply: valid_edge_extremities; rewrite (oute hco).
     move: (pin) => /andP[] _; rewrite under_pvert_y; last first.
       by move: vhce; rewrite /valid_edge ppe.
-    rewrite -(eqP (same_pvert_y vhce _)); last by apply/eqP.
+    rewrite -(same_pvert_y vhce); last by apply/eqP.
     rewrite on_pvert; last first.
       by rewrite -(eqP (oute hco)) // left_on_edge.
     move=> ple.
@@ -5609,7 +5609,7 @@ have plcc : contains_point' pt lcc.
     by move: vllcce; rewrite /valid_edge ppe.
   rewrite under_pvert_y // -?ltNge.
   apply: le_lt_trans yabove.  
-  rewrite -(eqP (same_pvert_y vllcce _)); last by apply/eqP.
+  rewrite -(same_pvert_y vllcce); last by apply/eqP.
   rewrite leNgt -strict_under_pvert_y //.
   by have /andP[] := lcc_ctn.
 have [/eqP lbnd' | safe] := boolP(left_limit lcc == p_x pt).
@@ -5979,7 +5979,7 @@ elim: gs g1 => [ | g2 gs Ih] g1.
   have [heP // | abs] := boolP (pp <<< he); last by rewrite andbF.
   have vpg1 : valid_edge g1 pp by rewrite (same_x_valid _ samex').
   rewrite (under_pvert_y vpg1) -ltNge.
-  rewrite (eqP (same_pvert_y vpg1 samex')).
+  rewrite (same_pvert_y vpg1 samex').
   have eong1 : point e === g1 by rewrite -lg1 left_on_edge.
   rewrite (on_pvert eong1).
   have [leP | abs] := boolP (p_y (point e) < p_y pp); last by [].
@@ -5987,8 +5987,7 @@ elim: gs g1 => [ | g2 gs Ih] g1.
   move: leP; rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
   have vphe : valid_edge he pp by rewrite (same_x_valid _ samex').
   move: (samex'); rewrite eq_sym=> samex2.
-  (* TODO same_pvert_y should not end with a bool equality *)
-  rewrite (eqP (same_pvert_y vhe samex2)).
+  rewrite (same_pvert_y vhe samex2).
   move: heP; rewrite (strict_under_pvert_y vphe).
   by rewrite lt_neqAle=> /andP[] /negbTE ->.
 rewrite /=.
@@ -6008,7 +6007,7 @@ have vpg1 : valid_edge g1 pp by rewrite (same_x_valid _ samex').
 have vpg2 : valid_edge g2 pp by rewrite (same_x_valid _ samex').
 rewrite /in_safe_side_left /=.
 rewrite (under_pvert_y vpg1) (strict_under_pvert_y vpg2).
-rewrite (eqP (same_pvert_y vpg1 samex')) (eqP (same_pvert_y vpg2 samex')).
+rewrite (same_pvert_y vpg1 samex') (same_pvert_y vpg2 samex').
 rewrite (on_pvert eong1) (on_pvert eong2).
 rewrite (andbA (p_y pp < _)); set P1 := ((p_y pp < _) && _).
 have -> : P1 = false; last rewrite !andbF /=.
@@ -6088,7 +6087,7 @@ have lcase_open :
   apply/implyP; rewrite {}/P1.
   have vlpp : valid_edge le pp by rewrite (same_x_valid _ samex).
   rewrite pt_eqE samex /= under_pvert_y //.
-  have /eqP -> := same_pvert_y vlpp samex.
+  rewrite (same_pvert_y vlpp samex).
   by rewrite le_eqVlt negb_or=> /andP[].
 
 have hcase_open :  forall fno nos' lno',
@@ -6111,7 +6110,7 @@ have hcase_open :  forall fno nos' lno',
     have vehc : valid_edge (high c) (point e) by move: eonhc=> /andP[].
     have vphc : valid_edge (high c) pp by rewrite (same_x_valid _ samex).
     rewrite (strict_under_pvert_y vphc).
-    rewrite (eqP (same_pvert_y vphc samex)).
+    rewrite (same_pvert_y vphc samex).
     by rewrite (on_pvert eonhc) -leNgt le_eqVlt pph orbT.
 
   rewrite /in_safe_side_left.
@@ -6153,7 +6152,7 @@ have hcase_open :  forall fno nos' lno',
   apply/implyP; rewrite {}/P1.
   have vhpp : valid_edge he pp by rewrite (same_x_valid _ samex).
   rewrite strict_under_pvert_y //.
-  have /eqP -> := same_pvert_y vhpp samex.
+  rewrite (same_pvert_y vhpp samex).
   by rewrite lt_neqAle=>/andP[].
 
 have ate : p_y pp == p_y (point e) ->
@@ -6219,7 +6218,7 @@ case ccq: cc => [ | c1 cc'].
     have ppuh : pp <<< he.
       rewrite (strict_under_pvert_y vphe).
       apply: (lt_trans ppl).
-      rewrite (eqP (same_pvert_y vphe samex)).
+      rewrite (same_pvert_y vphe samex).
       by rewrite -(strict_under_pvert_y vp).
     have := lcase_open fno nos' lno'; rewrite ogq=> /(_ oeq isT ppl).
     move=> [{}lcase_open tail_false].
@@ -6238,9 +6237,9 @@ case ccq: cc => [ | c1 cc'].
     move=> /negbTE -> _.
     rewrite !inE !pt_eqE (eqP samex) eqxx /=.
     move:(ppal); rewrite (under_pvert_y vple) le_eqVlt negb_or=> /andP[].
-    rewrite (eqP (same_pvert_y vple samex))=> /negbTE -> _.
+    rewrite (same_pvert_y vple samex)=> /negbTE -> _.
     move: (ppuh); rewrite (strict_under_pvert_y vphe) lt_neqAle=> /andP[].
-    rewrite (eqP (same_pvert_y vphe samex))=> /negbTE -> _.
+    rewrite (same_pvert_y vphe samex)=> /negbTE -> _.
     by move: ppl; rewrite lt_neqAle=> /andP[] /negbTE -> _.
 
   rewrite -ogq.
@@ -6256,7 +6255,7 @@ case ccq: cc => [ | c1 cc'].
   move: hcase; rewrite lno'q=> ->.
   have ppal : pp >>> le.
     rewrite (under_pvert_y vple) -ltNge.
-    rewrite (eqP (same_pvert_y vple samex)).
+    rewrite (same_pvert_y vple samex).
     apply: lt_trans pph.
     by rewrite ltNge -(under_pvert_y vl).
 
@@ -6275,9 +6274,9 @@ case ccq: cc => [ | c1 cc'].
   move=> /negbTE -> _.
   rewrite !inE !pt_eqE (eqP samex) eqxx /=.
   move:(ppal); rewrite (under_pvert_y vple) le_eqVlt negb_or=> /andP[].
-  rewrite (eqP (same_pvert_y vple samex))=> /negbTE -> _.
+  rewrite (same_pvert_y vple samex)=> /negbTE -> _.
   move:(ppuh); rewrite (strict_under_pvert_y vphe) lt_neqAle=>/andP[].
-  rewrite (eqP (same_pvert_y vphe samex)).
+  rewrite (same_pvert_y vphe samex).
   move=>/negbTE -> _.
   by move: pph; rewrite lt_neqAle eq_sym => /andP[] /negbTE -> _.
 
@@ -6304,7 +6303,7 @@ case ogq: (outgoing e) => [ | g1 gs]; last first.
     have ppuh : pp <<< he.
       rewrite (strict_under_pvert_y vphe).
       apply: (lt_trans ppl).
-      rewrite (eqP (same_pvert_y vphe samex)).
+      rewrite (same_pvert_y vphe samex).
       by rewrite -(strict_under_pvert_y vp).
     have := lcase_open fno nos' lno'; rewrite ogq=> /(_ oeq isT ppl).
     move=> [{}lcase_open tail_false].
@@ -6331,7 +6330,7 @@ case ogq: (outgoing e) => [ | g1 gs]; last first.
   move: hcase; rewrite lno'q=> ->.
   have ppal : pp >>> le.
     rewrite (under_pvert_y vple) -ltNge.
-    rewrite (eqP (same_pvert_y vple samex)).
+    rewrite (same_pvert_y vple samex).
     apply: lt_trans pph.
     by rewrite ltNge -(under_pvert_y vl).
  (* here need to prove that the only side where pp can be is the side of lcc *)
