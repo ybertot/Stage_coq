@@ -7333,7 +7333,8 @@ Lemma start_edge_covered_general_position bottom top s closed open evs :
   {in s & evs, forall g e, non_inner g (point e)} ->
   {in evs, forall e, uniq (outgoing e)} ->
   start evs bottom top = (open, closed) ->
-  {in events_to_edges evs, forall g, edge_covered g open closed}.
+  {in events_to_edges evs, forall g, edge_covered g open closed} /\
+  {in evs, forall e, exists2 c, c \in open ++ closed & point e \in left_pts c}.
 Proof.
 move=> ltev boxwf startok nocs' inbox_s evin lexev evsub out_evs cle
   n_inner uniq_edges.
@@ -7342,7 +7343,7 @@ have nocs : {in bottom :: top :: s &, no_crossing R}.
   by apply: inter_at_ext_no_crossing.
 *)
 rewrite /start.
-case evsq : evs => [ | ev future_events]; first by move=> r_eq g.
+case evsq : evs => [ | ev future_events]; first by split; move=> r_eq ?.
 have evsn0 : evs != [::] by rewrite evsq.
 have := initial_edge_covering_general_position ltev lexev boxwf cle
   startok nocs' n_inner evin evsub out_evs uniq_edges evsn0.
@@ -7353,18 +7354,22 @@ move=> istateP req.
 suff main : forall events op cl st cov_set, 
   edge_covered_general_position_invariant bottom top s cov_set st events ->
   scan events st = (op, cl) ->
-  {in events_to_edges (cov_set ++ events), forall g, edge_covered g op cl}.
+  ({in events_to_edges (cov_set ++ events), forall g, edge_covered g op cl} /\
+  {in cov_set ++ events, forall e, exists2 c, c \in op ++ cl &
+    point e \in left_pts c}).
   by move: req; apply: (main _ _ _ _ [:: ev]).
-move=> {req istateP istate oca_eq lno nos evsn0 evsq future_events ev}.
-move=> {uniq_edges n_inner out_evs evsub lexev evin startok ltev}.
-move=> {cle closed open evs}.
-elim=> [ | ev evs Ih] op cl st cov_set.
+  move=> {req istateP istate oca_eq lno nos evsn0 evsq future_events ev}.
+  move=> {uniq_edges n_inner out_evs evsub lexev evin startok ltev}.
+  move=> {cle closed open evs}.
+  elim=> [ | ev evs Ih] op cl st cov_set.
   case: st => fop lsto lop cls lstc lsthe lstx /=.
-  move=> []; rewrite /state_open_seq/state_closed_seq /=.
-  move=> main _ _ _ _ _ _ [] <- <-.
-  move=> g; rewrite cats0=> /flatten_mapP[e' /main /[apply]].
-  apply: edge_covered_sub; first by [].
-  by move=> c; rewrite mem_rcons.
+  move=> []; rewrite /state_open_seq/state_closed_seq /= => + p_main.
+  move=> main _ _ _ _ _ [] <- <-; rewrite cats0; split.
+    move=> g=> /flatten_mapP[e' /main /[apply]].
+    apply: edge_covered_sub; first by [].
+    by move=> c; rewrite mem_rcons.
+  move=> e=> /p_main [c2 c2in pin2]; exists c2=> //.
+  by move: c2in; rewrite !mem_cat mem_rcons.
 move=> inv0; rewrite -cat_rcons.
 apply: Ih.
 case stq : st => [fop lsto lop cls lstc lsthe lstx].
