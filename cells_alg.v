@@ -7587,7 +7587,6 @@ have lt_p_ev :
 by constructor.
 Qed.
 
-
 Lemma start_safe_sides bottom top s closed open evs :
   sorted (fun e1 e2=> p_x (point e1) < p_x (point e2)) evs ->
   bottom <| top ->
@@ -7604,7 +7603,9 @@ Lemma start_safe_sides bottom top s closed open evs :
   {in s & evs, forall g e, non_inner g (point e)} ->
   {in evs, forall e, uniq (outgoing e)} ->
   start evs bottom top = (open, closed) ->
- {in closed, forall c p,
+ {in closed, forall c,
+     closed_cell_side_limit_ok c /\
+    forall p,
      in_safe_side_left p c || in_safe_side_right p c ->
      {in events_to_edges evs, forall g, ~ p === g} /\
      {in evs, forall ev, p != point ev}}.
@@ -7614,7 +7615,7 @@ move=> ltev boxwf startok nocs' inbox_s evin lexev evsub out_evs cle
 have nocs : {in bottom :: top :: s &, no_crossing R}.
   by apply: inter_at_ext_no_crossing.
 rewrite /start.
-case evsq : evs => [ | ev future_events]; first by move=> r_eq g.
+case evsq : evs => [ | ev future_events]; first by move=> [] _ <- c.
 have evsn0 : evs != [::] by rewrite evsq.
 case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
 set istate := Bscan _ _ _ _ _ _ _.
@@ -7627,14 +7628,17 @@ move=> invss req.
 suff main: forall events op cl st processed_set, 
   safe_side_general_position_invariant bottom top s processed_set st events ->
   scan events st = (op, cl) ->
-  {in cl, forall c p, in_safe_side_left p c || in_safe_side_right p c ->
+  {in cl, forall c,
+    closed_cell_side_limit_ok c /\
+    forall p, in_safe_side_left p c || in_safe_side_right p c ->
     {in events_to_edges (processed_set ++ events), forall g, ~ p === g} /\
          {in processed_set ++ events, forall e', p != point e'}} /\
   {in op, forall c p, in_safe_side_left p c ->
          {in events_to_edges (processed_set ++ events), forall g, ~ p === g} /\
          {in processed_set ++ events, forall e', p != point e'}}.
   have [A B] := main _ _ _ _ _ invss req.
-  by move=> c cin p pside; have := A c cin p pside.
+  move=> c cin; move: (A c cin) => [] clok A'; split; first by [].
+  by move=> p pside; have := A' _ pside.
 elim=> [ | {evsq oca_eq istate invss}ev {req}future_events Ih] op cl st p_set.
   case stq : st => [fop lsto lop cls lstc lsthe lstx] [].
   move=> d_inv e_inv.
@@ -7643,7 +7647,9 @@ elim=> [ | {evsq oca_eq istate invss}ev {req}future_events Ih] op cl st p_set.
      lolt rllt clok rl A B C D.
   rewrite /= => -[] <- <-; rewrite !cats0.
   split.
-    move=> c cin p pin; split.
+    move=> c cin.
+    split; first by apply: (allP clok); rewrite mem_rcons.
+    move=> p pin; split.
       by move=> g gin; apply: (A g c gin); rewrite // mem_rcons.
     by move=> e ein; apply: (C e c ein); rewrite // mem_rcons.
   move=> c cin p pin.
