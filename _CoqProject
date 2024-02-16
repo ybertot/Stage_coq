@@ -5,6 +5,7 @@ math_comp_complements.v
 points_and_edges.v
 events.v
 cells.v
+opening_cells.v
 cells_alg.v
 trials.v
 draw.v

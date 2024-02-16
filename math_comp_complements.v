@@ -211,3 +211,61 @@ by apply: newx.
 Qed.
 
 End abstract_subsets_and_partition.
+
+Section subset_tactic.
+
+Lemma all_sub [T : eqType] [p : pred T] [s1 s2 : seq T] :
+  {subset s1 <= s2} -> all p s2 -> all p s1.
+Proof.  by move=> subs as2; apply/allP=> x xin; apply/(allP as2)/subs. Qed.
+
+Lemma subset_consl [T : eqType] (x : T) (s s': seq T) :
+  x \in s' -> {subset s <= s'} -> {subset (x :: s) <= s'}.
+Proof.
+by move=> xin ssub g; rewrite inE=> /orP[/eqP -> // | ]; apply: ssub.
+Qed.
+
+Lemma subset_catl [T : eqType] (s1 s2 s' : seq T) :
+  {subset s1 <= s'} -> {subset s2 <= s'} -> {subset s1 ++ s2 <= s'}.
+Proof.
+move=> s1sub s2sub g; rewrite mem_cat=>/orP[];[apply: s1sub | apply s2sub].
+Qed.
+
+Lemma subset_catrl [T : eqType] [s s1 s2 : seq T] :
+  {subset s <= s1} -> {subset s <= s1 ++ s2}.
+Proof. by move=> ssub g gn; rewrite mem_cat ssub. Qed.
+
+Lemma subset_catrr [T : eqType] [s s1 s2 : seq T] :
+  {subset s <= s2} -> {subset s <= s1 ++ s2}.
+Proof. by move=> ssub g gn; rewrite mem_cat ssub ?orbT. Qed.
+
+Lemma subset_id [T : eqType] [s : seq T] : {subset s <= s}.
+Proof. by move=> x. Qed.
+
+Lemma subset_head [T : eqType] [s1 s2 : seq T] [x : T] :
+  {subset (x :: s1) <= s2} -> head x s1 \in s2.
+Proof. 
+by move=> sub; apply: sub; case: s1=> [ | a ?] /=; rewrite !inE eqxx ?orbT.
+Qed.
+
+End subset_tactic.
+
+Ltac subset_tac :=
+  trivial; 
+  match goal with
+  | |- {subset ?x <= ?x} => apply: subset_id
+  | |- {subset (_ :: _) <= _} => apply: subset_consl; subset_tac
+  | |- {subset (_ ++ _) <= _} => apply: subset_catl; subset_tac
+  | |- {subset _ <= _ ++ _} => 
+     solve[(apply: subset_catrl; subset_tac)] || 
+     (apply: subset_catrr; subset_tac)
+  | |- {subset _ <= _} =>
+    let g := fresh "g" in let gin := fresh "gin" in
+    move=> g gin; rewrite !(mem_cat, inE, cat_rcons);
+    rewrite ?eqxx ?gin ?orbT //; subset_tac
+  | |- is_true (?x \in (?x :: _)) => rewrite inE eqxx; done
+  | |- is_true (head _ (rcons _ _) \in _) => rewrite head_rcons; subset_tac
+  | |- is_true (head _ _ \in _) => apply: subset_head; subset_tac
+  | |- is_true (_ \in (_ :: _)) => rewrite inE; apply/orP; right; subset_tac
+  | |- is_true (_ \in (_ ++ _)) => rewrite mem_cat; apply/orP;
+    (solve [left; subset_tac] || (right; subset_tac))
+  end.
