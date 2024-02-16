@@ -26,27 +26,6 @@ Notation dummy_pt := (dummy_pt R).
 Notation dummy_edge := (dummy_edge R).
 Notation dummy_cell := (dummy_cell R).
 
-Definition close_cell (p : pt) (c : cell) :=
-  match vertical_intersection_point p (low c),
-        vertical_intersection_point p (high c) with
-  | None, _ | _, None => c
-  | Some p1, Some p2 => 
-    Bcell (left_pts c) (no_dup_seq [:: p1; p; p2]) (low c) (high c)
-  end.
-
-Definition closing_cells (p : pt) (contact_cells: seq cell) : seq cell :=
-  [seq close_cell p c | c <- contact_cells].
-
-Lemma close_cell_preserve_3sides p c :
-  [/\ low (close_cell p c) = low c,
-      high (close_cell p c) = high c &
-      left_pts (close_cell p c) = left_pts c].
-Proof.
-rewrite /close_cell.
-case: (vertical_intersection_point p (low c))=> [p1 | ] //.
-by case: (vertical_intersection_point p (high c))=> [p2 | ].
-Qed.
-
 Fixpoint open_cells_decomposition_contact open_cells pt :
    option (seq cell * seq cell * cell) :=
 if open_cells is c :: q then

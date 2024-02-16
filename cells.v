@@ -141,6 +141,38 @@ Definition inside_box p :=
   ((p_x (left_pt bottom) < p_x p < p_x (right_pt bottom)) &&
   (p_x (left_pt top) < p_x p < p_x (right_pt top))).
 
+(* this function removes consecutives duplicates, meaning the seq needs
+ to be sorted first if we want to remove all duplicates *)
+Fixpoint no_dup_seq (A : eqType) (s : seq A) : (seq A) :=
+  match s with
+  | [::] => [::]
+  | a::q => match q with
+            | [::] => s
+            | b::r => if a == b then no_dup_seq q else a::(no_dup_seq q)
+            end
+    end.
+
+Definition close_cell (p : pt) (c : cell) :=
+  match vertical_intersection_point p (low c),
+        vertical_intersection_point p (high c) with
+  | None, _ | _, None => c
+  | Some p1, Some p2 => 
+    Bcell (left_pts c) (no_dup_seq [:: p1; p; p2]) (low c) (high c)
+  end.
+
+Definition closing_cells (p : pt) (contact_cells: seq cell) : seq cell :=
+  [seq close_cell p c | c <- contact_cells].
+
+Lemma close_cell_preserve_3sides p c :
+  [/\ low (close_cell p c) = low c,
+      high (close_cell p c) = high c &
+      left_pts (close_cell p c) = left_pts c].
+Proof.
+rewrite /close_cell.
+case: (vertical_intersection_point p (low c))=> [p1 | ] //.
+by case: (vertical_intersection_point p (high c))=> [p2 | ].
+Qed.
+
 Lemma inside_box_between p : inside_box p -> between_edges bottom top p.
 Proof.  by move=> /andP[]. Qed.
 

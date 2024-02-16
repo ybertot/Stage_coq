@@ -25,34 +25,25 @@ Notation dummy_pt := (dummy_pt R).
 Notation dummy_edge := (dummy_edge R).
 Notation dummy_cell := (dummy_cell R).
 
-(* this function removes consecutives duplicates, meaning the seq needs
- to be sorted first if we want to remove all duplicates *)
-Fixpoint no_dup_seq (A : eqType) (s : seq A) : (seq A) :=
-  match s with
-  | [::] => [::]
-  | a::q => match q with
-            | [::] => s
-            | b::r => if a == b then no_dup_seq q else a::(no_dup_seq q)
-            end
-    end.
-
 Fixpoint opening_cells_aux (p : pt) (out : seq edge) (low_e high_e : edge) 
   : seq cell * cell :=
-      match out with
-    | [::] => let op0 := vertical_intersection_point p low_e in
-              let op1 := vertical_intersection_point p high_e in
-                      match (op0,op1) with
-                          |(None,_) |(_,None)=> ([::], dummy_cell)
-                          |(Some(p0),Some(p1)) =>
-                              ([::] , Bcell  (no_dup_seq ([:: p1; p; p0])) [::] low_e high_e)                      end
-    | c::q => let op0 := vertical_intersection_point p low_e in
-              let (s, nc) := opening_cells_aux p q c high_e in
-                    match op0 with
-                       | None => ([::], dummy_cell)
-                       | Some(p0) =>
-                        (Bcell  (no_dup_seq([:: p; p0])) [::] low_e c :: s,
-                         nc)
-                    end
+  match out with
+  | [::] =>
+      let op0 := vertical_intersection_point p low_e in
+      let op1 := vertical_intersection_point p high_e in
+      match (op0,op1) with
+      |(None,_) |(_,None)=> ([::], dummy_cell)
+      |(Some(p0),Some(p1)) =>
+        ([::] , Bcell  (no_dup_seq ([:: p1; p; p0])) [::] low_e high_e)
+      end
+  | c::q =>
+    let op0 := vertical_intersection_point p low_e in
+    let (s, nc) := opening_cells_aux p q c high_e in
+    match op0 with
+    | None => ([::], dummy_cell)
+    | Some(p0) =>
+      (Bcell  (no_dup_seq([:: p; p0])) [::] low_e c :: s, nc)
+  end
 end.
 
 Definition opening_cells (p : pt) (out : seq edge) (l h : edge) : seq cell :=
@@ -1069,6 +1060,93 @@ rewrite map_rcons rcons_uniq.
 rewrite oca_eq /= in lg2 lg1.
 by rewrite lg2 lg1 g2nin ul.
 Qed.
+
+(* TODO : move to points_and_edges. *)
+Lemma half_point_valid (g : edge) (p1 p2 : pt) :
+  valid_edge g p1 -> valid_edge g p2 ->
+  valid_edge g {| p_x := (p_x p1 + p_x p2) / 2; p_y := (p_y p1 + p_y p2) /2 |}.
+Proof.
+rewrite /valid_edge; move=> /andP[] vp1l vp1r /andP[] vp2l vp2r /=.
+have cst2gt0 : (0 < 2 :> R) by apply: addr_gt0.
+apply/andP; split.
+  rewrite -(ler_pM2r cst2gt0) -mulrA mulVf ?mulr1; last by apply: lt0r_neq0.
+  by rewrite mulrDr !mulr1 lerD.
+rewrite -(ler_pM2r cst2gt0) -mulrA mulVf ?mulr1; last by apply: lt0r_neq0.
+by rewrite mulrDr !mulr1 lerD.
+Qed.
+
+Lemma half_between (x y : R) : x < y -> x < (x + y) / 2 < y.
+Proof.
+move=> xy.
+have cst2gt0 : (0 < 2 :> R) by apply: addr_gt0.
+apply/andP; split.
+  rewrite -(ltr_pM2r cst2gt0) -mulrA mulVf ?mulr1; last by apply: lt0r_neq0.
+  by rewrite mulrDr !mulr1 ler_ltD.
+rewrite -(ltr_pM2r cst2gt0) -mulrA mulVf ?mulr1; last by apply: lt0r_neq0.
+by rewrite mulrDr !mulr1 ltr_leD.
+Qed.
+
+Lemma half_between_edges (g1 g2 : edge) p :
+  valid_edge g1 p -> valid_edge g2 p -> p >>= g1 -> p <<< g2 ->
+  {| p_x := p_x p; p_y := (pvert_y p g1 + pvert_y p g2) / 2|} >>> g1 /\
+  {| p_x := p_x p; p_y := (pvert_y p g1 + pvert_y p g2) / 2|} <<< g2.
+Proof.
+move=> vg1 vg2 pal puh; set p1 := Bpt _ _.
+have samex : p_x p1 == p_x p by rewrite eqxx.
+have v1g1 : valid_edge g1 p1 by rewrite (same_x_valid _ samex).
+have v1g2 : valid_edge g2 p1 by rewrite (same_x_valid _ samex).
+rewrite (under_pvert_y v1g1) (strict_under_pvert_y v1g2) -ltNge; apply/andP.
+apply: half_between.
+have := puh; rewrite (strict_under_pvert_y vg2); apply: le_lt_trans.
+by rewrite leNgt -(strict_under_pvert_y vg1).
+Qed.
+
+Lemma opening_cells_non_empty e le he:
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  point e >>> le ->
+  point e <<< he ->
+  out_left_event e ->
+  uniq (outgoing e) ->
+  {in [:: le, he & outgoing e] &, forall e1 e2, inter_at_ext e1 e2} ->
+  {in opening_cells (point e) (outgoing e) le he, forall c p,
+     valid_edge (low c) p -> valid_edge (high c) p ->
+     p_x (point e) < p_x p ->
+     exists q, [&& q >>> low (close_cell p c), q <<< high (close_cell p c)&
+                 left_limit (close_cell p c) < p_x q < 
+                 right_limit (close_cell p c)]}.
+Proof.
+move=> vle vhe pal puh oute une noc.
+rewrite /opening_cells.
+have : {subset le :: sort (@edge_below _) (outgoing e) <=
+               [:: le, he & outgoing e]}.
+  move=> g; rewrite inE mem_sort=> /orP[/eqP -> | ]; first by subset_tac.
+  by move=> gin; rewrite !inE gin !orbT.
+have := outleft_event_sort oute.
+elim: (sort _ _) {-4} (le) vle (underWC pal)=> [ | g1 gs Ih].
+  move=> g0 vg0 pag0 _ sub0.
+  rewrite /= (pvertE vg0) (pvertE vhe) /=.
+  set c0 := (X in [:: X])=> ?; rewrite inE => /eqP -> p vlp vhp pxgt.
+  (* point p0 has no guarantee concerning the vertical position. *)
+  set p0 := {| p_x := (p_x (point e) + p_x p) / 2;
+               p_y := (p_x (point e) + p_x p) / 2 |}.
+  have vlp0 : valid_edge g0 p0 by apply: half_point_valid.
+  set p1 := {| p_x := p_x p0; p_y := pvert_y p0 g0|}.
+  have vlp1 : valid_edge g0 p1 by apply: half_point_valid.
+  have vhp1 : valid_edge he p1 by apply: half_point_valid.
+  have p1ong0 : p1 === g0 by apply: (pvert_on vlp0).
+  have g0bhe : g0 <| he.
+    have := edge_below_from_point_above _ vlp vhp.
+      rewrite 
+      rewrite (strict_nonAunder vlp1) p1ong0 /=.
+  have p1uh : p1 <<< he.
+
+
+  have := half_between_edges vlp1 vhp1.
+  set q := {| p_x := p_x p1; p_y := (pvert_y p1 g0 + pvert_y p1 he) / 2|}.
+  
+
+  have := fun p => close_cell_preserve_3sides p c0.
 
 End opening_cells.
 
