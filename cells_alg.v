@@ -1171,7 +1171,7 @@ case: (opening_cells_aux _ _ _ _) => [s1 c1] {} Ih /=.
 by rewrite vle vc Ih.
 Qed.
 
-Lemma adjacent_opening_aux' p s le he news newc :
+Lemma adjacent_opening_aux p s le he news newc :
   valid_edge le p -> valid_edge he p ->
   {in s, forall g, left_pt g == p} ->
   opening_cells_aux p s le he = (news, newc) -> 
@@ -1193,7 +1193,7 @@ case: (s1) Ih1 Ih2 => [ | a s'] /=.
 by move=> -> ->; rewrite eqxx.
 Qed.
 
-Lemma adjacent_opening' p s le he:
+Lemma adjacent_opening p s le he:
   valid_edge le p -> valid_edge he p ->
   {in s, forall g, left_pt g == p} ->
   adjacent_cells (opening_cells p s le he).
@@ -1202,7 +1202,7 @@ move=> vle vhe lefts.
 have lefts' : {in sort (@edge_below _) s, forall g, left_pt g == p}.
   by move=> g; rewrite mem_sort; apply: lefts.
 rewrite /opening_cells; case oca_eq: (opening_cells_aux _ _ _ _) => [so co].
-by have [] := adjacent_opening_aux' vle vhe  lefts' oca_eq.
+by have [] := adjacent_opening_aux vle vhe  lefts' oca_eq.
 Qed.
 
 Lemma opening_cells_last_lexePt e low_e high_e c :
@@ -1280,72 +1280,6 @@ have := IH c' einfc' c'v outq nc' c'infh.
 by rewrite oca_eq.
 Qed.
 
-Lemma opening_cells_aux_side_limit' e s le he s' c':
-  valid_edge le e -> valid_edge he e -> le <| he ->
-  e >>= le -> e <<< he ->
-  {in [:: le, he & s] &, no_crossing R} ->
-  {in s, forall g, left_pt g == e} ->
-  opening_cells_aux e s le he = (s', c') ->
-  all open_cell_side_limit_ok (rcons s' c').
-Proof.
-move=> + vh.
-elim : s le s' c'=> [ | g s Ih] le s' c' /= vl lowhigh above under noc lg.
-  have := pvertE vl; set p1 := Bpt _ _ => /[dup] vip1 ->.
-  have := pvertE vh; set p2 := Bpt _ _ => /[dup] vip2 ->.
-  rewrite /open_cell_side_limit_ok => -[] <- <- /=.
-  have [v1 on1 x1] : [/\ valid_edge le p1, p1 === le & p_x e = p_x p1].
-    by have [on1 xp] := intersection_on_edge vip1.
-  have [v2 on2 x2] : [/\ valid_edge he p2, p2 === he & p_x e = p_x p2].
-    by have [on2 xp] := intersection_on_edge vip2.
-  have p2ne : p2 != e.
-    apply/eqP=> A; have := strict_under_edge_lower_y x2 on2.
-    by rewrite under => /esym; rewrite ltNge A lexx.
-  rewrite (negbTE p2ne); case: ifP => [p1ise | p1ne] /=;
-    move: on1 on2; rewrite ?(eqP p2ise) -?(eqP p1ise) => on1 on2;
-    rewrite ?eqxx ?on1 ?on2 ?(eqP p2ise) -?(eqP p1ise) -?x1 -?x2
-        ?eqxx ?andbT //=.
-    have euh : e <<= he.
-      apply: (order_edges_viz_point' vl)=> //.
-      move: on1; rewrite /point_on_edge /point_under_edge=>/andP[]/eqP -> _.
-      by rewrite lexx.
-    rewrite lt_neqAle.
-    have tmp:= (under_edge_lower_y x2 on2).
-    rewrite (eqP p1ise) /p1 /p2 /= in tmp; rewrite -tmp {tmp}.
-    rewrite -/p1 -(eqP p1ise) euh andbT.
-    apply/negP=> A; case/negP: p2ne; rewrite pt_eqE (eqP p1ise) /=.
-    by rewrite (eqP A) !eqxx.
-  rewrite -(strict_under_edge_lower_y x2 on2) under /=.
-  rewrite ltNge le_eqVlt negb_or.
-  rewrite -(strict_under_edge_lower_y x1 on1) above andbT.
-  by apply/negP=> A;case/negbT/negP:p1ne; rewrite pt_eqE -?x1 (eqP A) !eqxx.
-have /eqP lgg : left_pt g == e by apply: lg; rewrite inE eqxx.
-have := pvertE vl; set p1 := Bpt _ _ => /[dup] vip1 ->.
-have [v1 on1 x1] : [/\ valid_edge le p1, p1 === le & p_x e = p_x p1].
-  by have [on1 xp] := intersection_on_edge vip1.
-have eong : e === g by rewrite -(eqP (lg g _)) ?inE ?eqxx // left_on_edge.
-case oca_eq : (opening_cells_aux _ _ _ _) => [so co] [] <- <-.
-rewrite /=; apply/andP; split.
-  rewrite /open_cell_side_limit_ok.
-  case: ifP=> [eisp1 | enp1] /=;
-    rewrite -?x1 !eqxx on1 -?(eqP eisp1) ?eong ?andbT //=.
-  rewrite ltNge le_eqVlt negb_or.
-  rewrite -(strict_under_edge_lower_y x1 on1) above andbT.
-  by apply/negP=> A; case/negP: enp1; rewrite pt_eqE (eqP A) x1 ?eqxx.
-apply/allP=> c cintl.
-suff/allP/(_ c cintl) : all open_cell_side_limit_ok (rcons so co) by [].
-apply: (Ih g) => //.
-- by apply: valid_edge_extremities; rewrite lg ?inE ?eqxx.
-- have [hein gin] : he \in [:: le , he, g & s] /\ g \in [:: le, he, g & s].
-    by split; rewrite !inE eqxx ?orbT.
-  have := no_crossingE (noc _ _ gin hein).
-  rewrite (eqP (lg _ _)); last by rewrite inE eqxx.
-  by move=> /(_ vh) [] /(_ under).
-- by rewrite -(eqP (lg g _)) ?inE ?eqxx ?left_pt_above.
-- move: noc; apply: sub_in2.
-  by move=> g'; rewrite !inE => /orP [-> |/orP[-> | ->]]; rewrite ?orbT.
-by move: lg; apply: sub_in1 => g' gin; rewrite inE gin orbT.
-Qed.
-
 Lemma opening_cells_aux_side_limit e s le he s' c':
   valid_edge le e -> valid_edge he e ->
   e >>= le -> e <<< he ->
@@ -1416,63 +1350,433 @@ case oca_eq : (opening_cells_aux _ _ _ _) => [so co].
 by apply.
 Qed.
 
-Lemma opening_cells_below_high p e c s le he:
-  (e >>> le) && (e <<< he) ->
-  valid_edge le e ->
-  valid_edge he e ->
-  valid_edge he p -> (forall g, g \in s -> left_pt g == e) ->
-  {in le::he::s &, no_crossing R} ->
-  c \in opening_cells e s le he -> strict_inside_open p c -> p <<< he.
-Proof.
-move=> ebounds vle vhe vp gleft noc oc /andP[]/andP[] plhc _ lims.
-move: (ebounds) => /andP[] above under.
-have labove : e >>= le by rewrite -leNgt ltW // ltNge; exact: above.
-have := opening_cells_subset vle vhe gleft oc => /andP[] _.
-rewrite inE=>/orP[/eqP <- //|hcin].
-have hcin' : high c \in le :: he :: s by rewrite !inE hcin ?orbT.
-have hein : he \in le :: he :: s by rewrite !inE eqxx !orbT.
-have blo : high c <| he.
-  have := no_crossingE (@noc _ _ hcin' hein).
-  rewrite (eqP (gleft _ hcin)) vhe.
-  by move: ebounds=> /andP[] _ -> /(_ isT)[] /(_ isT).
-apply: (order_edges_strict_viz_point' _ vp blo plhc).
-have cok := opening_cells_side_limit vle vhe labove under gleft.
-move: cok =>/allP/(_ c oc) {}cok.
-by apply: (valid_high_limits cok); move: lims=> /andP[] -> /ltW ->.
-Qed.
-
-Lemma opening_cells_above_low p e c s le he:
-  (e >>> le) && (e <<< he) ->
-  valid_edge le e ->
-  valid_edge he e ->
-  valid_edge le p -> (forall g, g \in s -> left_pt g == e) ->
-  {in le:: he :: s &, no_crossing R} ->
-  c \in opening_cells e s le he -> strict_inside_open p c -> p >>> le.
-Proof.
-move=> ebounds vle vhe vp gleft noc oc /andP[]/andP[] _ palc lims.
-move: (ebounds) => /andP[] above under.
-have labove : e >>= le by rewrite -leNgt ltW // ltNge; exact: above.
-have := opening_cells_subset vle vhe gleft oc => /andP[] + _.
-rewrite inE=>/orP[/eqP <- //|lcin].
-have lcin' : low c \in le :: he :: s by rewrite !inE lcin !orbT.
-have lein : le \in le :: he :: s by rewrite !inE eqxx.
-have blo : le <| low c.
-  have := no_crossingE (@noc _ _ lcin' lein).
-  rewrite (eqP (gleft _ lcin)) vle.
-  by move: ebounds=> /andP[] -> _ /(_ isT)[] _ /(_ isT).
-apply/negP=> pule; case/negP: palc.
-apply: (order_edges_viz_point' vp _ blo pule).
-have cok := opening_cells_side_limit vle vhe labove under gleft.
-move: cok => /allP/(_ c oc) {}cok.
-by apply: (valid_low_limits cok); move: lims=> /andP[] -> /ltW ->.
-Qed.
-
 Lemma fan_edge_below_trans (s : seq edge) p :
   {in s, forall g, left_pt g == p} ->
   {in s & &, transitive (@edge_below R)}.
 Proof.
 move=> lcnd g1 g2 g3 g1in g2in g3in.
 by apply: trans_edge_below_out (eqP (lcnd _ _))(eqP (lcnd _ _))(eqP (lcnd _ _)).
+Qed.
+
+Lemma opening_cells_pairwise' e le he :
+   point e >>> le ->
+   point e <<< he ->
+   out_left_event e ->
+   {in le :: he :: outgoing e &, no_crossing R} ->
+   valid_edge le (point e) ->
+   valid_edge he (point e) ->
+   pairwise (@edge_below _)
+         [seq high x | x <- (opening_cells (point e) (outgoing e) le he)].
+Proof.
+move=> pal puh (* lein hein *) oute noc vle vhe; rewrite /opening_cells.
+have oute' := outleft_event_sort oute.
+have lein : le \in le :: he :: sort (@edge_below _) (outgoing e) by subset_tac.
+have hein : he \in le :: he :: sort (@edge_below _) (outgoing e) by subset_tac.
+have subo' : {subset sort (@edge_below _) (outgoing e) <=
+   le :: he :: sort (@edge_below _) (outgoing e)} by subset_tac.
+have sub' : (le :: he :: sort (@edge_below _) (outgoing e)) =i (le :: he :: (outgoing e)).
+  by move=> g; rewrite !inE mem_sort.
+have noc' : {in le :: he :: sort (@edge_below _) (outgoing e) &, no_crossing R}.
+  by move=> g1 g2; rewrite !sub'; apply: noc.
+case oca_eq : opening_cells_aux => [s' c].
+rewrite pairwise_map pairwise_rcons -pairwise_map /=.
+have [_ it _]:= outgoing_conditions pal puh lein hein vle vhe subo' noc' oute'.
+have := opening_cells_aux_high vle vhe oute'; rewrite oca_eq /= => highsq.
+ apply/andP; split.
+  rewrite [X in is_true X]
+     (_ : _ = all (fun x => x <| high c) [seq high x | x <- s']); last first.
+    by rewrite all_map.
+  have := opening_cells_aux_high_last vle vhe oute'; rewrite oca_eq /= => ->.
+  by rewrite highsq; apply/allP.
+rewrite highsq.
+have loc_trans : {in sort (@edge_below _) (outgoing e) & &,
+ transitive (@edge_below _)}.
+  by apply: (@fan_edge_below_trans _ (point e)).
+have /sort_edge_below_sorted : {in outgoing e &, no_crossing _}.
+  by move=> x y xin yin; apply: noc; subset_tac.
+by rewrite (sorted_pairwise_in loc_trans (allss _)).
+Qed.
+
+Lemma opening_cells_contains_point e le he nos:
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  point e >>> le ->
+  point e <<< he ->
+  out_left_event e ->
+  opening_cells (point e) (outgoing e) le he = nos ->
+  {in nos, forall c, contains_point (point e) c}.
+Proof.
+move=> vle vhe pal puh oute oceq.
+have oute' := outleft_event_sort oute.
+have := opening_cells_aux_subset vle vhe oute'.
+move: oceq; rewrite /opening_cells.
+case oca_eq : (opening_cells_aux _ _ _ _)=> [nos' lno'] <- /(_ _ _ _ erefl).
+move=> main x xin; rewrite /contains_point.
+move: (main x xin); rewrite !inE=> /andP[] lows highs.
+apply/andP; split.
+  move: lows=> /orP[/eqP -> | /oute'/eqP <-]; first by rewrite underWC.
+  by rewrite left_pt_above.
+move: highs=> /orP[/eqP -> | /oute'/eqP <-]; first by rewrite underW.
+by rewrite left_pt_below.
+Qed.
+
+Lemma opening_cells_last_left_pts e le he :
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  out_left_event e ->
+  outgoing e != nil ->
+  point e <<< he ->
+  left_pts (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e))
+     le he).2
+ = Bpt (p_x (point e)) (pvert_y (point e) he) :: point e :: nil.
+Proof.
+move=> vle vhe oute onn puh.
+have oute' := outleft_event_sort oute.
+have puh' : p_y (point e) < pvert_y (point e) he.
+  by rewrite -strict_under_pvert_y.
+have pdif :{| p_x := p_x (point e); p_y := pvert_y (point e) he |} != point e.
+  rewrite pt_eqE negb_and /=; apply/orP; right; rewrite eq_sym.
+  by move: puh'; rewrite lt_neqAle => /andP[] ->.
+case ogeq : (sort _ (outgoing e)) (mem_sort (@edge_below _) (outgoing e)) =>
+  [ | fog ogs] // .
+  move=> abs; case ogeq' : (outgoing e) onn => [ | f q] //=.
+  by suff : f \in [::];[rewrite in_nil | rewrite abs ogeq' inE eqxx].
+move=> elems.
+have lf : left_pt fog = point e.
+  by move: oute'; rewrite ogeq=> oute2; apply/eqP/oute2; rewrite inE eqxx.
+have vf : valid_edge fog (point e) by rewrite valid_edge_extremities // lf eqxx.
+rewrite /= pvertE //.
+have : {subset ogs <= outgoing e} by move=> x xin; rewrite -elems inE xin orbT.
+move: (fog) lf vf {ogeq elems}.
+elim : (ogs) le {vle} => [ | f q Ih] //= => le fog1 lfog1 vf1 qsubo.
+  rewrite pvertE // pvertE //= (negbTE pdif).
+  have -> : pvert_y (point e) fog1 = p_y (point e).
+     by apply on_pvert; rewrite -lfog1 left_on_edge.
+  rewrite pt_eqE /= !eqxx /=; congr (_ :: _ :: _); apply/eqP.
+  by rewrite pt_eqE /= !eqxx.
+case oca_eq: (opening_cells_aux _ _ _ _) => [s c].
+rewrite pvertE //=.
+have lfq : left_pt f = point e.
+  by apply/eqP/oute'; rewrite mem_sort qsubo // inE eqxx.
+have vf : valid_edge f (point e).
+  by apply: valid_edge_extremities; rewrite lfq eqxx.
+have qsub : {subset q <= outgoing e}.
+  by move=> x xin; apply: qsubo; rewrite inE xin orbT.
+by have := Ih le f lfq vf qsub; rewrite oca_eq /=.
+Qed.
+
+Lemma opening_cells_aux_absurd_case e le he (s : seq edge) :
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  s != [::] ->
+  {in s, forall g, left_pt g == point e} ->
+   (opening_cells_aux (point e) (sort (@edge_below _) s) le he).1 != [::].
+Proof.
+move=> vle vhe + outs; case sq : s => [ // | a s'] _.
+case ssq : (sort (@edge_below _) s) => [ | b s2].
+  by suff : a \in [::];[ | rewrite -ssq mem_sort sq inE eqxx].
+rewrite -sq ssq /= pvertE //.
+by case oca_eq : (opening_cells_aux _ _ _ _).
+Qed.
+
+(* TODO : complain that there is no sort_eq0 lemma with statement
+   (sort r l == [::]) = (l == [::]) *)
+
+Lemma opening_cells_1 e le he:
+  outgoing e != [::] ->
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  out_left_event e ->
+  exists fno nos lno, opening_cells (point e) (outgoing e) le he =
+       fno :: rcons nos lno.
+Proof.
+move=> ogn vle vhe oute.
+rewrite /opening_cells.
+have := opening_cells_aux_absurd_case vle vhe ogn oute.
+set x := (opening_cells_aux _ _ _ _).
+case x => [ [ | fno nos] lno] // _.
+by exists fno, nos, lno.
+Qed.
+
+Lemma opening_cells_in p' s le he :
+  valid_edge le p' -> valid_edge he p' ->
+  {in s, forall g, left_pt g == p'} ->
+  {in opening_cells p' s le he, forall c, p' \in left_pts c}.
+Proof.
+move=> + vhe outp.
+rewrite /opening_cells.
+have {outp} : {in sort (@edge_below _) s, forall g, left_pt g == p'}.
+  by move=> g; rewrite mem_sort; apply: outp.
+elim: (sort _ _) le => [ | g gs Ih] le.
+  move=> _ /= vle g.
+  rewrite (pvertE vle) (pvertE vhe) !inE => /eqP ->.
+  case: ifP=> []; case: ifP=> [] /=.
+        by move=> /eqP -> // /eqP <-; rewrite inE eqxx.
+      by rewrite mem_head.
+    by move=> /eqP <-; rewrite !inE eqxx orbT.
+  by rewrite !inE eqxx ?orbT.
+move=> outp vl.
+have lgq : left_pt g = p' by apply/eqP; apply: (outp _ (mem_head _ _)).
+have vg : valid_edge g p' by rewrite -lgq valid_edge_left.
+have {}outp : {in gs, forall g, left_pt g == p'}.
+  by move=> g' gin; apply: outp; rewrite inE gin orbT.
+have {}Ih := Ih g outp vg.
+rewrite /= (pvertE vl); case oca_eq : (opening_cells_aux _ _ _ _)=> [nos lno].
+move: Ih; rewrite oca_eq /= => Ih.
+move=> c; rewrite inE=> /orP[/eqP -> /= |]; last by apply: Ih.
+case: ifP; last by rewrite mem_head.
+by move=> /eqP <-; rewrite mem_head.
+Qed.
+
+Lemma last_opening_cells_side_char e le he pp nos lno :
+  outgoing e != [::] ->
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  point e <<< he ->
+  out_left_event e ->
+  opening_cells (point e) (outgoing e) le he = rcons nos lno ->
+  in_safe_side_left pp lno =
+   [&& p_x pp == p_x (point e), p_y (point e) < p_y pp & pp <<< he].
+Proof.
+move=> ogn0 vle vhe puh oute oeq.
+have oute' := outleft_event_sort oute.
+have oca_eq:
+  (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he) =
+ (nos, lno).
+  move: oeq; rewrite /opening_cells; case: (opening_cells_aux _ _ _ _)=> [a b].
+  by move/eqP; rewrite eqseq_rcons=> /andP[] /eqP -> /eqP ->.
+have lnoin : lno \in opening_cells (point e) (outgoing e) le he.
+  by rewrite oeq mem_rcons mem_head.
+rewrite /in_safe_side_left.
+have := opening_cells_left oute vle vhe lnoin=> ->.
+have [samex /= | ] := boolP (p_x pp == p_x (point e)); last by [].
+have highlno : high lno = he.
+  by have := opening_cells_aux_high_last vle vhe oute'; rewrite oca_eq.
+rewrite highlno [in RHS]andbC.
+have := opening_cells_1 ogn0 vle vhe oute => -[fno [nos' [lno' oeq']]].
+have [nosq lnoq] : nos = fno :: nos' /\ lno = lno'.
+  move: oeq'; rewrite oeq -[fno :: rcons _ _]/(rcons (fno :: _) _) => /eqP.
+  by rewrite eqseq_rcons => /andP[] /eqP -> /eqP ->.
+have llnoq : low lno = high (last fno nos').
+  have := adjacent_opening vle vhe oute; rewrite oeq'.
+  rewrite /= -cats1 cat_path=> /andP[] _ /=.
+  by rewrite andbT lnoq eq_sym=> /eqP.
+have /oute lfnoq : high (last fno nos') \in outgoing e.
+  have := opening_cells_high vle vhe oute; rewrite oeq'.
+  have := size_sort (@edge_below _) (outgoing e).
+(* TODO : should use some lemma here *)
+  rewrite -(mem_sort (@edge_below _)); case: (sort _ _) => [ | w w'] //=.
+    by move=>/eqP; rewrite eq_sym size_eq0 (negbTE ogn0).
+  move=> _ [] <-; rewrite map_rcons=> /eqP.
+  rewrite eqseq_rcons => /andP[] /eqP <- _.
+  by elim/last_ind: (nos') => [ | ? ? _];
+rewrite ?mem_head // last_rcons inE map_rcons mem_rcons mem_head orbT.
+have eonl : point e === low lno by rewrite llnoq -(eqP lfnoq) left_on_edge.
+have ppal : (pp >>> low lno) = (p_y (point e) < p_y pp).
+  have := under_edge_lower_y (eqP samex) eonl => ->.
+  by rewrite -ltNge.
+rewrite ppal.
+have := opening_cells_last_left_pts vle vhe oute ogn0 puh.
+rewrite oca_eq /= => ->.
+have [ppuh /= | ] := boolP (pp <<< he); last by [].
+have [ppae /= | ] := boolP (p_y (point e) < p_y pp); last by [].
+rewrite !inE !pt_eqE /=.
+have vpphe : valid_edge he pp by rewrite (same_x_valid _ samex).
+rewrite -(same_pvert_y vpphe samex).
+move: ppuh; rewrite (strict_under_pvert_y vpphe) lt_neqAle=> /andP[].
+move=> /negbTE -> _.
+move: ppae; rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
+by rewrite !andbF.
+Qed.
+
+Lemma opening_cells_first_left_pts e le he :
+  valid_edge le (point e) ->
+  outgoing e != nil ->
+  point e >>> le ->
+  left_pts 
+     (head dummy_cell
+     (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e))
+     le he).1)
+ = point e :: Bpt (p_x (point e)) (pvert_y (point e) le) :: nil.
+Proof.
+move=> vle onn pal.
+set W := sort _ _.
+have sgt0 : (0 < size W)%N by rewrite /W size_sort; case : (outgoing e) onn.
+case Wq : W sgt0 => [ // | g1 gs'] _ /=.
+case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
+rewrite pvertE //=.
+case: ifP=> // samept.
+have := pvert_on vle; rewrite -(eqP samept) => onle.
+have /andP[/eqP pf _] := onle.
+by move: pal; rewrite /point_under_edge pf le_eqVlt eqxx.
+Qed.
+
+Lemma first_opening_cells_side_char e le he pp fno nos lno :
+  outgoing e != [::] ->
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  point e >>> le ->
+  out_left_event e ->
+  opening_cells (point e) (outgoing e) le he = rcons (fno :: nos) lno ->
+  in_safe_side_left pp fno =
+   [&& p_x pp == p_x (point e), p_y pp  < p_y (point e) & pp >>> le].
+Proof.
+move=> ogn0 vle vhe pal oute oeq.
+have oute' := outleft_event_sort oute.
+have oca_eq:
+  (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he) =
+ ((fno :: nos), lno).
+  move: oeq; rewrite /opening_cells; case: (opening_cells_aux _ _ _ _)=> [a b].
+  by move/eqP; rewrite eqseq_rcons=> /andP[] /eqP -> /eqP ->.
+have fnoin : fno \in opening_cells (point e) (outgoing e) le he.
+  by rewrite oeq mem_rcons !inE eqxx orbT.
+rewrite /in_safe_side_left.
+have := opening_cells_left oute vle vhe fnoin=> ->.
+have [samex /= | ] := boolP (p_x pp == p_x (point e)); last by [].
+have lowfno : low fno = le.
+  by rewrite (lower_edge_new_cells vle vhe oeq).
+rewrite lowfno.
+have /oute hfnoq : high fno \in outgoing e.
+  have := opening_cells_high vle vhe oute; rewrite oeq /=.
+  have := size_sort (@edge_below _) (outgoing e).
+(* TODO : should use some lemma here *)
+  rewrite -(mem_sort (@edge_below _)); case: (sort _ _) => [ | w w'] //=.
+    by move=>/eqP; rewrite eq_sym size_eq0 (negbTE ogn0).
+  move=> _ [] <-; rewrite map_rcons=> /eqP.
+  rewrite eqseq_rcons => /andP[] /eqP <- _.
+  by rewrite mem_head.
+have eonh : point e === high fno by rewrite -(eqP hfnoq) left_on_edge.
+have ppue : (pp <<< high fno) = (p_y pp < p_y (point e)).
+  by have := strict_under_edge_lower_y (eqP samex) eonh.
+rewrite ppue.
+have := opening_cells_first_left_pts he vle ogn0 pal.
+rewrite oca_eq /= => ->.
+have [{}ppue /= | ] := boolP (p_y pp < p_y (point e)); last by [].
+have [ppal /= | ] := boolP (pp >>> le); last by [].
+rewrite !inE !pt_eqE /=.
+have vpple : valid_edge le pp by rewrite (same_x_valid _ samex).
+rewrite -(same_pvert_y vpple samex).
+move: ppal; rewrite (under_pvert_y vpple) le_eqVlt negb_or=> /andP[].
+move=> /negbTE -> _.
+move: ppue; rewrite lt_neqAle=> /andP[] /negbTE -> _.
+by rewrite !andbF.
+Qed.
+
+Lemma middle_opening_cells_side_char e le he pp fno nos lno :
+  outgoing e != [::] ->
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  out_left_event e ->
+  opening_cells (point e) (outgoing e) le he = rcons (fno :: nos) lno ->
+  ~~ has (in_safe_side_left pp) nos.
+Proof.
+move=> ogn0 vle vhe oute oeq.
+have oute' := outleft_event_sort oute.
+have oca_eq:
+  (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he) =
+ ((fno :: nos), lno).
+  move: oeq; rewrite /opening_cells; case: (opening_cells_aux _ _ _ _)=> [a b].
+  by move/eqP; rewrite eqseq_rcons=> /andP[] /eqP -> /eqP ->.
+rewrite -all_predC; apply/allP=> c cino /=.
+have cin : c \in opening_cells (point e) (outgoing e) le he.
+  by rewrite oeq mem_rcons !(inE, mem_cat) cino !orbT.
+rewrite /in_safe_side_left.
+have := opening_cells_left oute vle vhe cin=> ->.
+have [samex /= | ] := boolP (p_x pp == p_x (point e)); last by [].
+have /oute hc : high c \in outgoing e.
+  have := opening_cells_high vle vhe oute; rewrite oeq /=.
+  have := size_sort (@edge_below _) (outgoing e).
+(* TODO : should use some lemma here *)
+  rewrite -(mem_sort (@edge_below _)); case: (sort _ _) => [ | w w'] //=.
+    by move=>/eqP; rewrite eq_sym size_eq0 (negbTE ogn0).
+  move=> _ [] <-; rewrite map_rcons=> /eqP.
+  rewrite eqseq_rcons => /andP[] /eqP <- _.
+  by rewrite inE map_f ?orbT.
+have /oute lc : low c \in outgoing e.
+  have := opening_cells_high vle vhe oute; rewrite oeq /=.
+  have /= := opening_cells_seq_edge_shift oute' vle vhe oca_eq.
+  move=> [] _ -> /eqP; rewrite eqseq_rcons=> /andP[] /eqP + _.
+  rewrite -(mem_sort (@edge_below _)) => <-.
+  by rewrite map_f // mem_rcons inE cino orbT.
+have eonh : point e === high c by rewrite -(eqP hc) left_on_edge.
+have eonl : point e === low c by rewrite -(eqP lc) left_on_edge.
+have := strict_under_edge_lower_y (eqP samex) eonh=> ->.
+have := under_edge_lower_y (eqP samex) eonl=> ->.
+by rewrite le_eqVlt negb_or -!andbA andbCA; case: (_ < _); rewrite !andbF.
+Qed.
+
+Lemma single_opening_cell_side_char e le he pp :
+  valid_edge le (point e) ->
+  valid_edge he (point e) ->
+  point e >>> le ->
+  point e <<< he ->
+  outgoing e = [::] ->
+  has (in_safe_side_left pp) (opening_cells (point e) (outgoing e) le he) =
+  ([&& p_x pp == p_x (point e), pp >>> le & p_y pp < p_y (point e)] ||
+   [&& p_x pp == p_x (point e), pp <<< he & p_y (point e) < p_y pp]).
+Proof.
+move=> vle vhe pal puh og0.
+have oute : out_left_event e by move=> g; rewrite og0 in_nil.
+have [ppe | ppne] := eqVneq pp (point e).
+  rewrite ppe !lt_irreflexive !andbF.
+  apply /negbTE; rewrite -all_predC; apply/allP=> c cin /=.
+  have einl := opening_cells_in vle vhe oute cin.
+  by rewrite /in_safe_side_left einl !andbF.
+have := opening_cells_left oute vle vhe.
+rewrite og0 /opening_cells /=.
+rewrite (pvertE vle) (pvertE vhe) /= orbF.
+set c := Bcell _ _ _ _.
+move=> /(_ _ (mem_head _ _)).
+rewrite /in_safe_side_left /= => ->.
+have [samex /= | ] := boolP (p_x pp == p_x (point e)); last by [].
+rewrite andbCA.
+have puhy : p_y (point e) < pvert_y (point e) he.
+  by rewrite -(strict_under_pvert_y vhe).
+have paly :  pvert_y (point e) le < p_y (point e).
+  by rewrite ltNge -(under_pvert_y vle).
+
+rewrite !pt_eqE /= eqxx /=.
+move: (puhy); rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
+move: (paly); rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
+have vpple : valid_edge le pp by rewrite (same_x_valid _ samex).
+have vpphe : valid_edge he pp by rewrite (same_x_valid _ samex).
+
+have [ | pa] := lerP (p_y pp) (p_y (point e)); rewrite ?(andbF, orbF).
+  rewrite le_eqVlt => /orP[samey | /[dup] pu ->].
+    by case/negP: ppne; rewrite pt_eqE samex samey.
+  have [ppale | _] := boolP (pp >>> le); last by [].
+  have -> : pp <<< he.
+    rewrite (strict_under_pvert_y vpphe).
+    rewrite (same_pvert_y vpphe samex).
+    by apply: (lt_trans pu); rewrite -(strict_under_pvert_y vhe).
+  rewrite /=.
+  have ppaly :  pvert_y (point e) le < p_y pp.
+    rewrite -(same_pvert_y vpple samex).
+    by rewrite ltNge -(under_pvert_y vpple).
+  rewrite !inE (negbTE ppne) !pt_eqE /=.
+  move: ppaly; rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
+  have ppuhy : p_y pp < pvert_y (point e) he.
+    by apply: (lt_trans pu).
+  move: ppuhy; rewrite lt_neqAle => /andP[] /negbTE -> _.
+  by rewrite !andbF.
+move=> {c}.
+rewrite ltNge le_eqVlt pa orbT andbF andbT /=.
+have [ppuhe | _] := boolP (pp <<< he); last by rewrite andbF.
+have ppale : pp >>> le.
+  rewrite (under_pvert_y vpple).
+  rewrite (same_pvert_y vpple samex) -ltNge.
+  by apply: (lt_trans _ pa); rewrite ltNge -(under_pvert_y vle).
+rewrite /=.
+have ppaly :  pvert_y (point e) le < p_y pp.
+  rewrite -(same_pvert_y vpple samex).
+  by rewrite ltNge -(under_pvert_y vpple).
+rewrite !inE (negbTE ppne) !pt_eqE /=.
+move: ppaly; rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
+have ppuhy : p_y pp < pvert_y (point e) he.
+  rewrite -(same_pvert_y vpphe samex).
+  by rewrite -(strict_under_pvert_y vpphe).
+ move: ppuhy; rewrite lt_neqAle => /andP[] /negbTE -> _.
+by rewrite ppale !andbF.
 Qed.
 
 End opening_cells.
@@ -1862,8 +2166,9 @@ Let oute' : {in sort (@edge_below _) (outgoing e),
     forall g, left_pt g == (point e)}.
 Proof. by move=> x; rewrite mem_sort; apply: oute. Defined.
 
-(* This has been moved here temporarily, it is expected to be
-  transferred to the opening_cells section. *)
+(* This was a temporary movement section for objects
+  transferred to the opening_cells section, but now it seems
+  opening_cells_pairwise has to stay in this part of the world. *)
 
 Lemma opening_cells_pairwise le he :
    point e >>> le ->
@@ -1875,25 +2180,13 @@ Lemma opening_cells_pairwise le he :
    pairwise (@edge_below _)
          [seq high x | x <- (opening_cells (point e) (outgoing e) le he)].
 Proof.
-move=> pal puh lein hein vle vhe; rewrite /opening_cells.
-case oca_eq : opening_cells_aux => [s c].
-rewrite pairwise_map pairwise_rcons -pairwise_map /=.
-have [_ it _]:= outgoing_conditions pal puh lein hein vle vhe subo' noc oute'.
-have := opening_cells_aux_high vle vhe oute'; rewrite oca_eq /= => highsq.
- apply/andP; split.
-  rewrite [X in is_true X]
-     (_ : _ = all (fun x => x <| high c) [seq high x | x <- s]); last first.
-    by rewrite all_map.
-  have := opening_cells_aux_high_last vle vhe oute'; rewrite oca_eq /= => ->.
-  by rewrite highsq; apply/allP.
-rewrite highsq.
-have loc_trans : {in sort (@edge_below _) (outgoing e) & &,
- transitive (@edge_below _)}.
-  by apply: (@fan_edge_below_trans _ (point e)).
-have /sort_edge_below_sorted : {in outgoing e &, no_crossing _}.
-  by move=> x y xin yin; apply: noc; rewrite /all_edges/events_to_edges /=;
-   rewrite !mem_cat ?xin ?yin ?orbT.
-by rewrite (sorted_pairwise_in loc_trans (allss _)).
+move=> pal puh lein hein vle vhe.
+apply: opening_cells_pairwise'=> //.
+have sub : {subset [:: le, he & outgoing e] <=
+               all_edges open (e :: future_events)}.
+  move=> g1; rewrite !inE=> /orP[/eqP -> | /orP[/eqP -> | gin]] //.
+  by rewrite mem_cat events_to_edges_cons !mem_cat gin !orbT.
+by move=> g1 g2 /sub g1in /sub g2in; apply: noc.
 Qed.
 
 (* end of temporary moving area. *)
@@ -1984,7 +2277,7 @@ split.
   move: sort_evs; rewrite futq /= => /andP[] _.
   rewrite path_sortedE; last by move=> x y z; apply: lexPt_trans.
   by move=> /andP[] /allP /(_ e' e'in).
-have [adjnew lownew] := adjacent_opening_aux' vle vhe oute' oca_eq.
+have [adjnew lownew] := adjacent_opening_aux vle vhe oute' oca_eq.
 have := opening_cells_aux_high_last vle vhe oute'; rewrite oca_eq heq /=.
 move=> hnlsto.
 split.
@@ -2097,20 +2390,6 @@ Lemma inv1_seq_set_left_pts s1 s2 c1 lpts :
   inv1_seq (s1 ++ set_left_pts c1 lpts :: s2) <->
   inv1_seq (s1 ++ c1 :: s2).
 Proof. exact (inv1_seq_set_pts s1 s2 c1 lpts (right_pts c1)). Qed.
-
-Lemma opening_cells_aux_absurd_case le he (s : seq edge) :
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  s != [::] ->
-  {in s, forall g, left_pt g == point e} ->
-   (opening_cells_aux (point e) (sort (@edge_below _) s) le he).1 != [::].
-Proof.
-move=> vle vhe + outs; case sq : s => [ // | a s'] _.
-case ssq : (sort (@edge_below _) s) => [ | b s2].
-  by suff : a \in [::];[ | rewrite -ssq mem_sort sq inE eqxx].
-rewrite -sq ssq /= pvertE //.
-by case oca_eq : (opening_cells_aux _ _ _ _).
-Qed.
 
 #[clearbody]
 Let vlo : valid_edge (low lsto) (point e).
@@ -2768,49 +3047,6 @@ have vhe : valid_edge he (point e) by apply: open_edge_valid.
 by rewrite pvertE // pvertE //= !map_cat /= cats0.
 Qed.
 
-Lemma opening_cells_last_left_pts le he :
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  outgoing e != nil ->
-  point e <<< he ->
-  left_pts (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e))
-     le he).2
- = Bpt (p_x (point e)) (pvert_y (point e) he) :: point e :: nil.
-Proof.
-move=> vle vhe onn puh.
-have puh' : p_y (point e) < pvert_y (point e) he.
-  by rewrite -strict_under_pvert_y.
-have pdif :{| p_x := p_x (point e); p_y := pvert_y (point e) he |} != point e.
-  rewrite pt_eqE negb_and /=; apply/orP; right; rewrite eq_sym.
-  by move: puh'; rewrite lt_neqAle => /andP[] ->.
-case ogeq : (sort _ (outgoing e)) (mem_sort (@edge_below _) (outgoing e)) =>
-  [ | fog ogs] // .
-  move=> abs; case ogeq' : (outgoing e) onn => [ | f q] //=.
-  by suff : f \in [::];[rewrite in_nil | rewrite abs ogeq' inE eqxx].
-move=> elems.
-have lf : left_pt fog = point e.
-  by move: oute'; rewrite ogeq=> oute2; apply/eqP/oute2; rewrite inE eqxx.
-have vf : valid_edge fog (point e) by rewrite valid_edge_extremities // lf eqxx.
-rewrite /= pvertE //.
-have : {subset ogs <= outgoing e} by move=> x xin; rewrite -elems inE xin orbT.
-move: (fog) lf vf {ogeq elems}.
-elim : (ogs) le {vle} => [ | f q Ih] //= => le fog1 lfog1 vf1 qsubo.
-  rewrite pvertE // pvertE //= (negbTE pdif).
-  have -> : pvert_y (point e) fog1 = p_y (point e).
-     by apply on_pvert; rewrite -lfog1 left_on_edge.
-  rewrite pt_eqE /= !eqxx /=; congr (_ :: _ :: _); apply/eqP.
-  by rewrite pt_eqE /= !eqxx.
-case oca_eq: (opening_cells_aux _ _ _ _) => [s c].
-rewrite pvertE //=.
-have lfq : left_pt f = point e.
-  by apply/eqP/oute'; rewrite mem_sort qsubo // inE eqxx.
-have vf : valid_edge f (point e).
-  by apply: valid_edge_extremities; rewrite lfq eqxx.
-have qsub : {subset q <= outgoing e}.
-  by move=> x xin; apply: qsubo; rewrite inE xin orbT.
-by have := Ih le f lfq vf qsub; rewrite oca_eq /=.
-Qed.
-
 Lemma update_open_cell_side_limit_ok new_op new_lsto:
   update_open_cell lsto e = (new_op, new_lsto) ->
   p_x (point e) = left_limit lsto ->
@@ -2855,7 +3091,7 @@ case oca_eq: (opening_cells_aux _ _ _ _) => [[ | fno nos] lno].
   by rewrite ogq oca_eq.
 move=> -[] <- <- /=.
 have ognn : outgoing e != [::] by rewrite ogq.
-have := opening_cells_last_left_pts vlo vho ognn puh; rewrite /=.
+have := opening_cells_last_left_pts vlo vho oute ognn puh; rewrite /=.
 rewrite ogq oca_eq /= => llnoq /=.
 move: (alllpts); rewrite lptsq /= => /andP[] _ /andP[] -> ->.
 move: pxq; rewrite /left_limit lptsq /= => ->; rewrite eqxx /=.
@@ -3187,7 +3423,7 @@ case oca_eq : (opening_cells_aux _ _ _ _) => [[ // | fno nos] lno] [] <- <-.
   have onn : outgoing e != [::] by rewrite o_eq.
   by have := opening_cells_aux_absurd_case vlo vho onn oute; rewrite oca_eq.
 rewrite /= last_rcons.
-have [/= A ->] := adjacent_opening_aux' vlo vho oute' oca_eq.
+have [/= A ->] := adjacent_opening_aux vlo vho oute' oca_eq.
 split;[ | split]=> //=.
   have := opening_cells_aux_high_last vlo vho oute'.
   by rewrite oca_eq /=.
@@ -3556,28 +3792,6 @@ rewrite geq; apply.
 by rewrite fcteq -fcteq' map_f // fcteq' last_cat /= mem_last.
 Qed.
 
-Lemma opening_cells_first_left_pts le he :
-  valid_edge le (point e) ->
-  outgoing e != nil ->
-  point e >>> le ->
-  left_pts 
-     (head dummy_cell
-     (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e))
-     le he).1)
- = point e :: Bpt (p_x (point e)) (pvert_y (point e) le) :: nil.
-Proof.
-move=> vle onn pal.
-set W := sort _ _.
-have sgt0 : (0 < size W)%N by rewrite /W size_sort; case : (outgoing e) onn.
-case Wq : W sgt0 => [ // | g1 gs'] _ /=.
-case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
-rewrite pvertE //=.
-case: ifP=> // samept.
-have := pvert_on vle; rewrite -(eqP samept) => onle.
-have /andP[/eqP pf _] := onle.
-by move: pal; rewrite /point_under_edge pf le_eqVlt eqxx.
-Qed.
-
 (* This is not used, just now. *)
 Lemma left_limit_closing_cells (cc : seq cell) (p1 : pt) :
   adjacent_cells cc -> seq_valid cc p1 ->
@@ -3672,7 +3886,7 @@ rewrite inE => /orP[/eqP -> | ].
     rewrite inE eqxx=> /(_ isT)=> /andP[] _ /andP[] _ /andP[] _ /andP[] _.
     have := opening_cells_first_left_pts (high c) vle _ pal.
     rewrite ogq oca_eq => /(_ isT) /= -> /=.
-    have [_ /= ] := adjacent_opening_aux' vle vhe oute3 oca_eq => ->.
+    have [_ /= ] := adjacent_opening_aux vle vhe oute3 oca_eq => ->.
     rewrite /=.
     move=> /on_edge_same_point /[apply] /=.
     rewrite xcond /left_limit lptsq /= eqxx => /(_ isT) /eqP ->.
@@ -4172,27 +4386,6 @@ rewrite oca_eq /= in lg2 lg1.
 by rewrite lg2 lg1 g2nin ul.
 Qed.
 
-Lemma opening_cells_contains_point le he nos:
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  point e >>> le ->
-  point e <<< he ->
-  opening_cells (point e) (outgoing e) le he = nos ->
-  {in nos, forall c, contains_point (point e) c}.
-Proof.
-move=> vle vhe pal puh oceq.
-have := opening_cells_aux_subset vle vhe oute'.
-move: oceq; rewrite /opening_cells.
-case oca_eq : (opening_cells_aux _ _ _ _)=> [nos' lno'] <- /(_ _ _ _ erefl).
-move=> main x xin; rewrite /contains_point.
-move: (main x xin); rewrite !inE=> /andP[] lows highs.
-apply/andP; split.
-  move: lows=> /orP[/eqP -> | /oute'/eqP <-]; first by rewrite underWC.
-  by rewrite left_pt_above.
-move: highs=> /orP[/eqP -> | /oute'/eqP <-]; first by rewrite underW.
-by rewrite left_pt_below.
-Qed.
-
 Lemma step_keeps_uniq_default fc cc lcc lc le he nos lno:
   open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
   opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he = (nos, lno) ->
@@ -4203,7 +4396,7 @@ have [ocd [lcc_ctn [all_ct [all_nct [flcnct [heq [leq [lein hein]]]]]]]] :=
     decomposition_main_properties oe exi.
 have [pal puh vle vhe old_nctn]:=
    decomposition_connect_properties rfo sval adj cbtom bet_e oe.
-have := opening_cells_contains_point vle vhe pal puh.
+have := opening_cells_contains_point vle vhe pal puh oute.
 rewrite /opening_cells oca_eq => /(_ _ erefl)=> new_ctn.
 have uo : uniq (sort (@edge_below _) (outgoing e)) by rewrite sort_uniq.
 have heno : he \notin (sort (@edge_below _) (outgoing e)).
@@ -4421,17 +4614,6 @@ rewrite mem_cat=> /orP[xin | ].
   have /ccP // : x \in closing_cells (point e) cc.
   by move/mapP: xin=> [] x' x'in ->; apply/map_f/mem_behead.
 by rewrite -mem_rcons; apply: closed_right_limit.
-Qed.
-
-Lemma outgoing_high_opening g le he:
-   valid_edge le (point e) -> valid_edge he (point e) ->
-   g \in (outgoing e) ->
-   exists2 c, c \in opening_cells (point e) (outgoing e) le he & high c = g.
-Proof.
-move=> vle vhe gin.
-have : g \in rcons (sort (@edge_below _) (outgoing e)) he.
-  by rewrite mem_rcons inE mem_sort gin orbT.
-by rewrite -(opening_cells_high vle vhe oute)=> /mapP[c cin ->]; exists c.
 Qed.
 
 Lemma contains_right (c : cell) :
@@ -5486,7 +5668,7 @@ have valcc : seq_valid cc (point e).
   by apply/allP=> x xin; apply: (allP sval); rewrite ocd !mem_cat xin ?orbT.
 have lonew : low (head dummy_cell
                  (opening_cells (point e) (outgoing e) le he)) = le.
-  have := adjacent_opening_aux' vl vp oute'; rewrite /opening_cells oca_eq.
+  have := adjacent_opening_aux vl vp oute'; rewrite /opening_cells oca_eq.
   by move=> /(_ _ _ erefl) [].
 have lonew' : head dummy_edge
     [seq low c | c <- opening_cells (point e) (outgoing e) le he] = le.
@@ -5891,357 +6073,6 @@ by case: ifP=> [/eqP <- | ];
   case: ifP=> [/eqP <- // | _ ]; rewrite !inE eqxx ?orbT.
 Qed.
 
-Lemma opening_cells_in p' s le he :
-  valid_edge le p' -> valid_edge he p' ->
-  {in s, forall g, left_pt g == p'} ->
-  {in opening_cells p' s le he, forall c, p' \in left_pts c}.
-Proof.
-move=> + vhe outp.
-rewrite /opening_cells.
-have {outp} : {in sort (@edge_below _) s, forall g, left_pt g == p'}.
-  by move=> g; rewrite mem_sort; apply: outp.
-elim: (sort _ _) le => [ | g gs Ih] le.
-  move=> _ /= vle g.
-  rewrite (pvertE vle) (pvertE vhe) !inE => /eqP ->.
-  case: ifP=> []; case: ifP=> [] /=.
-        by move=> /eqP -> // /eqP <-; rewrite inE eqxx.
-      by rewrite mem_head.
-    by move=> /eqP <-; rewrite !inE eqxx orbT.
-  by rewrite !inE eqxx ?orbT.
-move=> outp vl.
-have lgq : left_pt g = p' by apply/eqP; apply: (outp _ (mem_head _ _)).
-have vg : valid_edge g p' by rewrite -lgq valid_edge_left.
-have {}outp : {in gs, forall g, left_pt g == p'}.
-  by move=> g' gin; apply: outp; rewrite inE gin orbT.
-have {}Ih := Ih g outp vg.
-rewrite /= (pvertE vl); case oca_eq : (opening_cells_aux _ _ _ _)=> [nos lno].
-move: Ih; rewrite oca_eq /= => Ih.
-move=> c; rewrite inE=> /orP[/eqP -> /= |]; last by apply: Ih.
-case: ifP; last by rewrite mem_head.
-by move=> /eqP <-; rewrite mem_head.
-Qed.
-
-(* TODO : complain that there is no sort_eq0 lemma with statement
-   (sort r l == [::]) = (l == [::]) *)
-
-Lemma opening_cells_1 le he:
-  outgoing e != [::] ->
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  exists fno nos lno, opening_cells (point e) (outgoing e) le he =
-       fno :: rcons nos lno.
-Proof.
-move=> ogn vle vhe.
-rewrite /opening_cells.
-have := opening_cells_aux_absurd_case vle vhe ogn oute.
-set x := (opening_cells_aux _ _ _ _).
-case x => [ [ | fno nos] lno] // _.
-by exists fno, nos, lno.
-Qed.
-
-(* TODO : probably useless, thanks to the next few lemmas. *)
-Lemma opening_cells_follow_safe_side_y le he pp:
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  point e <<< he ->
-  outgoing e != [::] ->
-  p_x pp = p_x (point e) ->
-  has (in_safe_side_left pp)
-    (behead (opening_cells (point e) (outgoing e) le he)) =
-    (p_y (point e) < p_y pp) && (pp <<< he).
-Proof.
-move=> vle vhe puh ogn0 samex.
-have : sort (@edge_below _) (outgoing e) != [::].
-  move: (size_sort (@edge_below _) (outgoing e)).
-  case: (sort _ _)=> [ | a b] //.
-  by move=>/esym/eqP/=; rewrite size_eq0 (negbTE ogn0).
-move: oute'; rewrite /opening_cells.
-case: (sort _ _) => [ | g1 gs] //.
-rewrite /= (pvertE vle).
-move=> + _.
-case oca_eq : (opening_cells_aux _ _ _ _) => [w w'] /=.
-move: (samex) => /eqP samex'.
-move: w w' oca_eq.
-elim: gs g1 => [ | g2 gs Ih] g1.
-  move=> + + + out'.
-  have /eqP lg1 := out' _ (mem_head _ _).
-  have vg1 : valid_edge g1 (point e) by rewrite -lg1 valid_edge_left.
-  rewrite /= (pvertE vg1) (pvertE vhe).
-  move=> w w' [] <- <- /=.
-  have -> : point e == {| p_x := p_x (point e); p_y := pvert_y (point e) g1 |}.
-    rewrite pt_eqE eqxx /=.
-    by have /on_pvert -> : (point e) === g1 by rewrite -lg1 left_on_edge.
-  have ylthe : p_y (point e) < pvert_y (point e) he.
-    by rewrite -(strict_under_pvert_y vhe).
-  have /negbTE-> :
-     {| p_x := p_x (point e); p_y := pvert_y (point e) he|} != point e.
-    by move: ylthe; rewrite pt_eqE eqxx /= ltNge le_eqVlt negb_or=> /andP[] ->.
-  rewrite /in_safe_side_left /=.
-  rewrite /left_limit /= samex eqxx orbF /=.
-  have [heP // | abs] := boolP (pp <<< he); last by rewrite andbF.
-  have vpg1 : valid_edge g1 pp by rewrite (same_x_valid _ samex').
-  rewrite (under_pvert_y vpg1) -ltNge.
-  rewrite (same_pvert_y vpg1 samex').
-  have eong1 : point e === g1 by rewrite -lg1 left_on_edge.
-  rewrite (on_pvert eong1).
-  have [leP | abs] := boolP (p_y (point e) < p_y pp); last by [].
-  rewrite !inE !pt_eqE /= samex' /=.
-  move: leP; rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
-  have vphe : valid_edge he pp by rewrite (same_x_valid _ samex').
-  move: (samex'); rewrite eq_sym=> samex2.
-  rewrite (same_pvert_y vhe samex2).
-  move: heP; rewrite (strict_under_pvert_y vphe).
-  by rewrite lt_neqAle=> /andP[] /negbTE ->.
-rewrite /=.
-move=> + + + out'.
-have lg1 := out' _ (mem_head _ _).
-have vg1 : valid_edge g1 (point e) by rewrite -(eqP lg1) valid_edge_left.
-case oca_eq' : (opening_cells_aux _ _ _ _) => [u u'].
-rewrite (pvertE vg1).
-move=> w w' [] <- <- /= {w w'}.
-rewrite pt_eqE /= eqxx.
-have lg2 : left_pt g2 == point e.
-  by apply: out'; rewrite !inE eqxx orbT.
-have eong1 : point e === g1 by rewrite -(eqP lg1) left_on_edge.
-have eong2 : point e === g2 by rewrite -(eqP lg2) left_on_edge.
-have vg2 : valid_edge g2 (point e) by rewrite -(eqP lg2) valid_edge_left.
-have vpg1 : valid_edge g1 pp by rewrite (same_x_valid _ samex').
-have vpg2 : valid_edge g2 pp by rewrite (same_x_valid _ samex').
-rewrite /in_safe_side_left /=.
-rewrite (under_pvert_y vpg1) (strict_under_pvert_y vpg2).
-rewrite (same_pvert_y vpg1 samex') (same_pvert_y vpg2 samex').
-rewrite (on_pvert eong1) (on_pvert eong2).
-rewrite (andbA (p_y pp < _)); set P1 := ((p_y pp < _) && _).
-have -> : P1 = false; last rewrite !andbF /=.
-  rewrite {}/P1 -ltNge; apply/negP=> /andP[] /lt_trans /[apply].
-  by rewrite lt_irreflexive.
-apply: (Ih g2)=> //.
-by move=> g gin; apply: out'; rewrite inE gin orbT.
-Qed.
-
-Lemma last_opening_cells_side_char le he pp nos lno :
-  outgoing e != [::] ->
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  point e <<< he ->
-  opening_cells (point e) (outgoing e) le he = rcons nos lno ->
-  in_safe_side_left pp lno =
-   [&& p_x pp == p_x (point e), p_y (point e) < p_y pp & pp <<< he].
-Proof.
-move=> ogn0 vle vhe puh oeq.
-have oca_eq:
-  (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he) =
- (nos, lno).
-  move: oeq; rewrite /opening_cells; case: (opening_cells_aux _ _ _ _)=> [a b].
-  by move/eqP; rewrite eqseq_rcons=> /andP[] /eqP -> /eqP ->.
-have lnoin : lno \in opening_cells (point e) (outgoing e) le he.
-  by rewrite oeq mem_rcons mem_head.
-rewrite /in_safe_side_left.
-have := opening_cells_left oute vle vhe lnoin=> ->.
-have [samex /= | ] := boolP (p_x pp == p_x (point e)); last by [].
-have highlno : high lno = he.
-  by have := opening_cells_aux_high_last vle vhe oute'; rewrite oca_eq.
-rewrite highlno [in RHS]andbC.
-have := opening_cells_1 ogn0 vle vhe => -[fno [nos' [lno' oeq']]].
-have [nosq lnoq] : nos = fno :: nos' /\ lno = lno'.
-  move: oeq'; rewrite oeq -[fno :: rcons _ _]/(rcons (fno :: _) _) => /eqP.
-  by rewrite eqseq_rcons => /andP[] /eqP -> /eqP ->.
-have llnoq : low lno = high (last fno nos').
-  have := adjacent_opening' vle vhe oute; rewrite oeq'.
-  rewrite /= -cats1 cat_path=> /andP[] _ /=.
-  by rewrite andbT lnoq eq_sym=> /eqP.
-have /oute lfnoq : high (last fno nos') \in outgoing e.
-  have := opening_cells_high vle vhe oute; rewrite oeq'.
-  have := size_sort (@edge_below _) (outgoing e).
-(* TODO : should use some lemma here *)
-  rewrite -(mem_sort (@edge_below _)); case: (sort _ _) => [ | w w'] //=.
-    by move=>/eqP; rewrite eq_sym size_eq0 (negbTE ogn0).
-  move=> _ [] <-; rewrite map_rcons=> /eqP.
-  rewrite eqseq_rcons => /andP[] /eqP <- _.
-  by elim/last_ind: (nos') => [ | ? ? _];
-rewrite ?mem_head // last_rcons inE map_rcons mem_rcons mem_head orbT.
-have eonl : point e === low lno by rewrite llnoq -(eqP lfnoq) left_on_edge.
-have ppal : (pp >>> low lno) = (p_y (point e) < p_y pp).
-  have := under_edge_lower_y (eqP samex) eonl => ->.
-  by rewrite -ltNge.
-rewrite ppal.
-have := opening_cells_last_left_pts vle vhe ogn0 puh.
-rewrite oca_eq /= => ->.
-have [ppuh /= | ] := boolP (pp <<< he); last by [].
-have [ppae /= | ] := boolP (p_y (point e) < p_y pp); last by [].
-rewrite !inE !pt_eqE /=.
-have vpphe : valid_edge he pp by rewrite (same_x_valid _ samex).
-rewrite -(same_pvert_y vpphe samex).
-move: ppuh; rewrite (strict_under_pvert_y vpphe) lt_neqAle=> /andP[].
-move=> /negbTE -> _.
-move: ppae; rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
-by rewrite !andbF.
-Qed.
-
-Lemma first_opening_cells_side_char le he pp fno nos lno :
-  outgoing e != [::] ->
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  point e >>> le ->
-  opening_cells (point e) (outgoing e) le he = rcons (fno :: nos) lno ->
-  in_safe_side_left pp fno =
-   [&& p_x pp == p_x (point e), p_y pp  < p_y (point e) & pp >>> le].
-Proof.
-move=> ogn0 vle vhe pal oeq.
-have oca_eq:
-  (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he) =
- ((fno :: nos), lno).
-  move: oeq; rewrite /opening_cells; case: (opening_cells_aux _ _ _ _)=> [a b].
-  by move/eqP; rewrite eqseq_rcons=> /andP[] /eqP -> /eqP ->.
-have fnoin : fno \in opening_cells (point e) (outgoing e) le he.
-  by rewrite oeq mem_rcons !inE eqxx orbT.
-rewrite /in_safe_side_left.
-have := opening_cells_left oute vle vhe fnoin=> ->.
-have [samex /= | ] := boolP (p_x pp == p_x (point e)); last by [].
-have lowfno : low fno = le.
-  by rewrite (lower_edge_new_cells vle vhe oeq).
-rewrite lowfno.
-have /oute hfnoq : high fno \in outgoing e.
-  have := opening_cells_high vle vhe oute; rewrite oeq /=.
-  have := size_sort (@edge_below _) (outgoing e).
-(* TODO : should use some lemma here *)
-  rewrite -(mem_sort (@edge_below _)); case: (sort _ _) => [ | w w'] //=.
-    by move=>/eqP; rewrite eq_sym size_eq0 (negbTE ogn0).
-  move=> _ [] <-; rewrite map_rcons=> /eqP.
-  rewrite eqseq_rcons => /andP[] /eqP <- _.
-  by rewrite mem_head.
-have eonh : point e === high fno by rewrite -(eqP hfnoq) left_on_edge.
-have ppue : (pp <<< high fno) = (p_y pp < p_y (point e)).
-  by have := strict_under_edge_lower_y (eqP samex) eonh.
-rewrite ppue.
-have := opening_cells_first_left_pts he vle ogn0 pal.
-rewrite oca_eq /= => ->.
-have [{}ppue /= | ] := boolP (p_y pp < p_y (point e)); last by [].
-have [ppal /= | ] := boolP (pp >>> le); last by [].
-rewrite !inE !pt_eqE /=.
-have vpple : valid_edge le pp by rewrite (same_x_valid _ samex).
-rewrite -(same_pvert_y vpple samex).
-move: ppal; rewrite (under_pvert_y vpple) le_eqVlt negb_or=> /andP[].
-move=> /negbTE -> _.
-move: ppue; rewrite lt_neqAle=> /andP[] /negbTE -> _.
-by rewrite !andbF.
-Qed.
-
-Lemma middle_opening_cells_side_char le he pp fno nos lno :
-  outgoing e != [::] ->
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  opening_cells (point e) (outgoing e) le he = rcons (fno :: nos) lno ->
-  ~~ has (in_safe_side_left pp) nos.
-Proof.
-move=> ogn0 vle vhe oeq.
-have oca_eq:
-  (opening_cells_aux (point e) (sort (@edge_below _) (outgoing e)) le he) =
- ((fno :: nos), lno).
-  move: oeq; rewrite /opening_cells; case: (opening_cells_aux _ _ _ _)=> [a b].
-  by move/eqP; rewrite eqseq_rcons=> /andP[] /eqP -> /eqP ->.
-rewrite -all_predC; apply/allP=> c cino /=.
-have cin : c \in opening_cells (point e) (outgoing e) le he.
-  by rewrite oeq mem_rcons !(inE, mem_cat) cino !orbT.
-rewrite /in_safe_side_left.
-have := opening_cells_left oute vle vhe cin=> ->.
-have [samex /= | ] := boolP (p_x pp == p_x (point e)); last by [].
-have /oute hc : high c \in outgoing e.
-  have := opening_cells_high vle vhe oute; rewrite oeq /=.
-  have := size_sort (@edge_below _) (outgoing e).
-(* TODO : should use some lemma here *)
-  rewrite -(mem_sort (@edge_below _)); case: (sort _ _) => [ | w w'] //=.
-    by move=>/eqP; rewrite eq_sym size_eq0 (negbTE ogn0).
-  move=> _ [] <-; rewrite map_rcons=> /eqP.
-  rewrite eqseq_rcons => /andP[] /eqP <- _.
-  by rewrite inE map_f ?orbT.
-have /oute lc : low c \in outgoing e.
-  have := opening_cells_high vle vhe oute; rewrite oeq /=.
-  have /= := opening_cells_seq_edge_shift oute' vle vhe oca_eq.
-  move=> [] _ -> /eqP; rewrite eqseq_rcons=> /andP[] /eqP + _.
-  rewrite -(mem_sort (@edge_below _)) => <-.
-  by rewrite map_f // mem_rcons inE cino orbT.
-have eonh : point e === high c by rewrite -(eqP hc) left_on_edge.
-have eonl : point e === low c by rewrite -(eqP lc) left_on_edge.
-have := strict_under_edge_lower_y (eqP samex) eonh=> ->.
-have := under_edge_lower_y (eqP samex) eonl=> ->.
-by rewrite le_eqVlt negb_or -!andbA andbCA; case: (_ < _); rewrite !andbF.
-Qed.
-
-Lemma single_opening_cell_side_char le he pp :
-  valid_edge le (point e) ->
-  valid_edge he (point e) ->
-  point e >>> le ->
-  point e <<< he ->
-  outgoing e = [::] ->
-  has (in_safe_side_left pp) (opening_cells (point e) (outgoing e) le he) =
-  ([&& p_x pp == p_x (point e), pp >>> le & p_y pp < p_y (point e)] ||
-   [&& p_x pp == p_x (point e), pp <<< he & p_y (point e) < p_y pp]).
-Proof.
-move=> vle vhe pal puh og0.
-have out' : out_left_event e by move=> g; rewrite og0 in_nil.
-have [ppe | ppne] := eqVneq pp (point e).
-  rewrite ppe !lt_irreflexive !andbF.
-  apply /negbTE; rewrite -all_predC; apply/allP=> c cin /=.
-  have einl := opening_cells_in vle vhe out' cin.
-  by rewrite /in_safe_side_left einl !andbF.
-have := opening_cells_left oute vle vhe.
-rewrite og0 /opening_cells /=.
-rewrite (pvertE vle) (pvertE vhe) /= orbF.
-set c := Bcell _ _ _ _.
-move=> /(_ _ (mem_head _ _)).
-rewrite /in_safe_side_left /= => ->.
-have [samex /= | ] := boolP (p_x pp == p_x (point e)); last by [].
-rewrite andbCA.
-have puhy : p_y (point e) < pvert_y (point e) he.
-  by rewrite -(strict_under_pvert_y vhe).
-have paly :  pvert_y (point e) le < p_y (point e).
-  by rewrite ltNge -(under_pvert_y vle).
-
-rewrite !pt_eqE /= eqxx /=.
-move: (puhy); rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
-move: (paly); rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
-have vpple : valid_edge le pp by rewrite (same_x_valid _ samex).
-have vpphe : valid_edge he pp by rewrite (same_x_valid _ samex).
-
-have [ | pa] := lerP (p_y pp) (p_y (point e)); rewrite ?(andbF, orbF).
-  rewrite le_eqVlt => /orP[samey | /[dup] pu ->].
-    by case/negP: ppne; rewrite pt_eqE samex samey.
-  have [ppale | _] := boolP (pp >>> le); last by [].
-  have -> : pp <<< he.
-    rewrite (strict_under_pvert_y vpphe).
-    rewrite (same_pvert_y vpphe samex).
-    by apply: (lt_trans pu); rewrite -(strict_under_pvert_y vhe).
-  rewrite /=.
-  have ppaly :  pvert_y (point e) le < p_y pp.
-    rewrite -(same_pvert_y vpple samex).
-    by rewrite ltNge -(under_pvert_y vpple).
-  rewrite !inE (negbTE ppne) !pt_eqE /=.
-  move: ppaly; rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
-  have ppuhy : p_y pp < pvert_y (point e) he.
-    by apply: (lt_trans pu).
-  move: ppuhy; rewrite lt_neqAle => /andP[] /negbTE -> _.
-  by rewrite !andbF.
-move=> {c}.
-rewrite ltNge le_eqVlt pa orbT andbF andbT /=.
-have [ppuhe | _] := boolP (pp <<< he); last by rewrite andbF.
-have ppale : pp >>> le.
-  rewrite (under_pvert_y vpple).
-  rewrite (same_pvert_y vpple samex) -ltNge.
-  by apply: (lt_trans _ pa); rewrite ltNge -(under_pvert_y vle).
-rewrite /=.
-have ppaly :  pvert_y (point e) le < p_y pp.
-  rewrite -(same_pvert_y vpple samex).
-  by rewrite ltNge -(under_pvert_y vpple).
-rewrite !inE (negbTE ppne) !pt_eqE /=.
-move: ppaly; rewrite lt_neqAle eq_sym=> /andP[] /negbTE -> _.
-have ppuhy : p_y pp < pvert_y (point e) he.
-  rewrite -(same_pvert_y vpphe samex).
-  by rewrite -(strict_under_pvert_y vpphe).
- move: ppuhy; rewrite lt_neqAle => /andP[] /negbTE -> _.
-by rewrite ppale !andbF.
-Qed.
-
 Lemma last_closing_side_char pp fc cc lcc lc le he :
   open_cells_decomposition open (point e) = (fc, cc, lcc, lc, le, he) ->
   cc != [::] ->
@@ -6494,10 +6325,10 @@ have := opening_cells_aux_absurd_case vle vhe ogq oute; rewrite oca_eq /=.
 case nosq : nos => [ | fno nos'] // _.
 move: oeq; rewrite nosq=> oeq.
 rewrite /=.
-rewrite (first_opening_cells_side_char pp ogq vle vhe pal oeq).
+rewrite (first_opening_cells_side_char pp ogq vle vhe pal oute oeq).
 rewrite [in X in _ == X]has_rcons.
-rewrite (last_opening_cells_side_char pp ogq vle vhe puh oeq).
-rewrite (negbTE (middle_opening_cells_side_char pp ogq vle vhe oeq)) orbF.
+rewrite (last_opening_cells_side_char pp ogq vle vhe puh oute oeq).
+rewrite (negbTE (middle_opening_cells_side_char pp ogq vle vhe oute oeq)) orbF.
 case ccq : cc => [ | cc1 cc'].  
     move: (oe); rewrite ccq=> oe'.
     rewrite /= (single_closing_side_char pp oe') orbF.
