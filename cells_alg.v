@@ -2680,23 +2680,6 @@ move: (allP svalcc _ cin) => /= /andP[] vloc vhic.
 by rewrite (pvertE vloc) (pvertE vhic).
 Qed.
 
-Lemma right_limit_close_cell p1 c :
-  valid_edge (low c) p1 -> valid_edge (high c) p1 ->
-  right_limit (close_cell p1 c) = p_x p1.
-Proof.
-move=> vlc vhc; rewrite /close_cell /right_limit.
-rewrite !pvertE //=.
-by case: ifP; case: ifP.
-Qed.
-
-Lemma left_limit_close_cell p1 c :
-   left_limit (close_cell p1 c) = left_limit c.
-Proof.
-rewrite /close_cell.
-by do 2 (case: (vertical_intersection_point _ _) => //).
-Qed.
-
-
 Definition set_right_pts (c : cell) (l : seq pt) :=
   Bcell (left_pts c) l (low c) (high c).
 
@@ -4929,7 +4912,7 @@ by rewrite (right_limit_close_cell vlc' vhc') le_refl.
 Qed.
 
 (* TODO : move to other file *)
-Lemma close_cell_in p' c :
+Lemma close_cell_in (p' : pt) c :
   valid_cell c p' ->
   p' \in right_pts (close_cell p' c).
 Proof.
@@ -6213,7 +6196,7 @@ have llop0ltev : left_limit op0 < p_x (point ev).
 have lltr : {in [:: close_cell (point ev) op0], 
   forall c, left_limit c < right_limit c}.
   move=> c; rewrite inE=> /eqP ->.
-  rewrite (@right_limit_close_cell (point ev) op0 vb0 vt0).
+  rewrite (@right_limit_close_cell _ (point ev) op0 vb0 vt0).
   by rewrite left_limit_close_cell.
 have clok: all (@closed_cell_side_limit_ok _) [:: close_cell (point ev) op0].
   rewrite /= andbT.

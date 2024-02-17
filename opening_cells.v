@@ -289,16 +289,6 @@ case: (opening_cells_aux _ _ _ _) => [s1 c1] - /(_ _ _ erefl) {} IH /=.
 by move=> [] <- <- /=; rewrite leg1.
 Qed.
 
-Lemma sort_edge_below_sorted s :
-  {in s &, @no_crossing _} ->
-  sorted (@edge_below R) (sort (@edge_below R) s).
-Proof.
-move=> noc.
-have /sort_sorted_in : {in s &, total (@edge_below _)}.
-  by move=> x1 x2 x1in x2in; apply/orP/noc.
-by apply; apply: allss.
-Qed.
-
 Lemma opening_cells_right_form p s low_e high_e :
 valid_edge low_e p ->
 valid_edge high_e p ->
@@ -632,7 +622,7 @@ Lemma opening_cells_pairwise' e le he :
    pairwise (@edge_below _)
          [seq high x | x <- (opening_cells (point e) (outgoing e) le he)].
 Proof.
-move=> pal puh (* lein hein *) oute noc vle vhe; rewrite /opening_cells.
+move=> pal puh oute noc vle vhe; rewrite /opening_cells.
 have oute' := outleft_event_sort oute.
 have lein : le \in le :: he :: sort (@edge_below _) (outgoing e) by subset_tac.
 have hein : he \in le :: he :: sort (@edge_below _) (outgoing e) by subset_tac.
@@ -1123,30 +1113,111 @@ have : {subset le :: sort (@edge_below _) (outgoing e) <=
   move=> g; rewrite inE mem_sort=> /orP[/eqP -> | ]; first by subset_tac.
   by move=> gin; rewrite !inE gin !orbT.
 have := outleft_event_sort oute.
-elim: (sort _ _) {-4} (le) vle (underWC pal)=> [ | g1 gs Ih].
-  move=> g0 vg0 pag0 _ sub0.
-  rewrite /= (pvertE vg0) (pvertE vhe) /=.
+have : sorted (@edge_below _) (le :: (sort (@edge_below _) (outgoing e))).
+  by apply: (sorted_outgoing vle vhe _ _ _ (inter_at_ext_no_crossing noc)).
+have : uniq (le :: sort (@edge_below _) (outgoing e)).
+  rewrite /= sort_uniq une andbT.
+  rewrite mem_sort; apply/negP=> /oute /eqP abs.
+  by move: pal; rewrite under_onVstrict // -abs left_on_edge.
+elim: (sort _ _) {-6} (le) vle (underWC pal)=> [ | g1 gs Ih] le' vle' pale'.
+  move=> _ _ _ sub0.
+  rewrite /= (pvertE vle') (pvertE vhe) /=.
   set c0 := (X in [:: X])=> ?; rewrite inE => /eqP -> p vlp vhp pxgt.
   (* point p0 has no guarantee concerning the vertical position. *)
   set p0 := {| p_x := (p_x (point e) + p_x p) / 2;
                p_y := (p_x (point e) + p_x p) / 2 |}.
-  have vlp0 : valid_edge g0 p0 by apply: half_point_valid.
-  set p1 := {| p_x := p_x p0; p_y := pvert_y p0 g0|}.
-  have vlp1 : valid_edge g0 p1 by apply: half_point_valid.
+  have vlp0 : valid_edge le' p0 by apply: half_point_valid.
+  set p1 := {| p_x := p_x p0; p_y := pvert_y p0 le'|}.
+  have vlp1 : valid_edge le' p1 by apply: half_point_valid.
   have vhp1 : valid_edge he p1 by apply: half_point_valid.
-  have p1ong0 : p1 === g0 by apply: (pvert_on vlp0).
-  have g0bhe : g0 <| he.
-    have := edge_below_from_point_above _ vlp vhp.
-      rewrite 
-      rewrite (strict_nonAunder vlp1) p1ong0 /=.
+  have p1onle' : p1 === le' by apply: (pvert_on vlp0).
+  have hein : he \in [:: le, he & outgoing e] by subset_tac.
+  have le'in : le' \in [:: le, he & outgoing e] by apply: sub0; subset_tac.
+  have ba' : inter_at_ext le' he by apply: noc.
+  have ba : below_alt le' he by apply: (inter_at_ext_no_crossing noc).
+  have le'bhe : le' <| he.
+    by apply: (edge_below_from_point_above ba vle' vhe).
   have p1uh : p1 <<< he.
-
-
-  have := half_between_edges vlp1 vhp1.
-  set q := {| p_x := p_x p1; p_y := (pvert_y p1 g0 + pvert_y p1 he) / 2|}.
-  
-
-  have := fun p => close_cell_preserve_3sides p c0.
+    have p1ule' : p1 <<= le' by rewrite (under_onVstrict vlp1) p1onle'.
+    have : p1 <<= he by apply: (order_edges_viz_point' vlp1).
+    rewrite (under_onVstrict vhp1)=> /orP[p1onhe |]; last by [].
+    case: ba'=> [lqh | ]; first by move: pale'; rewrite lqh puh.
+    move=> /(_ _ p1onle' p1onhe).
+    rewrite !inE=> /orP[] /eqP abs.
+      move: vle'; rewrite /valid_edge=> /andP[] + _; rewrite -abs.
+      rewrite leNgt=> /negP[].
+      by have := half_between pxgt=> /andP[] + _; apply.
+    move: vlp; rewrite /valid_edge=> /andP[] _; rewrite -abs.
+    rewrite leNgt=> /negP[].
+    by have := half_between pxgt=> /andP[] _ +.
+  have p1ale' : p1 >>= le' by rewrite (strict_nonAunder vlp1) p1onle'.
+  have := half_between_edges vlp1 vhp1 p1ale' p1uh.
+  set q := {| p_x := p_x p1; p_y := (pvert_y p1 le' + pvert_y p1 he) / 2|}.
+  move=> []qal quh.  
+  exists q.
+  have [-> -> _] := close_cell_preserve_3sides p c0.
+  rewrite right_limit_close_cell // left_limit_close_cell qal quh.
+  have := half_between pxgt=> /andP[] keepit ->; rewrite andbT /=.
+  rewrite /c0/=.
+  by case: ifP=>[] _; case: ifP=> [] _ /=; rewrite /left_limit /= keepit.
+move=> uns srt out sub /=.
+case oca_eq: opening_cells_aux => [s c].
+rewrite (pvertE vle') /=.
+set c0 := Bcell _ _ _ _.
+move=> c1; rewrite inE=> /orP[/eqP -> | c1in] p /= vlp vhc pxgt; last first.
+  have lg1 : left_pt g1 = (point e).
+    by have := out _ (mem_head _ _) => /eqP <-.
+  have vg1 : valid_edge g1 (point e) by rewrite -lg1 valid_edge_left.
+  have ag1 : point e >>= g1 by rewrite -lg1 left_pt_above.
+  have out' : forall ed, ed \in gs -> left_pt ed == point e.
+    by move=> ed edin; apply: out; rewrite inE edin orbT.
+  have sub' : {subset g1 :: gs <= [:: le, he & outgoing e]}.
+    by move=> g gin; apply: sub; rewrite inE gin orbT.
+  have c1in' : c1 \in (let (s0, c2) := opening_cells_aux (point e) gs g1 he in
+       rcons s0 c2).
+    by rewrite oca_eq.
+  have srt' : sorted (@edge_below _) (g1 :: gs) by move: srt=> /= /andP[] _.
+  have un' : uniq (g1 :: gs) by move: uns=> /= /andP[].
+  by apply: (Ih g1 vg1 ag1 un' srt' out' sub' _ c1in').
+have [-> -> _] := close_cell_preserve_3sides p c0.
+rewrite right_limit_close_cell // left_limit_close_cell.
+set p0 := {| p_x := (p_x (point e) + p_x p) / 2;
+               p_y := (p_x (point e) + p_x p) / 2 |}.
+have vlp0 : valid_edge le' p0 by apply: half_point_valid.
+set p1 := {| p_x := p_x p0; p_y := pvert_y p0 le'|}.
+have vlp1 : valid_edge le' p1 by apply: half_point_valid.
+have lg1 : left_pt g1 = point e by apply/eqP/out/mem_head.
+have vg1 : valid_edge g1 (point e) by rewrite -lg1 valid_edge_left.
+have vhp1 : valid_edge g1 p1 by apply: half_point_valid.
+have p1onle' : p1 === le' by apply: (pvert_on vlp0).
+have g1in : g1 \in [:: le, he & outgoing e] by apply: sub; subset_tac.
+have le'in : le' \in [:: le, he & outgoing e] by apply: sub; subset_tac.
+have ba' : inter_at_ext le' g1 by apply: noc.
+have ba : below_alt le' g1 by apply: (inter_at_ext_no_crossing noc).
+have le'bhe : le' <| g1 by move: srt=> /= /andP[].
+have p1ug1 : p1 <<< g1.
+  have p1ule' : p1 <<= le' by rewrite (under_onVstrict vlp1) p1onle'.
+  have : p1 <<= g1.
+    by apply: (order_edges_viz_point' vlp1).
+  rewrite (under_onVstrict vhp1)=> /orP[p1ong1 |]; last by [].
+  case: ba'=> [lqg1 | ]; first by move: uns; rewrite lqg1 /= inE eqxx.
+  move=> /(_ _ p1onle' p1ong1).
+  rewrite !inE=> /orP[] /eqP abs.
+    move: vle'; rewrite /valid_edge=> /andP[] + _; rewrite -abs.
+    rewrite leNgt=> /negP[].
+    by have := half_between pxgt=> /andP[] + _; apply.
+  move: vlp; rewrite /valid_edge=> /andP[] _; rewrite -abs.
+  rewrite leNgt=> /negP[].
+  by have := half_between pxgt=> /andP[] _ +.
+have p1ale' : p1 >>= le' by rewrite (strict_nonAunder vlp1) p1onle'.
+have := half_between_edges vlp1 vhp1 p1ale' p1ug1.
+set q := {| p_x := p_x p1; p_y := (pvert_y p1 le' + pvert_y p1 g1) / 2|}.
+move=> []qal qug1.
+exists q.
+have := half_between pxgt=> /andP[] keepit ->; rewrite andbT /=.
+rewrite /c0/= qal qug1 /=.
+by case: ifP=> [] _ /=; rewrite /left_limit /= keepit.
+Qed.
 
 End opening_cells.
 

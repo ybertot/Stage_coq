@@ -173,6 +173,22 @@ case: (vertical_intersection_point p (low c))=> [p1 | ] //.
 by case: (vertical_intersection_point p (high c))=> [p2 | ].
 Qed.
 
+Lemma right_limit_close_cell p1 c :
+  valid_edge (low c) p1 -> valid_edge (high c) p1 ->
+  right_limit (close_cell p1 c) = p_x p1.
+Proof.
+move=> vlc vhc; rewrite /close_cell /right_limit.
+rewrite !pvertE //=.
+by case: ifP; case: ifP.
+Qed.
+
+Lemma left_limit_close_cell p1 c :
+   left_limit (close_cell p1 c) = left_limit c.
+Proof.
+rewrite /close_cell.
+by do 2 (case: (vertical_intersection_point _ _) => //).
+Qed.
+
 Lemma inside_box_between p : inside_box p -> between_edges bottom top p.
 Proof.  by move=> /andP[]. Qed.
 

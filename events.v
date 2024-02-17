@@ -169,6 +169,16 @@ Proof.
 move=> outs g gin; rewrite -(eqP (outs _ gin)); apply: left_on_edge.
 Qed.
 
+Lemma sort_edge_below_sorted s :
+  {in s &, @no_crossing _} ->
+  sorted (@edge_below R) (sort (@edge_below R) s).
+Proof.
+move=> noc.
+have /sort_sorted_in : {in s &, total (@edge_below _)}.
+  by move=> x1 x2 x1in x2in; apply/orP/noc.
+by apply; apply: allss.
+Qed.
+
 Lemma sorted_outgoing le he e : 
   valid_edge le (point e) ->
   valid_edge he (point e) ->
