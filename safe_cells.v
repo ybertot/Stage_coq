@@ -37,8 +37,9 @@ Hypothesis disj_closed :  {in closed &, disjoint_closed_cells R}.
 Hypothesis disj_open :  {in [:: o_cell] & closed, disjoint_open_closed_cells R}.
 Hypothesis coverage : {in obstacles, forall g, edge_covered g [::] closed}.
 Hypothesis covered_points :
-   {in points, forall p, exists2 c, c \in [:: o_cell] ++
-             closed & p \in left_pts c}.
+   {in points, forall p, exists2 c, c \in closed & p \in right_pts c /\
+       (p >>> low c)}.
+
 Hypothesis closed_ok : {in closed, forall c, closed_cell_side_limit_ok c}.
 Hypothesis noc : {in obstacles &, forall g1 g2, inter_at_ext g1 g2}.
 
