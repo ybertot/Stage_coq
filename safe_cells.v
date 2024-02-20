@@ -40,6 +40,8 @@ Hypothesis covered_points :
    {in points, forall p, exists2 c, c \in closed & p \in right_pts c /\
        (p >>> low c)}.
 
+Hypothesis non_empty_closed : {in closed, forall c, exists p,
+  [&& p >>> low c, p <<< high c & left_limit c < p_x p < right_limit c]}.
 Hypothesis closed_ok : {in closed, forall c, closed_cell_side_limit_ok c}.
 Hypothesis noc : {in obstacles &, forall g1 g2, inter_at_ext g1 g2}.
 
@@ -58,8 +60,35 @@ have [[opc [pccs [pccssub [highs [cpccs [opco lopcq]]]]]] | ] := coverage gin.
   by [].
 move=> [[ | pc1 pcc] [pccn0 [pcccl [ highs [conn [lpcc rpcc]]]]]].
   by [].
-have {}lpcc : left_limit pc1 <= p_x p.
+have : left_limit pc1 <= p_x p.
   by move:(pong)=> /andP[] _ /andP[]; rewrite lpcc.
+rewrite le_eqVlt=> /orP[/eqP pxq | ].
+  have plg : p = left_pt g by admit.
+  have pin : p \in points.
+    apply: obstacles_in; rewrite mem_cat; apply/orP; left.
+    by rewrite plg map_f.
+  have [c' ccl' [pc'r p'al]] := (covered_points pin).
+  have := disj_closed ccl ccl'.
+  move=> [].
+    admit.
+  move=> /(_ p); rewrite pinc=> /negP; apply.
+  rewrite inside_closed'E p'al.
+  have c'ok := closed_ok ccl'.
+  have /andP[_ /andP[_ /andP[_ /andP[_ /andP[_ ]]] ]] := c'ok.
+  move=> /andP[rn0 /andP[samex /andP[srt /andP[onlow onhigh]]]].
+  have prlq : p_x p = right_limit c' by apply/eqP/(allP samex).
+  rewrite (under_edge_lower_y prlq onhigh).
+  have -> /= : p_y p <= p_y (last (dummy_pt R) (right_pts c')).
+    elim/last_ind:{-1} (right_pts c') (erefl (right_pts c'))=>[| ps pn _] psq.
+      by rewrite psq in rn0.
+    move: pc'r; rewrite psq mem_rcons inE => /orP[/eqP -> | pps].
+      by rewrite last_rcons.
+    move: (srt); rewrite psq map_rcons => srt'.
+    have := sorted_rconsE lt_trans srt'=> /allP/(_ _ (map_f _ pps))/ltW.
+    by rewrite last_rcons.
+  have [p1 /andP[_ /andP[ _ /andP[A B]]]] := non_empty_closed ccl'.
+  by rewrite prlq (lt_trans A B) le_refl.
+
 move: lpcc; rewrite le_eqVlt=> /orP[/eqP onleft | ].
   (* We probably need to show that every closed cell has a closed
      neighbor on the left, except for the first one, but in this case

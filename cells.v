@@ -748,7 +748,7 @@ Qed.
 
 Definition open_cell_side_limit_ok c :=
   [&& left_pts c != [::],
-   all (fun p => p_x p == p_x (last dummy_pt (left_pts c))) (left_pts c),
+   all (fun p => p_x p == left_limit c) (left_pts c),
   sorted >%R [seq p_y p | p <- left_pts c],
   (head dummy_pt (left_pts c) === high c) &
   (last dummy_pt (left_pts c) === low c)].
@@ -910,12 +910,12 @@ Qed.
 
 Definition closed_cell_side_limit_ok c :=
  [&& left_pts c != [::],
-   all (fun p : pt => p_x p == p_x (last dummy_pt (left_pts c))) (left_pts c),
+   all (fun p : pt => p_x p == left_limit c) (left_pts c),
    sorted >%R [seq p_y p | p <- left_pts c],
    head dummy_pt (left_pts c) === high c,
    last dummy_pt (left_pts c) === low c,
     right_pts c != [::],
-   all (fun p : pt => p_x p == p_x (head dummy_pt (right_pts c))) (right_pts c),
+   all (fun p : pt => p_x p == right_limit c) (right_pts c),
    sorted <%R [seq p_y p | p <- right_pts c],
    head dummy_pt (right_pts c) === low c &
    last dummy_pt (right_pts c) === high c].
@@ -926,8 +926,8 @@ Proof.
 move=> /andP[] _ /andP[] _ /andP[] _ /andP[] _ /andP[] _.
 move=> /andP[] ln0 /andP[] eqs /andP[] _ /andP[] /andP[] _ /andP[] _ /[swap].
 move=> /andP[] _ /andP[] _.
+rewrite (eqP (allP eqs (head dummy_pt (right_pts c)) (head_in_not_nil _ ln0))).
 rewrite /right_limit /open_limit.
-rewrite -(eqP (allP eqs (last dummy_pt (right_pts c)) (last_in_not_nil _ ln0))).
 by case : (lerP (p_x (right_pt (low c))) (p_x (right_pt (high c)))).
 Qed.
 

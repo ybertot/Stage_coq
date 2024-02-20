@@ -837,18 +837,19 @@ rewrite /open_cell_side_limit_ok/closed_cell_side_limit_ok.
 rewrite /close_cell /=; have /exists_point_valid [p1 /[dup] vip1 ->] := vl.
 have /exists_point_valid [p2 /[dup] vip2 -> /=] := vh.
 move=> /andP[] -> /andP[]-> /andP[]-> /andP[] -> -> /=.
-have [o1 x1]:=intersection_on_edge vip1.
-have [o2 x2]:=intersection_on_edge vip2.
+have [o1 /esym/eqP x1]:=intersection_on_edge vip1.
+have [o2 /eqP x2]:=intersection_on_edge vip2.
 rewrite -?(eq_sym (point e)).
-case:ifP=>[/eqP q1 | enp1];case:ifP=>[/eqP q2 | enp2]; move: (o1) (o2);
- rewrite /=  -?q1 -?q2 -?x1 -?x2 ?eqxx/= => -> ->; rewrite ?andbT //=.
-- move: ctp=> /andP[] _ eh.
+case:ifP (o1) (o2) =>[/eqP q1 |enp1];case:ifP=>[/eqP q2 |enp2]; rewrite ?q1 ?q2;
+  rewrite -?q1 -?q2 /= ?eqxx ?x2 ?x1 /= => -> -> //; rewrite /= ?andbT.
+- move: x1 x2 ctp=> /eqP/esym x1 /eqP x2 /andP[] _ eh.
   by apply: (under_edge_strict_lower_y x2 (negbT enp2) eh).
-- move: ctp=> /andP[] el _.
+- move: x1 x2 ctp=> /eqP/esym x1 /eqP x2 /andP[] el _.
   by apply: (above_edge_strict_higher_y x1 (negbT enp1) el).
-move: ctp=> /andP[] el eh.
-by rewrite (above_edge_strict_higher_y x1 (negbT enp1) el) //
-      (under_edge_strict_lower_y x2 (negbT enp2) eh).
+move: x1 x2 ctp=> /eqP/esym x1 /eqP x2 /andP[] el eh.
+rewrite (above_edge_strict_higher_y x1 (negbT enp1) el) //
+      (under_edge_strict_lower_y x2 (negbT enp2) eh) //.
+by rewrite -x1 x2 eqxx.
 Qed.
 
 Lemma closing_cells_side_limit' cc :
@@ -1840,7 +1841,8 @@ case ogq : (outgoing e) => [ | fog ogs].
   move=> [] <- <-; rewrite /= andbT /open_cell_side_limit_ok /=.
   have pxel : p_x (point e) = p_x (last p2 lpts').
     by rewrite pxq /left_limit lptsq.
-  move: (alllpts); rewrite lptsq /= => /andP[] -> /andP[] /[dup]/eqP p2x -> ->.
+  move: (alllpts); rewrite /left_limit.
+  rewrite lptsq /= => /andP[] -> /andP[] /[dup]/eqP p2x -> ->.
   rewrite lptsq /= in athigh.
   have pxe1 : p_x (point e) = p_x p1.
     by have := alllpts; rewrite lptsq /= => /andP[] /eqP ->.
@@ -1856,7 +1858,8 @@ move=> -[] <- <- /=.
 have ognn : outgoing e != [::] by rewrite ogq.
 have := opening_cells_last_left_pts vlo vho oute ognn puh; rewrite /=.
 rewrite ogq oca_eq /= => llnoq /=.
-move: (alllpts); rewrite lptsq /= => /andP[] _ /andP[] -> ->.
+move: (alllpts); rewrite /left_limit.
+rewrite lptsq /= => /andP[] _ /andP[] -> ->.
 move: pxq; rewrite /left_limit lptsq /= => ->; rewrite eqxx /=.
 rewrite p2lte /=.
 have := allP open_side_limit lsto lstoin => /andP[] _ /andP[] _.
@@ -1884,7 +1887,7 @@ have lstok : open_cell_side_limit_ok lsto by apply: (allP open_side_limit).
 case lptsq : (left_pts lsto) => [ | p1 [ | p2 lpts]] //.
   by move: lstok; rewrite /open_cell_side_limit_ok lptsq.
 have /andP[p1onh p1onl] : (p1 === high lsto) && (p1 === low lsto).
-  by move: lstok; rewrite /open_cell_side_limit_ok lptsq /= eqxx /=.
+  by move: lstok; rewrite /open_cell_side_limit_ok /left_limit lptsq /= eqxx /=.
 have /eqP samex : p_x (point e) = p_x p1.
   by have := pxhere; rewrite lstxq /left_limit lptsq /=.
 suff : p_y (point e) < p_y (point e) by rewrite lt_irreflexive.
@@ -2006,7 +2009,7 @@ rewrite /open_cell_side_limit_ok /=.
 have pxe : p_x (point e) = p_x (last p2 lpts).
   by rewrite pxhere lstxq /left_limit lptsq /=.
 rewrite pxe eqxx /=.
-move: (lstok); rewrite /open_cell_side_limit_ok lptsq /=.
+move: (lstok); rewrite /open_cell_side_limit_ok /left_limit lptsq /=.
 move=> /andP[] /andP[] /[dup] /eqP p1x -> /andP[] -> ->.
 move=> /andP[] /andP[] -> -> /andP[] p1on ->.
 rewrite /= !andbT.
