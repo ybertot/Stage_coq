@@ -25,16 +25,22 @@ Variables closed : seq cell.
    Then, coverage will be given for all obstacles by the fact that all
    edges in obstacles are different from top. *)
 Variable o_cell : cell.
-Variables bottom top : cell.
+Variables bottom top : edge.
 Variable obstacles : seq edge.
 Variables points : seq pt.
 
-Hypothesis obstacles_in :
-  {subset [seq left_pt g | g <- obstacles] ++ [seq right_pt g | g <- obstacles]
-     <= points}.
+Hypothesis obstacles_sub :
+  {subset [seq low c | c <- closed] ++
+     [seq high c | c <- closed] <= bottom :: top :: obstacles}.
+
+Hypothesis obstacles_point_in :
+  {subset [seq left_pt g | g <- obstacles] ++
+    [seq right_pt g | g <- obstacles] <= points}.
 
 Hypothesis disj_closed :  {in closed &, disjoint_closed_cells R}.
-Hypothesis disj_open :  {in [:: o_cell] & closed, disjoint_open_closed_cells R}.
+(*
+Hypothesis disj_open :  {in [:: o_cell] & closed, disjoint_open_closed_cells R}*)
+
 Hypothesis coverage : {in obstacles, forall g, edge_covered g [::] closed}.
 Hypothesis covered_points :
    {in points, forall p, exists2 c, c \in closed & p \in right_pts c /\
@@ -43,10 +49,27 @@ Hypothesis covered_points :
 Hypothesis non_empty_closed : {in closed, forall c, exists p,
   [&& p >>> low c, p <<< high c & left_limit c < p_x p < right_limit c]}.
 Hypothesis closed_ok : {in closed, forall c, closed_cell_side_limit_ok c}.
-Hypothesis noc : {in obstacles &, forall g1 g2, inter_at_ext g1 g2}.
+Hypothesis noc : {in bottom :: top :: obstacles &,
+  forall g1 g2, inter_at_ext g1 g2}.
+Hypothesis low_high : {in closed, forall c, low c <| high c}.
+Hypothesis low_dif_high : {in closed, forall c, low c != high c}.
 
-Lemma above_low : {in closed, forall c p, p === high c -> p >>= low c}.
-Admitted.
+Lemma x_left_pts_left_limit (c : cell) (p : pt) :
+  closed_cell_side_limit_ok c ->
+  p \in left_pts c -> p_x p = left_limit c.
+Proof.
+move=> + pin; move=> /andP[] ln0 /andP[] lsx _.
+by rewrite (eqP (allP lsx _ _)).
+Qed.
+
+Lemma x_right_pts_right_limit (c : cell) (p : pt) :
+  closed_cell_side_limit_ok c ->
+  p \in right_pts c -> p_x p = right_limit c.
+Proof.
+move=> + pin; move=> /andP[] _ /andP[] _ /andP[] _ /andP[] _ /andP[] _.
+move=> /andP[] rn0 /andP[] rsx _.
+by rewrite (eqP (allP rsx _ _)).
+Qed.
 
 Lemma left_limit_left_pt_high_cl (c : cell) :
   closed_cell_side_limit_ok c ->
@@ -81,6 +104,26 @@ Proof.
 move=> /andP[] _ /andP[] _ /andP[] _ /andP[] _ /andP[] _.
 move=> /andP[] rn0 /andP[] rsx /andP[] _ /andP[] /andP[] _ /andP[] _ + _.
 by rewrite (eqP (allP rsx _ (head_in_not_nil _ rn0))).
+Qed.
+
+Lemma right_valid :
+  {in closed, forall c, {in right_pts c, forall p, 
+      valid_edge (low c) p /\ valid_edge (high c) p}}.
+Proof.
+move=> c cin p pin.
+have cok := closed_ok cin.
+have [p' /andP[_ /andP[_ /andP[p'l p'r]]]] := non_empty_closed cin.
+have lltr : left_limit c < right_limit c.
+  by apply: (lt_trans p'l p'r).
+split.
+  apply/andP; split; rewrite (x_right_pts_right_limit cok pin).
+    apply/(le_trans (left_limit_left_pt_low_cl cok)).
+    by apply/ltW.
+  by apply: right_limit_right_pt_low_cl.
+apply/andP; split; rewrite (x_right_pts_right_limit cok pin).
+  apply/(le_trans (left_limit_left_pt_high_cl cok)).
+  by apply/ltW.
+by apply: right_limit_right_pt_high_cl.
 Qed.
 
 Lemma closed_cell_in_high_above_low p (c : cell) :
@@ -120,6 +163,86 @@ move: midr; apply/negP; rewrite -leNgt abs.
 by apply: right_limit_right_pt_low_cl.
 Qed.
 
+(* I don't know yet if this is going to be used. *)
+Lemma above_low : {in closed, forall c p, p === high c -> p >>= low c}.
+Proof.
+move=> c cl p.
+Admitted.
+
+
+Lemma right_side_under_high (c : cell) p :
+  closed_cell_side_limit_ok c ->
+  valid_edge (high c) p ->
+  p \in right_pts c ->
+  p <<= high c.
+Proof.
+move=> cok vph pin.
+set p' := {| p_x := p_x p; p_y := pvert_y p (high c)|}.
+have sx: p_x p = p_x p' by rewrite /p'.
+have p'on : p' === high c by apply: pvert_on vph.
+rewrite (under_edge_lower_y sx) //.
+have := cok.
+do 5 move=> /andP[] _.
+move=> /andP[] rn0 /andP[] rsx /andP[] srt /andP[] _ lon.
+have p'q : p' = last (dummy_pt _) (right_pts c).
+  have := on_edge_same_point p'on lon.
+  rewrite (allP rsx _ pin)=> /(_ isT)=> samey.
+  by apply/eqP; rewrite pt_eqE samey (allP rsx _ pin).
+move: rn0 p'q pin srt.
+elim/last_ind: (right_pts c) => [| rpts p2 Ih] // _ p'q pin srt.
+move: pin; rewrite mem_rcons inE => /orP[/eqP -> | pin].
+  by rewrite p'q last_rcons.
+apply: ltW; rewrite p'q last_rcons.
+move: srt; rewrite map_rcons=> srt.
+by have := (allP (sorted_rconsE lt_trans srt)); apply; rewrite map_f.
+Qed.
+
+Lemma in_bound_closed_valid (c : cell) p :
+  closed_cell_side_limit_ok c ->
+  left_limit c <= p_x p -> p_x p <= right_limit c ->
+  valid_edge (low c) p /\ valid_edge (high c) p.
+Proof.
+move=> cok lp pr.
+have llh := left_limit_left_pt_high_cl cok.
+have lll := left_limit_left_pt_low_cl cok.
+have rrh := right_limit_right_pt_high_cl cok.
+have rrl := right_limit_right_pt_low_cl cok.
+split; rewrite /valid_edge.
+  by rewrite (le_trans lll lp) (le_trans pr rrl).
+by rewrite (le_trans llh lp) (le_trans pr rrh).
+Qed.
+
+Lemma left_side_under_high (c : cell) p :
+  closed_cell_side_limit_ok c ->
+  valid_edge (high c) p ->
+  p \in left_pts c ->
+  p <<= high c.
+Proof.
+move=> cok vph pin.
+set p' := {| p_x := p_x p; p_y := pvert_y p (high c)|}.
+have sx: p_x p = p_x p' by rewrite /p'.
+have p'on : p' === high c by apply: pvert_on vph.
+rewrite (under_edge_lower_y sx) //.
+have := cok.
+move=> /andP[] ln0 /andP[] lsx /andP[] srt /andP[] hon _.
+have p'q : p' = head (dummy_pt _) (left_pts c).
+  have := on_edge_same_point p'on hon.
+  rewrite (eqP (allP lsx _ pin)).
+  rewrite (x_left_pts_left_limit cok (head_in_not_nil _ ln0)) eqxx.
+  move=> /(_ isT)=> samey.
+  apply/eqP; rewrite pt_eqE samey andbT.
+  rewrite (eqP (allP lsx _ pin)) eq_sym.
+  by rewrite (allP lsx _ (head_in_not_nil _ ln0)).
+move: ln0 p'q pin srt.
+case: (left_pts c)=> [| p2 lpts] // _ p'q pin srt.
+move: pin; rewrite inE => /orP[/eqP -> | pin].
+  by rewrite p'q.
+apply: ltW; rewrite p'q.
+move: srt=> /=; rewrite (path_sortedE); last first.
+  by move=> x y z xy yz; apply: (lt_trans yz xy).
+by move=> /andP[] /allP/(_ (p_y p)) + _; apply; rewrite map_f.
+Qed.
+
 Lemma safe_cell_interior c p :
   c \in closed -> p <<< high c -> p >>> low c ->
   left_limit c < p_x p < right_limit c ->
@@ -134,15 +257,21 @@ move=> [[ | pc1 pcc] [pccn0 [pcccl [ highs [conn [lpcc rpcc]]]]]].
   by [].
 have : left_limit pc1 <= p_x p.
   by move:(pong)=> /andP[] _ /andP[]; rewrite lpcc.
-rewrite le_eqVlt=> /orP[/eqP pxq | ].
-  have plg : p = left_pt g by admit.
+rewrite le_eqVlt=> /orP[ /eqP pxq | ].
+  have plg : p = left_pt g.
+    move: lpcc; rewrite /= pxq=> /eqP samex.
+    have := on_edge_same_point pong (left_on_edge _).
+    rewrite samex=> /(_ isT) samey.
+    by apply/eqP; rewrite pt_eqE samex samey.
   have pin : p \in points.
-    apply: obstacles_in; rewrite mem_cat; apply/orP; left.
+    apply: obstacles_point_in; rewrite mem_cat; apply/orP; left.
     by rewrite plg map_f.
   have [c' ccl' [pc'r p'al]] := (covered_points pin).
   have := disj_closed ccl ccl'.
-  move=> [].
-    admit.
+  move=> [cqc' | ].
+    have [p' /andP[] _ /andP[] _ /andP[] lp' p'r]:= non_empty_closed ccl'.
+    move: pleft; rewrite cqc'.
+    by rewrite (x_right_pts_right_limit (closed_ok ccl')) // lt_irreflexive.
   move=> /(_ p); rewrite pinc=> /negP; apply.
   rewrite inside_closed'E p'al.
   have c'ok := closed_ok ccl'.
@@ -166,22 +295,94 @@ elim: pcc pc1 pcccl highs conn rpcc {lpcc pccn0} =>
   have hpc1 : high pc1 = g by apply: (highs _ (mem_head _ _)).
   move: rpcc; rewrite /last_cell/= => rpc1.
   have vgp : valid_edge g p by move: pong=> /andP[].
-  have in1 : inside_closed' p pc1.
+  have [pr | pnr ] := eqVneq p (right_pt g).
+    have [c' c'in [prc' pin']] : exists2 c', c' \in closed &
+        p_x p = right_limit c' /\ inside_closed' p c'.
+      have pp : p \in points.
+        by apply/obstacles_point_in; rewrite pr mem_cat map_f // orbT.
+      have [c' c'in [pr' pal']] := covered_points pp.
+      exists c'; rewrite // inside_closed'E pal'.
+      rewrite (x_right_pts_right_limit (closed_ok c'in)) // le_refl.
+      have [q /andP[] _ /andP[] _ /andP[] Q1 Q2] := non_empty_closed c'in.
+      rewrite (lt_trans Q1 Q2) ?andbT {q Q1 Q2}.
+      have [vpl' vph'] := right_valid c'in pr'.
+      by rewrite (right_side_under_high (closed_ok c'in)).
+    have [cqc' | ] := disj_closed ccl c'in.
+      by move: pleft; rewrite prc' cqc'; rewrite lt_irreflexive.
+    by move=> /(_ p); rewrite pin' pinc.
+  have noc1 : inter_at_ext (low pc1) (high pc1).
+    by apply/noc; apply: obstacles_sub; rewrite mem_cat map_f //= ?orbT.
+  have ponh : p === high pc1 by rewrite hpc1.
+  have pin1 : inside_closed' p pc1.
     rewrite inside_closed'E under_onVstrict hpc1 // pong pc1lp /=.
     rewrite rpc1; move: vgp=> /andP[] _ ->; rewrite andbT.
+    have := closed_cell_in_high_above_low (low_dif_high pc1cl) (low_high pc1cl)
+    noc1 (closed_ok pc1cl) _ ponh; apply.
+    rewrite pc1lp /= rpc1.
+    move: (pong)=> /andP[] _ /andP[] _; rewrite le_eqVlt=> /orP[]; last by [].
+    move=> abs.
+    move: pnr=> /negP[]; rewrite pt_eqE abs /=.
+    by have := on_edge_same_point pong (right_on_edge _) abs.
+  have vph1 : valid_edge (high pc1) p by move: ponh=> /andP[].
+  have [cqc' | ] := disj_closed ccl pc1cl.
+    by move: puh; rewrite strict_nonAunder cqc' // ponh.
+  by move=> /(_ p); rewrite pin1 pinc.
+have pcccl' : {subset pc2 :: pcc <= closed}.
+  by move=> c' c'in; apply: pcccl; rewrite inE c'in orbT.
+have highs' : {in pc2 :: pcc, forall c, high c = g}.
+  by move=> c' c'in; apply highs; rewrite inE c'in orbT.
+have conn' : connect_limits (pc2 :: pcc).
+  by move: conn; rewrite /= => /andP[].
+have rpcc' : right_limit (last_cell (pc2 :: pcc)) = p_x (right_pt g).
+  by exact: rpcc.
+have [pleft2 | pright2 ] := lerP (p_x p) (left_limit pc2).
+(* In this case, p is inside pc1, contradiction with pinc *)
+  have v1 : valid_edge g p by move: pong=> /andP[].
+  have pc1cl : pc1 \in closed by apply: pcccl; rewrite inE eqxx.  
+  suff pin1 : inside_closed' p pc1.
+    have [cqpc1 | ] := disj_closed ccl pc1cl.
+      move: puh; rewrite cqpc1 (highs _ (mem_head _ _)) strict_nonAunder //.
+      by rewrite pong.
+  by move=> /(_ p); rewrite pin1 pinc.
+  rewrite inside_closed'E.
+  have r1l2 : right_limit pc1 = left_limit pc2.
+    by apply/eqP; move: conn=> /= /andP[].
+  move: (conn)=> /= /andP[] /eqP -> _; rewrite pleft2 pc1lp !andbT.
+  rewrite (highs _ (mem_head _ _)) under_onVstrict // pong /=.
+  have ponh : p === high pc1 by rewrite (highs _ (mem_head _ _)).
+  have noc1 : inter_at_ext (low pc1) (high pc1).
+    by apply/noc; apply: obstacles_sub; rewrite mem_cat map_f //= ?orbT.
+  move: (pleft2); rewrite le_eqVlt=> /orP[/eqP pat | pltstrict]; last first.
+    have := closed_cell_in_high_above_low (low_dif_high pc1cl) (low_high pc1cl)
+      noc1 (closed_ok pc1cl) _ ponh; apply.
+    move: (conn)=> /= /andP[] /eqP -> _.
+    by rewrite pltstrict pc1lp.
+  have sl : p_x (left_pt g) < p_x p.
+    have llh := left_limit_left_pt_high_cl (closed_ok pc1cl).
+    by rewrite -(highs _ (mem_head _ _)); apply: (le_lt_trans llh).
+  have pc2cl : pc2 \in closed by apply: pcccl'; rewrite mem_head.
+  have sr : p_x p < p_x (right_pt g).
+    rewrite pat.
+    have [p' /andP[] _ /andP[] _ /andP[] l2p' p'r2] := non_empty_closed pc2cl.
+    rewrite (lt_trans l2p') // (lt_le_trans p'r2) //.
+    have := right_limit_right_pt_high_cl (closed_ok pc2cl).
+    by rewrite (highs' _ (mem_head _ _)).
+  have [vl1 vh1] : valid_edge (low pc1) p /\ valid_edge (high pc1) p.
+    have := in_bound_closed_valid (closed_ok pc1cl) (ltW pc1lp).
+    by rewrite pat r1l2 le_refl=> /(_ isT).
+  have := above_low pc1cl ponh.
+  rewrite strict_nonAunder // negb_and negbK=> /orP[] ponl; last by [].
+  have lo : low pc1 \in bottom :: top :: obstacles.
+    by apply: obstacles_sub; rewrite mem_cat map_f.
+  have ho : high pc1 \in bottom :: top :: obstacles.
+    by apply: obstacles_sub; rewrite mem_cat map_f ?orbT.
+  have [lqh | ] := noc ho lo.
+    by have := low_dif_high pc1cl; rewrite lqh eqxx.
+  move=> /(_ p ponh ponl); rewrite !inE=> /orP[]/eqP pext.
+    by move: sl; rewrite pext (highs _ (mem_head _ _)) lt_irreflexive.
+  by move: sr; rewrite pext (highs _ (mem_head _ _)) lt_irreflexive.
+(* In this case, we use the induction hypothesis *)
+by have := Ih pc2 pcccl' highs' conn' rpcc' pright2.
+Qed.
 
-move: lpcc; rewrite le_eqVlt=> /orP[/eqP onleft | ].
-  (* We probably need to show that every closed cell has a closed
-     neighbor on the left, except for the first one, but in this case
-     p cannot be inside the closed cell c,
-     So there is another cell, in which p is inside_closed', and disjointness
-     should make it possible to conclude. *)
-  admit.
-elim : pcc pc1 pcccl highs conn rpcc {pccn0} => [ | pc2 pcc Ih]
-  pc1 pcccl highs conn rpcc lpcc.
-  (* if pc1 == c, there is a contradiction, because p <<< high c but
-     p === high pc1 *)
-  (* if pc1 != c we need to perform another case analysis.
-        pf p === low pc1, then we p must be an event, and there exist
-        another cell c' such that inside_closed' p  c' and p_x p = left_limit c'
-        and c' != c, because  left_limit c <   beurk. *)
+End safety_property.
