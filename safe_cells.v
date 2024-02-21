@@ -48,6 +48,78 @@ Hypothesis noc : {in obstacles &, forall g1 g2, inter_at_ext g1 g2}.
 Lemma above_low : {in closed, forall c p, p === high c -> p >>= low c}.
 Admitted.
 
+Lemma left_limit_left_pt_high_cl (c : cell) :
+  closed_cell_side_limit_ok c ->
+  p_x (left_pt (high c)) <= left_limit c.
+Proof.
+move=> /andP[] ln0 /andP[] lsx /andP[] _ /andP[] /andP[] _ /andP[] + _ _.
+by rewrite (eqP (allP lsx _ (head_in_not_nil _ ln0))).
+Qed.
+
+Lemma right_limit_right_pt_high_cl (c : cell) :
+  closed_cell_side_limit_ok c ->
+  right_limit c <= p_x (right_pt (high c)).
+Proof.
+move=> /andP[] _ /andP[] _ /andP[] _ /andP[] _ /andP[] _.
+move=> /andP[] rn0 /andP[] rsx /andP[] _ /andP[] _ /andP[] _ /andP[] _. 
+by rewrite (eqP (allP rsx _ (last_in_not_nil _ rn0))).
+Qed.
+
+Lemma left_limit_left_pt_low_cl (c : cell) :
+  closed_cell_side_limit_ok c ->
+  p_x (left_pt (low c)) <= left_limit c.
+Proof.
+move=> /andP[] ln0 /andP[] lsx /andP[] _ /andP[] _ /andP[].
+move=> /andP[] _ /andP[] + _ _.
+by rewrite (eqP (allP lsx _ (last_in_not_nil _ ln0))).
+Qed.
+
+Lemma right_limit_right_pt_low_cl (c : cell) :
+  closed_cell_side_limit_ok c ->
+  right_limit c <= p_x (right_pt (low c)).
+Proof.
+move=> /andP[] _ /andP[] _ /andP[] _ /andP[] _ /andP[] _.
+move=> /andP[] rn0 /andP[] rsx /andP[] _ /andP[] /andP[] _ /andP[] _ + _.
+by rewrite (eqP (allP rsx _ (head_in_not_nil _ rn0))).
+Qed.
+
+Lemma closed_cell_in_high_above_low p (c : cell) :
+  low c != high c ->
+  low c <| high c ->
+  inter_at_ext (low c) (high c) ->
+  closed_cell_side_limit_ok c ->
+  left_limit c < p_x p < right_limit c ->
+  p === high c -> p >>> low c.
+Proof.
+move=> dif bel noclh cok /andP[] midl midr on.
+have [vlp vhp] : valid_edge (low c) p /\ valid_edge (high c) p.
+  move: cok=> /andP[] ln0 /andP[] lsx /andP[].
+  move=> _ /andP[] /andP[] _ /andP[] lh _ /andP[] /andP[] _ /andP[] ll _.
+  move=> /andP[] rn0 /andP[] rsx /andP[].
+  move=> _ /andP[] /andP[] _ /andP[] _ rl /andP[] _ /andP[] _ rh.
+  rewrite (eqP (allP lsx _ (last_in_not_nil (dummy_pt _) ln0))) in ll.
+  rewrite (eqP (allP rsx _ (head_in_not_nil (dummy_pt _) rn0))) in rl.
+  rewrite (eqP (allP lsx _ (head_in_not_nil (dummy_pt _) ln0))) in lh.
+  rewrite (eqP (allP rsx _ (last_in_not_nil (dummy_pt _) rn0))) in rh.
+  split; rewrite /valid_edge.
+    by rewrite (ltW (le_lt_trans ll midl)) (ltW (lt_le_trans midr rl)).
+  by rewrite (ltW (le_lt_trans lh midl)) (ltW (lt_le_trans midr rh)).
+rewrite under_onVstrict // negb_or.
+move: noclh=> [abs | noclh]; first by rewrite abs eqxx in dif.
+apply/andP; split; last first.
+  apply/negP=> abs.
+  have := order_edges_strict_viz_point' vlp vhp bel abs.
+  by rewrite strict_nonAunder // on.
+apply/negP=> abs.
+have := noclh _ abs on; rewrite !inE=> /orP[] /eqP {}abs.
+  move: midl; apply/negP; rewrite -leNgt abs.
+  by apply: left_limit_left_pt_low_cl.
+(* TODO: at this place, the typechecking loops, this warrants a bug report. *)
+(*(  have := left_limit_max cok. *)
+move: midr; apply/negP; rewrite -leNgt abs.
+by apply: right_limit_right_pt_low_cl.
+Qed.
+
 Lemma safe_cell_interior c p :
   c \in closed -> p <<< high c -> p >>> low c ->
   left_limit c < p_x p < right_limit c ->
@@ -88,6 +160,15 @@ rewrite le_eqVlt=> /orP[/eqP pxq | ].
     by rewrite last_rcons.
   have [p1 /andP[_ /andP[ _ /andP[A B]]]] := non_empty_closed ccl'.
   by rewrite prlq (lt_trans A B) le_refl.
+elim: pcc pc1 pcccl highs conn rpcc {lpcc pccn0} =>
+  [ | pc2 pcc Ih] pc1 pcccl highs conn rpcc pc1lp.
+  have pc1cl : pc1 \in closed by apply: pcccl; rewrite inE eqxx.  
+  have hpc1 : high pc1 = g by apply: (highs _ (mem_head _ _)).
+  move: rpcc; rewrite /last_cell/= => rpc1.
+  have vgp : valid_edge g p by move: pong=> /andP[].
+  have in1 : inside_closed' p pc1.
+    rewrite inside_closed'E under_onVstrict hpc1 // pong pc1lp /=.
+    rewrite rpc1; move: vgp=> /andP[] _ ->; rewrite andbT.
 
 move: lpcc; rewrite le_eqVlt=> /orP[/eqP onleft | ].
   (* We probably need to show that every closed cell has a closed
