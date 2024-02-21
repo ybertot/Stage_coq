@@ -5843,6 +5843,8 @@ Record safe_side_general_position_invariant (bottom top : edge)
     rf_closed : {in state_closed_seq s, forall c, low c <| high c};
     diff_edges :
        {in state_open_seq s ++ state_closed_seq s, forall c, low c != high c};
+    sub_closed :
+      {subset cell_edges (state_closed_seq s) <= bottom :: top :: edge_set};
    (* TODO : move this to the common invariant. *)
    left_o_lt :
         {in state_open_seq s & events, 
@@ -5955,6 +5957,13 @@ have dif1 : {in (nos ++ [:: lno]) ++
     by rewrite /opening_cells oca_eq; apply.
   rewrite inE /close_cell (pvertE vb0) (pvertE vt0) => /eqP -> /=.
   by apply/negP=> /eqP abs; move: pab; rewrite abs (underW put).
+have subc1 : {subset cell_edges [:: close_cell (point ev) op0] <= 
+    bottom :: top :: s}.
+  move=> c; rewrite !mem_cat !inE=> /orP[] /eqP ->.
+    have [-> _ _] := close_cell_preserve_3sides (point ev) op0.
+    by rewrite eqxx.
+  have [_ -> _] := close_cell_preserve_3sides (point ev) op0.
+  by rewrite eqxx orbT.
 have lte : {in evs, forall e, p_x (point ev) < p_x (point e)}.
   move: gen_pos; rewrite evsq /=.
   rewrite path_sortedE; last by move=> ? ? ?; apply: lt_trans.
@@ -6104,7 +6113,7 @@ elim=> [ | {evsq oca_eq istate invss}ev {req}future_events Ih] op cl st p_set.
   case stq : st => [fop lsto lop cls lstc lsthe lstx] [].
   move=> d_inv e_inv.
   set c_inv := common_inv_dis d_inv.
-  rewrite /state_open_seq/state_closed_seq/= => old_lt_fut b_e d_e
+  rewrite /state_open_seq/state_closed_seq/= => old_lt_fut b_e d_e subc
      lolt rllt clok rl A B C D.
   rewrite /= => -[] <- <-; rewrite !cats0.
   split.
@@ -6119,7 +6128,7 @@ elim=> [ | {evsq oca_eq istate invss}ev {req}future_events Ih] op cl st p_set.
   split.
     by move=> g gin; apply: (B g c gin).
   by move=> g gin; apply: (D g c gin).
-move=> [] d_inv e_inv old_lt_fut rf_cl d_e lolt rllt clok rl A B C D.
+move=> [] d_inv e_inv old_lt_fut rf_cl d_e subc lolt rllt clok rl A B C D.
 set c_inv := common_inv_dis d_inv.
 rewrite /step.
 case stq : st => [fop lsto lop cls lstc lsthe lstx].
@@ -6180,6 +6189,20 @@ have low_diff_high' :
   rewrite cats1 -map_rcons=> /mapP[c' c'in ->].
   have [-> -> _] := close_cell_preserve_3sides (point ev) c'.
   by apply: d_e; rewrite mem_cat ocd -cat_rcons !mem_cat c'in !orbT.
+(* Provint that closed cells used edges only from the initial set. *)
+have subc' :
+  {subset cell_edges (state_closed_seq rstate) <= [:: bottom, top & s]}.
+  move=> g; rewrite /state_closed_seq/= -cats1 -catA /= -cat_rcons.
+  rewrite cell_edges_cat mem_cat=> /orP[gold | ].
+    by apply: subc; rewrite stq.
+  have subo := edges_sub c_inv.
+  rewrite cats1 -map_rcons mem_cat=> /orP[] /mapP[c'] /mapP[c2 c2in ->] ->.
+    have [-> _ _] := close_cell_preserve_3sides (point ev) c2.
+    apply: subo; rewrite !mem_cat; apply/orP; left; apply/orP; left.
+    by rewrite map_f // ocd -cat_rcons !mem_cat c2in orbT.
+  have [_ -> _] := close_cell_preserve_3sides (point ev) c2.
+  apply: subo; rewrite !mem_cat; apply/orP; left; apply/orP; right.
+  by rewrite map_f // ocd -cat_rcons !mem_cat c2in orbT.
 (* Proving that open cells have a left side that is smaller than any
    event first coordinate. *)
 have loplte : {in state_open_seq rstate & future_events,
