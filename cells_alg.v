@@ -6075,14 +6075,16 @@ Lemma start_safe_sides bottom top s closed open evs :
     forall p,
      in_safe_side_left p c || in_safe_side_right p c ->
      {in events_to_edges evs, forall g, ~ p === g} /\
-     {in evs, forall ev, p != point ev}}.
+     {in evs, forall ev, p != point ev}} /\
+  {subset (cell_edges closed) <= [:: bottom, top & s]} /\
+  all (@closed_cell_side_limit_ok R) closed.
 Proof.
 move=> ltev boxwf startok nocs' inbox_s evin lexev evsub out_evs cle
   n_inner uniq_edges.
 have nocs : {in bottom :: top :: s &, no_crossing R}.
   by apply: inter_at_ext_no_crossing.
 rewrite /start.
-case evsq : evs => [ | ev future_events]; first by move=> [] _ <- c.
+case evsq : evs => [ | ev future_events]; first by move=> [] _ <-.
 have evsn0 : evs != [::] by rewrite evsq.
 case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
 set istate := Bscan _ _ _ _ _ _ _.
@@ -6104,8 +6106,11 @@ suff main: forall events op cl st processed_set,
          {in processed_set ++ events, forall e', p != point e'}} /\
   {in op, forall c p, in_safe_side_left p c ->
          {in events_to_edges (processed_set ++ events), forall g, ~ p === g} /\
-         {in processed_set ++ events, forall e', p != point e'}}.
-  have [A B] := main _ _ _ _ _ invss req.
+         {in processed_set ++ events, forall e', p != point e'}} /\
+  {subset (cell_edges cl) <= [:: bottom, top & s]} /\
+  all (@closed_cell_side_limit_ok _) cl.
+  have [A [B [C D]]] := main _ _ _ _ _ invss req.
+  split; last by [].
   move=> c cin; move: (A c cin) => [] crf [] difc [] clok A'.
   do 3 (split; first by []).
   by move=> p pside; have := A' _ pside.
@@ -6124,6 +6129,13 @@ elim=> [ | {evsq oca_eq istate invss}ev {req}future_events Ih] op cl st p_set.
     move=> p pin; split.
       by move=> g gin; apply: (A g c gin); rewrite // mem_rcons.
     by move=> e ein; apply: (C e c ein); rewrite // mem_rcons.
+  split; last first.
+    split; last first.
+      rewrite (eq_all_r (_ : lstc :: cls =i rcons cls lstc)) //.
+      by move=> c; rewrite mem_rcons.
+    move=> g.
+    rewrite -[lstc :: cls]/([:: lstc] ++ cls) cell_edges_catC cats1.
+    by apply: subc.
   move=> c cin p pin.
   split.
     by move=> g gin; apply: (B g c gin).
