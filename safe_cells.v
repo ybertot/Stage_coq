@@ -451,7 +451,7 @@ have sub_ref : {subset [seq left_pt g | g <- events_to_edges evs] ++
   rewrite inE; apply/orP; right; apply: Ih.
   by rewrite mem_cat map_f ?orbT.
 have missing_fact1 :
-  {in events_to_edges evs, forall g, cells.edge_covered g [::] closed}.
+  {in events_to_edges evs, forall g, edge_covered g [::] closed}.
   admit.
 have missing_fact2 :
  {in closed, forall c, exists p,
