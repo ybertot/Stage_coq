@@ -24,7 +24,6 @@ Variables closed : seq cell.
 (* The last open cell.  We need to prove that that its top edge is top.
    Then, coverage will be given for all obstacles by the fact that all
    edges in obstacles are different from top. *)
-Variable o_cell : cell.
 Variables bottom top : edge.
 Variable obstacles : seq edge.
 Variables points : seq pt.
@@ -386,3 +385,94 @@ by have := Ih pc2 pcccl' highs' conn' rpcc' pright2.
 Qed.
 
 End safety_property.
+
+
+Section main_statement.
+
+Variable R : realFieldType.
+
+Lemma start_yields_safe_cells evs bottom top (open closed : seq (cell R)):
+  sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) evs ->
+  bottom <| top ->
+  open_cell_side_limit_ok (start_open_cell bottom top) ->
+  {in [:: bottom, top & 
+         events_to_edges evs] &, forall e1 e2, inter_at_ext e1 e2} ->
+  {in events_to_edges evs,
+         forall g : edge R,
+         inside_box bottom top (left_pt g) &&
+         inside_box bottom top (right_pt g)} ->
+  all (inside_box bottom top) [seq point e | e <- evs] ->
+  sorted (lexPtEv (R:=R)) evs ->
+  {in evs, forall ev : event R, out_left_event ev} ->
+  close_edges_from_events evs ->
+  {in events_to_edges evs & evs, forall g e, non_inner g (point e)} ->
+  {in evs, forall e, uniq (outgoing e)} ->
+  start evs bottom top = (open, closed) ->
+  {in closed & events_to_edges evs, forall c g p,
+    strict_inside_closed p c -> ~~(p === g)}.
+Proof.
+move=> general_position bottom_below_top startok no_crossing.
+move=> all_edges_in all_points_in sorted_lex out_edges_correct.
+move=> edges_closed no_event_in_edge outgoing_event_unique start_eq.
+have [closed_has_disjoint_cells no_intersection_closed_open]:=
+   start_disjoint_general_position general_position bottom_below_top
+   startok no_crossing all_edges_in all_points_in sorted_lex (@subset_id _ _)
+   out_edges_correct edges_closed start_eq.
+have [all_edges_covered all_points_covered]:=
+   start_edge_covered_general_position general_position bottom_below_top
+   startok no_crossing all_edges_in all_points_in sorted_lex (@subset_id _ _)
+   out_edges_correct edges_closed no_event_in_edge outgoing_event_unique
+   start_eq.
+have [closed_main_properties [subcl all_closed_ok]] :=
+   start_safe_sides general_position bottom_below_top startok no_crossing
+   all_edges_in all_points_in sorted_lex (@subset_id _ _) out_edges_correct
+   edges_closed no_event_in_edge outgoing_event_unique start_eq.
+move=> c g cin gin p pin.
+set ref_points := [seq point e | e <- evs].
+(* TODO : decide on moving this to a separate lemma. *)
+have sub_ref : {subset [seq left_pt g | g <- events_to_edges evs] ++
+                  [seq right_pt g | g <- events_to_edges evs] <=
+                  ref_points}.
+  rewrite /ref_points.
+  move: edges_closed out_edges_correct.
+  elim: (evs) => [ | ev evs' Ih] //= => /andP [cl1 /Ih {}Ih].
+  move=> out_evs.
+  have oute : out_left_event ev by apply: out_evs; rewrite mem_head.
+  have {}out_evs : {in evs', forall ev, out_left_event ev}.
+   by move=> e ein; apply: out_evs; rewrite inE ein orbT.
+  have {}Ih := Ih out_evs.
+  rewrite events_to_edges_cons.
+  move=> q; rewrite mem_cat=> /orP[] /mapP[e + ->].
+    rewrite mem_cat => /orP[/oute/eqP -> | ein ]; first by rewrite mem_head.
+    rewrite inE; apply/orP; right; apply: Ih.
+    by rewrite mem_cat map_f.
+  rewrite mem_cat=> /orP[/(allP cl1)/hasP[e' e'in /eqP ->] | e'in].
+    by rewrite inE map_f ?orbT.
+  rewrite inE; apply/orP; right; apply: Ih.
+  by rewrite mem_cat map_f ?orbT.
+have missing_fact1 :
+  {in events_to_edges evs, forall g, cells.edge_covered g [::] closed}.
+  admit.
+have missing_fact2 :
+ {in closed, forall c, exists p,
+   [&& p >>> low c, p <<< high c & left_limit c < p_x p < right_limit c]}.
+  admit.
+have rf_cl : {in closed, forall c, low c <| high c}.
+  by move=> c' c'in; have [it _] := closed_main_properties _ c'in.
+have dif_lh_cl : {in closed, forall c, low c != high c}.
+  by move=> c' c'in; have [_ [it _]] := closed_main_properties _ c'in.
+have points_covered' : {in [seq left_pt g0 | g0 <- events_to_edges evs] ++
+       [seq right_pt g0 | g0 <- events_to_edges evs],
+     forall p0 : pt_eqType R,
+     exists2 c0 : cell_eqType R,
+       c0 \in closed & p0 \in right_pts c0 /\ p0 >>> low c0}.
+  by move=> q /sub_ref/mapP[e ein ->]; apply: all_points_covered.
+have puh : p <<< high c.
+  by move: pin; rewrite /strict_inside_closed => /andP[] /andP[].
+have pal : p >>> low c.
+  by move: pin; rewrite /strict_inside_closed => /andP[] /andP[].
+have p_between : left_limit c < p_x p < right_limit c.
+  by move: pin; rewrite /strict_inside_closed=> /andP[].
+by have := safe_cell_interior subcl (@subset_id _ _) closed_has_disjoint_cells
+  missing_fact1 points_covered' missing_fact2 (allP all_closed_ok)
+  no_crossing rf_cl dif_lh_cl cin puh pal p_between gin.
