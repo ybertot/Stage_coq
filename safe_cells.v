@@ -45,8 +45,7 @@ Hypothesis covered_points :
    {in points, forall p, exists2 c, c \in closed & p \in right_pts c /\
        (p >>> low c)}.
 
-Hypothesis non_empty_closed : {in closed, forall c, exists p,
-  [&& p >>> low c, p <<< high c & left_limit c < p_x p < right_limit c]}.
+Hypothesis non_empty_closed : {in closed, forall c, left_limit c < right_limit c}.
 Hypothesis closed_ok : {in closed, forall c, closed_cell_side_limit_ok c}.
 Hypothesis noc : {in bottom :: top :: obstacles &,
   forall g1 g2, inter_at_ext g1 g2}.
@@ -111,9 +110,8 @@ Lemma right_valid :
 Proof.
 move=> c cin p pin.
 have cok := closed_ok cin.
-have [p' /andP[_ /andP[_ /andP[p'l p'r]]]] := non_empty_closed cin.
 have lltr : left_limit c < right_limit c.
-  by apply: (lt_trans p'l p'r).
+  by apply: non_empty_closed cin.
 split.
   apply/andP; split; rewrite (x_right_pts_right_limit cok pin).
     apply/(le_trans (left_limit_left_pt_low_cl cok)).
@@ -268,7 +266,7 @@ rewrite le_eqVlt=> /orP[ /eqP pxq | ].
   have [c' ccl' [pc'r p'al]] := (covered_points pin).
   have := disj_closed ccl ccl'.
   move=> [cqc' | ].
-    have [p' /andP[] _ /andP[] _ /andP[] lp' p'r]:= non_empty_closed ccl'.
+    have := non_empty_closed ccl'.
     move: pleft; rewrite cqc'.
     by rewrite (x_right_pts_right_limit (closed_ok ccl')) // lt_irreflexive.
   move=> /(_ p); rewrite pinc=> /negP; apply.
@@ -286,8 +284,7 @@ rewrite le_eqVlt=> /orP[ /eqP pxq | ].
     move: (srt); rewrite psq map_rcons => srt'.
     have := sorted_rconsE lt_trans srt'=> /allP/(_ _ (map_f _ pps))/ltW.
     by rewrite last_rcons.
-  have [p1 /andP[_ /andP[ _ /andP[A B]]]] := non_empty_closed ccl'.
-  by rewrite prlq (lt_trans A B) le_refl.
+  by rewrite prlq le_refl andbT (non_empty_closed ccl').
 elim: pcc pc1 pcccl highs conn rpcc {lpcc pccn0} =>
   [ | pc2 pcc Ih] pc1 pcccl highs conn rpcc pc1lp.
   have pc1cl : pc1 \in closed by apply: pcccl; rewrite inE eqxx.  
@@ -302,8 +299,7 @@ elim: pcc pc1 pcccl highs conn rpcc {lpcc pccn0} =>
       have [c' c'in [pr' pal']] := covered_points pp.
       exists c'; rewrite // inside_closed'E pal'.
       rewrite (x_right_pts_right_limit (closed_ok c'in)) // le_refl.
-      have [q /andP[] _ /andP[] _ /andP[] Q1 Q2] := non_empty_closed c'in.
-      rewrite (lt_trans Q1 Q2) ?andbT {q Q1 Q2}.
+      rewrite (non_empty_closed c'in).
       have [vpl' vph'] := right_valid c'in pr'.
       by rewrite (right_side_under_high (closed_ok c'in)).
     have [cqc' | ] := disj_closed ccl c'in.
@@ -362,8 +358,7 @@ have [pleft2 | pright2 ] := lerP (p_x p) (left_limit pc2).
   have pc2cl : pc2 \in closed by apply: pcccl'; rewrite mem_head.
   have sr : p_x p < p_x (right_pt g).
     rewrite pat.
-    have [p' /andP[] _ /andP[] _ /andP[] l2p' p'r2] := non_empty_closed pc2cl.
-    rewrite (lt_trans l2p') // (lt_le_trans p'r2) //.
+    rewrite (lt_le_trans (non_empty_closed pc2cl)) //.
     have := right_limit_right_pt_high_cl (closed_ok pc2cl).
     by rewrite (highs' _ (mem_head _ _)).
   have [vl1 vh1] : valid_edge (low pc1) p /\ valid_edge (high pc1) p.
@@ -454,9 +449,8 @@ have missing_fact1 :
   {in events_to_edges evs, forall g, edge_covered g [::] closed}.
   admit.
 have missing_fact2 :
- {in closed, forall c, exists p,
-   [&& p >>> low c, p <<< high c & left_limit c < p_x p < right_limit c]}.
-  admit.
+ {in closed, forall c, left_limit c < right_limit c}.
+ by move=> c' c'in; have [_ [_ []]]:= closed_main_properties _ c'in.
 have rf_cl : {in closed, forall c, low c <| high c}.
   by move=> c' c'in; have [it _] := closed_main_properties _ c'in.
 have dif_lh_cl : {in closed, forall c, low c != high c}.
