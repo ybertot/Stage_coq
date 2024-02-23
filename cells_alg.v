@@ -170,7 +170,7 @@ Definition leftmost_points (bottom top : edge) :=
         [::]
   else
      if vertical_intersection_point (left_pt bottom) top is Some pt then
-        [:: pt; left_pt bottom]
+        no_dup_seq [:: pt; left_pt bottom]
      else
         [::].
 
@@ -2360,8 +2360,8 @@ case: ltrP => cmpl.
   move=> _ /andP[] samex _ /=.
   move: peq; rewrite /vertical_intersection_point.
   by case: ifP=> // ve [] <-.
-case peq: (vertical_intersection_point (left_pt bottom) top)=> [p' | //].
-by move=> _ /andP[].
+case peq: (vertical_intersection_point (left_pt bottom) top)=> [p' | //] _.
+by case: ifP=> [/eqP A | B]; move=> /andP[].
 Qed.
 
 Lemma trial1 c1 c2 :
@@ -4968,21 +4968,12 @@ Notation open_cell_side_limit_ok :=
   (@open_cell_side_limit_ok R).
 
 Lemma inside_box_left_ptsP bottom top p :
+  open_cell_side_limit_ok (start_open_cell bottom top) ->
   inside_box bottom top p -> left_limit (start_open_cell bottom top)  < p_x p.
 Proof.
-move=> /andP[] _ /andP[] valb valt.
-move: valb valt=> /andP[] pgelb plerb /andP[] pgelt plert.
-rewrite /start_open_cell/left_limit/leftmost_points; case: ifP=> cmpl.
-  have /exists_point_valid [p1 p1P] : valid_edge bottom (left_pt top).
-    rewrite /valid_edge (ltW cmpl) /=.
-    by apply: ltW; apply: (lt_trans pgelt).
-  rewrite p1P /=.
-  by move: (intersection_on_edge p1P) => [] _ <-.
-move/negbT: cmpl; rewrite -leNgt=>cmpl.
-have /exists_point_valid [p1 p1P] : valid_edge top (left_pt bottom).
-  rewrite /valid_edge cmpl /=.
-  by apply/ltW; apply: (lt_trans pgelb).
-by rewrite p1P /=.
+move=> sok /andP[] _ /andP[] /andP[] valb _ /andP[] valt _.
+rewrite leftmost_points_max //.
+by case : (lerP (p_x (left_pt bottom)) (p_x (left_pt top))).
 Qed.
 
 Lemma cell_edges_start bottom top :
@@ -5513,18 +5504,18 @@ Lemma bottom_left_start bottom top p :
   bottom_left_cells_lex [:: start_open_cell bottom top] p.
 Proof.
 move=> inbox_p startok c; rewrite inE => /eqP ->.
-move: startok; rewrite /open_cell_side_limit_ok /start_open_cell /=.
-rewrite /bottom_left_corner /= /leftmost_points /=.
-case: ifP=> [lowleft | highleft].
-case vpq: vertical_intersection_point=> [ the_point /= | ]; last by [].
-  move=> _.
-  have [_ xpoint]:= intersection_on_edge vpq.
-  rewrite /lexPt; apply/orP; left; rewrite -xpoint.
-  by move: inbox_p=> /andP[] _ /andP[] _ /andP[].
-case vpq : vertical_intersection_point => [ some_point /= | ]; last by [].
-  move=> _.  
-  rewrite /lexPt; apply/orP; left.
-  by move: inbox_p=> /andP[] _ /andP[] /andP[].
+have := leftmost_points_max startok => llq.
+move: (startok); rewrite /open_cell_side_limit_ok=> /andP[] ln0.
+move=> /andP[] samex _.
+rewrite /bottom_left_corner.
+have /eqP := (allP samex (last dummy_pt (left_pts (start_open_cell bottom top)))
+            (last_in_not_nil _ ln0)).
+rewrite llq.
+rewrite /lexPt=> ->.
+move: inbox_p=> /andP[] _ /andP[] /andP[] + _ /andP[] + _.
+case: (lerP (p_x (left_pt bottom)) (p_x (left_pt top))).
+  by move=> _ _ ->.
+by move=> _ ->.
 Qed.
 
 Lemma initial_edge_covering_general_position

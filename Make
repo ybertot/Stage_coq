@@ -7,5 +7,5 @@ events.v
 cells.v
 opening_cells.v
 cells_alg.v
-trials.v
-draw.v
+safe_cells.v
+
