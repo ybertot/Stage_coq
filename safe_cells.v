@@ -161,11 +161,16 @@ by apply: right_limit_right_pt_low_cl.
 Qed.
 
 (* I don't know yet if this is going to be used. *)
-Lemma above_low : {in closed, forall c p, p === high c -> p >>= low c}.
+Lemma above_low : 
+  {in closed, forall c p, p === high c -> valid_edge (low c) p ->
+     p >>= low c}.
 Proof.
-move=> c cl p.
-Admitted.
-
+move=> c cin p /[dup] ponh /andP[] _ vh vl.
+apply/negP=> pul.
+have lbh : low c <| high c by apply: low_high.
+have := order_edges_strict_viz_point' vl vh lbh pul.
+by rewrite strict_nonAunder // ponh.
+Qed.
 
 Lemma right_side_under_high (c : cell) p :
   closed_cell_side_limit_ok c ->
@@ -364,7 +369,7 @@ have [pleft2 | pright2 ] := lerP (p_x p) (left_limit pc2).
   have [vl1 vh1] : valid_edge (low pc1) p /\ valid_edge (high pc1) p.
     have := in_bound_closed_valid (closed_ok pc1cl) (ltW pc1lp).
     by rewrite pat r1l2 le_refl=> /(_ isT).
-  have := above_low pc1cl ponh.
+  have := above_low pc1cl ponh vl1.
   rewrite strict_nonAunder // negb_and negbK=> /orP[] ponl; last by [].
   have lo : low pc1 \in bottom :: top :: obstacles.
     by apply: obstacles_sub; rewrite mem_cat map_f.
@@ -387,6 +392,7 @@ Section main_statement.
 Variable R : realFieldType.
 
 Lemma start_yields_safe_cells evs bottom top (open closed : seq (cell R)):
+  evs != [::] ->
   sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) evs ->
   bottom <| top ->
   open_cell_side_limit_ok (start_open_cell bottom top) ->
@@ -397,7 +403,6 @@ Lemma start_yields_safe_cells evs bottom top (open closed : seq (cell R)):
          inside_box bottom top (left_pt g) &&
          inside_box bottom top (right_pt g)} ->
   all (inside_box bottom top) [seq point e | e <- evs] ->
-  sorted (lexPtEv (R:=R)) evs ->
   {in evs, forall ev : event R, out_left_event ev} ->
   close_edges_from_events evs ->
   {in events_to_edges evs & evs, forall g e, non_inner g (point e)} ->
@@ -406,9 +411,12 @@ Lemma start_yields_safe_cells evs bottom top (open closed : seq (cell R)):
   {in closed & events_to_edges evs, forall c g p,
     strict_inside_closed p c -> ~~(p === g)}.
 Proof.
-move=> general_position bottom_below_top startok no_crossing.
-move=> all_edges_in all_points_in sorted_lex out_edges_correct.
+move=> evsn0 general_position bottom_below_top startok no_crossing.
+move=> all_edges_in all_points_in out_edges_correct.
 move=> edges_closed no_event_in_edge outgoing_event_unique start_eq.
+have sorted_lex : sorted (@lexPtEv _) evs.
+  move: general_position; apply: sub_sorted.
+  by move=> e1 e2; rewrite /lexPtEv/lexPt=> ->.
 have [closed_has_disjoint_cells no_intersection_closed_open]:=
    start_disjoint_general_position general_position bottom_below_top
    startok no_crossing all_edges_in all_points_in sorted_lex (@subset_id _ _)
@@ -418,7 +426,7 @@ have [all_edges_covered all_points_covered]:=
    startok no_crossing all_edges_in all_points_in sorted_lex (@subset_id _ _)
    out_edges_correct edges_closed no_event_in_edge outgoing_event_unique
    start_eq.
-have [closed_main_properties [subcl all_closed_ok]] :=
+have [closed_main_properties [subcl [all_closed_ok last_open_props]]] :=
    start_safe_sides general_position bottom_below_top startok no_crossing
    all_edges_in all_points_in sorted_lex (@subset_id _ _) out_edges_correct
    edges_closed no_event_in_edge outgoing_event_unique start_eq.
@@ -445,10 +453,24 @@ have sub_ref : {subset [seq left_pt g | g <- events_to_edges evs] ++
     by rewrite inE map_f ?orbT.
   rewrite inE; apply/orP; right; apply: Ih.
   by rewrite mem_cat map_f ?orbT.
-have missing_fact1 :
+have covered_closed :
   {in events_to_edges evs, forall g, edge_covered g [::] closed}.
-  admit.
-have missing_fact2 :
+  move: last_open_props=> [slo [lloq [hloq [ocdis last_open_props]]]].
+  case oeq : open slo => [ | lsto [ | ? ?]] // _.
+  move=> g' g'in.
+  (* TODO : make a separate lemma. *)
+  have g'ntop : g' != top.
+    apply/negP=> /eqP abs.
+    have := all_edges_in _ g'in => /andP[] /andP[] _ /andP[] _.
+    by rewrite abs lt_irreflexive.
+  have := all_edges_covered _ g'in; rewrite oeq.
+  move=> [ | closed_covered]; last by right; exact: closed_covered.
+  move=> [opc [pcc [_ [highs [ _ [ opcin _]]]]]].
+  move: g'ntop.
+  rewrite -(highs opc); last by rewrite mem_rcons mem_head.
+  move: opcin; rewrite inE=> /eqP ->.
+  by rewrite -hloq oeq /= eqxx.
+have non_empty_closed :
  {in closed, forall c, left_limit c < right_limit c}.
  by move=> c' c'in; have [_ [_ []]]:= closed_main_properties _ c'in.
 have rf_cl : {in closed, forall c, low c <| high c}.
@@ -468,5 +490,8 @@ have pal : p >>> low c.
 have p_between : left_limit c < p_x p < right_limit c.
   by move: pin; rewrite /strict_inside_closed=> /andP[].
 by have := safe_cell_interior subcl (@subset_id _ _) closed_has_disjoint_cells
-  missing_fact1 points_covered' missing_fact2 (allP all_closed_ok)
+  covered_closed points_covered' non_empty_closed (allP all_closed_ok)
   no_crossing rf_cl dif_lh_cl cin puh pal p_between gin.
+Qed.
+
+End main_statement.
