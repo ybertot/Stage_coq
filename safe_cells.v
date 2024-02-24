@@ -519,14 +519,33 @@ have pub := order_edges_strict_viz_point' vt vb abs put.
 by move: pab; rewrite under_onVstrict // pub orbT.
 Qed.
 
+Lemma edges_inside_from_events_inside (bottom top : edge R) evs:
+    all (inside_box bottom top) [seq point e | e <- evs] ->
+    {in evs, forall ev, out_left_event ev} ->
+    close_edges_from_events evs ->
+   {in events_to_edges evs,
+         forall g : edge R,
+         inside_box bottom top (left_pt g) &&
+         inside_box bottom top (right_pt g)}.
+Proof.
+elim: evs => [ | e evs Ih] /=; first by [].
+move=> /andP[] inbox_e inbox_es out_es0.
+have out_e : out_left_event e by apply: out_es0; rewrite mem_head.
+have out_es : {in evs, forall e, out_left_event e}.
+   by move=> e' e'in; apply: out_es0; rewrite inE e'in orbT.
+move=> /andP[] close_e close_es.
+move=> g; rewrite events_to_edges_cons mem_cat=> /orP[] gin; last first.
+  by apply: (Ih   inbox_es out_es close_es).
+apply/andP; split; first by rewrite (eqP (out_e g gin)).
+move: close_e=> /allP /(_ g gin).
+move/hasP=> [e2 e2in /eqP ->].
+by apply: (allP inbox_es); rewrite map_f.
+Qed.
+
 Lemma start_yields_safe_cells evs bottom top (open closed : seq (cell R)):
   sorted (fun e1 e2 => p_x (point e1) < p_x (point e2)) evs ->
   {in [:: bottom, top & 
          events_to_edges evs] &, forall e1 e2, inter_at_ext e1 e2} ->
-  {in events_to_edges evs,
-         forall g : edge R,
-         inside_box bottom top (left_pt g) &&
-         inside_box bottom top (right_pt g)} ->
   all (inside_box bottom top) [seq point e | e <- evs] ->
   {in evs, forall ev : event R, out_left_event ev} ->
   close_edges_from_events evs ->
@@ -538,9 +557,9 @@ Lemma start_yields_safe_cells evs bottom top (open closed : seq (cell R)):
 Proof.
 have [ev0 | evsn0] := eqVneq evs [::].
   rewrite /start /=; rewrite ev0 /=.
-  by move=> _ _ _ _ _ _ _ _ [] _ <-.
+  by move=> _ _ _ _ _ _ _ [] _ <-.
 move=> general_position no_crossing.
-move=> all_edges_in all_points_in out_edges_correct.
+move=> all_points_in out_edges_correct.
 move=> edges_closed no_event_in_edge outgoing_event_unique start_eq.
 have [e0 e0in] : exists e, e \in evs.
   by case: (evs) evsn0 => [ | a ?] //; exists a; rewrite mem_head.
@@ -556,6 +575,10 @@ have bottom_below_top : bottom <| top.
 have sorted_lex : sorted (@lexPtEv _) evs.
   move: general_position; apply: sub_sorted.
   by move=> e1 e2; rewrite /lexPtEv/lexPt=> ->.
+have all_edges_in :   {in events_to_edges evs, forall g,
+         inside_box bottom top (left_pt g) &&
+         inside_box bottom top (right_pt g)}.
+  by apply: edges_inside_from_events_inside.
 have [closed_has_disjoint_cells no_intersection_closed_open]:=
    start_disjoint_general_position general_position bottom_below_top
    startok no_crossing all_edges_in all_points_in sorted_lex (@subset_id _ _)
