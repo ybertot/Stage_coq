@@ -1,4 +1,5 @@
 -R . cellDecomposition
+-R ../trajectories/theories trajectories
 -arg -w -arg -ambiguous-paths
 -arg -w -arg -notation-overridden
 math_comp_complements.v

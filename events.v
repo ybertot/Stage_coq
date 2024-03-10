@@ -1,7 +1,7 @@
 From mathcomp Require Import all_ssreflect all_algebra.
 Require Export Field.
 Require Import math_comp_complements.
-Require Import points_and_edges.
+Require Import generic_trajectories points_and_edges.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -18,27 +18,31 @@ Variable R : realFieldType.
 
 Notation pt := (pt R).
 Notation edge := (edge R).
+Notation p_x := (p_x R).
+Notation p_y := (p_y R).
 
-Record event := Bevent {point : pt; outgoing : seq edge}.
+Notation event := (event R edge).
+Notation point := (point R edge).
+Notation outgoing := (outgoing R edge).
 
 Definition event_eqb (ea eb : event) : bool :=
-  let: Bevent pta outa := ea in
-  let: Bevent ptb outb := eb in
-  (pta == ptb) && (outa == outb).
+  (point ea == point eb :> pt) && (outgoing ea == outgoing eb).
 
 Lemma event_eqP : Equality.axiom event_eqb.
 Proof.
 rewrite /Equality.axiom.
 move => [pta outa] [ptb outb] /=.
-have [/eqP <-|/eqP anb] := boolP(pta == ptb).
-  have [/eqP <-|/eqP anb] := boolP(outa == outb).
-    by apply:ReflectT.
+rewrite /event_eqb/=.
+have [/eqP <- | /eqP anb] := boolP (pta == ptb :> pt).
+  have [/eqP <- | /eqP anb] := boolP (outa == outb).
+    by apply: ReflectT.
   by apply : ReflectF => [][].
 by apply: ReflectF=> [][].
 Qed.
 
 Canonical event_eqType := EqType event (EqMixin event_eqP).
 
+Notation Bevent := (Bevent _ _).
 (* As in insertion sort, the add_event function assumes that event are
   sorted in evs (lexicographically, first coordinate, then second coordinate
   of the point.  On the other hand, no effort is made to sort the various
@@ -261,10 +265,10 @@ have [/eqP pp1 | pnp1'] /= := boolP (p_x p == p_x (point ev1)).
   rewrite -evseq.
   case aeq : (add_event p e inc evs) => [ | e' evs3].
     have := add_event_preserve_first p e inc
-           {| point := p2; outgoing := o2 |} evs2.
+           (Bevent p2 o2) evs2.
       by rewrite -evseq aeq => [[]].
   case: (add_event_preserve_first p e inc
-         {| point := p2; outgoing := o2 |} evs2)=> _.
+          (Bevent p2 o2) evs2)=> _.
   rewrite -evseq aeq /= => [] [eqp | eqp2].
     apply/andP; split; last by move: Ih; rewrite aeq.
     by rewrite /lexPtEv /lexPt eqp pp1 eqxx p1ltp orbT.
@@ -277,10 +281,10 @@ case evseq : evs => [ | [p2 o2] evs2].
   by case: (inc)=> /=; rewrite /lexPtEv /lexPt /= p1ltp.
 case aeq : (add_event p e inc evs) => [ | e' evs3].
   case: (add_event_preserve_first p e inc
-       {| point := p2; outgoing := o2 |} evs2).
+       (Bevent p2 o2) evs2).
   by rewrite -evseq aeq.
 case: (add_event_preserve_first p e inc
-     {| point := p2; outgoing := o2 |} evs2) => _.
+     (Bevent p2 o2) evs2) => _.
 have path_e'evs3 : path lexPtEv e' evs3 by move: Ih; rewrite aeq.
 rewrite -evseq aeq /= => [][e'p | e'p2]; rewrite path_e'evs3 andbT.
   by rewrite /lexPtEv /lexPt e'p p1ltp.
@@ -473,13 +477,14 @@ by have Ih'' := @out_left_add_event (left_pt g) g false _ erefl Ih'.
 Qed.
 
 Lemma add_event_point_subset (s : mem_pred pt) p g b evs :
-  {subset [seq point ev | ev <- evs] <= s} ->
+  {subset ([seq point ev | ev <- evs] : seq pt) <= s} ->
   p \in s ->
-  {subset [seq point ev | ev <- add_event p g b evs] <= s}.
+  {subset ([seq point ev | ev <- add_event p g b evs] : seq pt) <= s}.
 Proof.
 elim: evs => [ | ev evs Ih].
   by move=> _ pin /=; case: ifP => /= bval p'; rewrite inE=> /eqP ->.
-move=> cnd pin; have cnd' : {subset [seq point ev' | ev' <- evs] <= s}.
+move=> cnd pin.
+  have cnd' : {subset ([seq point ev' | ev' <- evs] : seq pt) <= s}.
   by move=> p' p'in; apply: cnd; rewrite inE p'in orbT.
 have Ih' := Ih cnd' pin; clear Ih.
 have evin : point ev \in s by apply: cnd; rewrite !inE eqxx.
@@ -491,7 +496,7 @@ Qed.
 Lemma edges_to_events_subset (s : mem_pred pt) (gs : seq edge) :
   {subset [seq left_pt g | g <- gs] <= s} ->
   {subset [seq right_pt g | g <- gs] <= s} ->
-  {subset [seq point ev | ev <- edges_to_events gs] <= s}.
+  {subset ([seq point ev | ev <- edges_to_events gs] : seq pt) <= s}.
 Proof.
 elim: gs => [// | g gs Ih].
 rewrite /=.

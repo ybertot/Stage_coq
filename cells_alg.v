@@ -1,5 +1,6 @@
 From mathcomp Require Import all_ssreflect all_algebra.
 Require Export Field.
+Require Import generic_trajectories.
 Require Import math_comp_complements points_and_edges events cells.
 Require Import opening_cells.
 
@@ -17,90 +18,59 @@ Section working_environment.
 Variable R : realFieldType.
 
 Notation pt := (pt R).
+Notation p_x := (p_x R).
+Notation p_y := (p_y R).
+Notation Bpt := (Bpt R).
 Notation edge := (edge R).
-Notation event := (event R).
+Notation event := (event R edge).
+Notation outgoing := (outgoing R edge).
+Notation point := (point R edge).
 
-Notation cell := (cell R).
+Notation cell := (cell R edge).
 
 Notation dummy_pt := (dummy_pt R).
-Notation dummy_edge := (dummy_edge R).
-Notation dummy_cell := (dummy_cell R).
+Notation dummy_edge := (dummy_edge R 0 edge (@unsafe_Bedge R)).
+Notation dummy_cell := (dummy_cell R 0 edge (@unsafe_Bedge _)).
 
-Fixpoint open_cells_decomposition_contact open_cells pt :
-   option (seq cell * seq cell * cell) :=
-if open_cells is c :: q then
-  if contains_point pt c then
-    if open_cells_decomposition_contact q pt is Some(cc, lc, c') then
-       Some(c :: cc, lc, c')
-     else
-       Some([::], q, c)
-  else
-    None
-else
-  None.
+Definition open_cells_decomposition_contact :=
+  open_cells_decomposition_contact R eq_op le +%R (fun x y => x - y) *%R 0
+    edge (@left_pt R) (@right_pt R).
 
-Fixpoint open_cells_decomposition_rec open_cells pt : 
-  seq cell * seq cell * cell * seq cell :=
-if open_cells is c :: q then
-  if contains_point pt c then
-     if open_cells_decomposition_contact q pt is Some(cc, lc, c') then
-        ([::], c :: cc, c', lc)
-     else
-        ([::], [::], c, q)
-  else
-    let '(fc, cc, c', lc) := open_cells_decomposition_rec q pt in
-    (c :: fc, cc, c', lc)
-else
-  ([::], [::], dummy_cell, [::]).
+Definition open_cells_decomposition_rec :=
+  open_cells_decomposition_rec R eq_op le +%R (fun x y => x - y) *%R 0
+  edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
-Definition open_cells_decomposition (open_cells : seq cell) (p : pt) :
-   seq cell * seq cell * cell * seq cell * edge * edge :=
-let '(fc, cc, c', lc) := open_cells_decomposition_rec open_cells p in
-(fc, cc, c', lc, low (head c' cc), high c').
+Definition open_cells_decomposition :=
+  open_cells_decomposition R eq_op le +%R (fun x y => x - y) *%R 0
+  edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
-Record scan_state :=
-  Bscan {sc_open1 : seq cell;
-         lst_open : cell;
-         sc_open2 : seq cell;
-         sc_closed : seq cell;
-         lst_closed : cell;
-         lst_high : edge;
-         lst_x : R}.
+Definition scan_state := scan_state R edge.
 
-Definition update_closed_cell (c : cell) (p : pt) : cell :=
-  let ptseq := right_pts c in
-  let newptseq :=
-    (belast  (head (cells.dummy_pt R) ptseq) (behead ptseq)) ++
-    [:: p; last (cells.dummy_pt R) ptseq] in
-  Bcell (left_pts c) newptseq (low c) (high c).
+Definition update_closed_cell :=
+  update_closed_cell R 0 edge.
 
-Definition set_left_pts (c : cell) (l : seq pt) :=
-  {| left_pts := l; right_pts := right_pts c; low := low c; high := high c |}.
+Definition set_left_pts :=
+  set_left_pts R.
+
+Notation low := (low R edge).
+Notation high := (high R edge).
+Notation left_pts := (left_pts R edge).
+Notation right_pts := (right_pts R edge).
+Notation Bcell := (Bcell R edge).
 
 Lemma high_set_left_pts (c : cell) l : high (set_left_pts c l) = high c.
 Proof. by case: c. Qed.
 
-Definition set_pts (c : cell) (l1 l2 : seq pt) :=
-  {| left_pts := l1; right_pts := l2; low := low c; high := high c |}.
+Definition set_pts := set_pts R edge.
 
 (* This function is to be called only when the event is in the middle
   of the last opening cell.  The point e needs to be added to the left
   points of one of the newly created open cells, but the one that receives
   the first segment of the last opening cells should keep its existing
   left points.*)
-Definition update_open_cell (c : cell) (e : event) : seq cell * cell :=
-  let ps := left_pts c in
-  if outgoing e is nil then
-    ([::], set_left_pts c [:: head dummy_pt ps, point e & behead ps])
-  else
-    match
-    opening_cells_aux (point e) (sort (@edge_below _) (outgoing e))
-        (low c) (high c) with
-    | ([::], c') => (* this is an absurd case. *)
-      ([::], c)
-    | (c'::tlc', lc') =>
-      (set_left_pts c' (point e :: behead ps) :: tlc', lc')
-    end.
+Definition update_open_cell := 
+  update_open_cell R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 0
+  edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Definition update_open_cell_top (c : cell) (new_high : edge) (e : event) :=
   if outgoing e is nil then
@@ -117,92 +87,26 @@ Definition update_open_cell_top (c : cell) (new_high : edge) (e : event) :=
       (set_left_pts f (point e :: behead (left_pts c)) :: q, lc)
     end.
 
-Definition simple_step (fc cc lc : seq cell) (lcc : cell) (le he : edge)
-   (closed_cells : seq cell) (last_closed : cell) ev :=
-  let new_closed := closing_cells (point ev) cc in
-  let last_new_closed := close_cell (point ev) lcc in
-  let closed_cells' := closed_cells ++ last_closed :: new_closed in
-  let (nos, lno) :=
-    opening_cells_aux (point ev) (sort (@edge_below _) (outgoing ev)) le he in
-    Bscan (fc ++ nos) lno lc closed_cells' last_new_closed he (p_x (point ev)).
+Notation Bscan := (Bscan _ _).
 
-Definition step (e : event) (st : scan_state) : scan_state :=
-   let p := point e in
-   let '(Bscan op1 lsto op2 cls cl lhigh lx) := st in
-   if (p_x p != lx) then
-     let '(first_cells, contact_cells, last_contact, last_cells, 
-           lower_edge, higher_edge) :=
-       open_cells_decomposition (op1 ++ lsto :: op2) p in
-     simple_step first_cells contact_cells last_cells last_contact
-       lower_edge higher_edge cls cl e
-   else if p >>> lhigh then
-     let '(fc', contact_cells, last_contact, last_cells,
-           low_edge, higher_edge) :=
-       open_cells_decomposition op2 p in
-     let first_cells := op1 ++ lsto :: fc' in
-     simple_step first_cells contact_cells last_cells last_contact
-       low_edge higher_edge cls cl e
-   else if p <<< lhigh then 
-     let new_closed := update_closed_cell cl (point e) in
-     let (new_opens, new_lopen) := update_open_cell lsto e in
-     Bscan (op1 ++ new_opens) new_lopen op2 cls new_closed lhigh lx
-   else (* here p === lhigh *)
-     let '(fc', contact_cells, last_contact, last_cells, lower_edge,
-                higher_edge) :=
-       open_cells_decomposition (lsto :: op2) p in
-       (* we know lsto was just open, so that its left limit is lx
-         and its right limit is bounded by p_x (right_pt lhigh), which
-         is necessarily p_x (point e). lsto is necessarily the
-         first cell of contact_cells.  So the first element of
-         contact_cells should not be closed. It can just be
-         disregarded. *)
-     let closed := closing_cells p (seq.behead contact_cells) in
-     let last_closed := close_cell p last_contact in
-     let (new_opens, new_lopen) := update_open_cell_top lsto higher_edge e in
-     Bscan (op1 ++ fc' ++ new_opens) new_lopen last_cells
-          (closed ++ cl :: cls) last_closed higher_edge lx.
+Definition simple_step :=
+  simple_step R eq_op le *%R (fun x y => x - y) *%R (fun x y => x / y)
+  0 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
-Definition leftmost_points (bottom top : edge) :=
-  if p_x (left_pt bottom) < p_x (left_pt top) then
-    if vertical_intersection_point (left_pt top) bottom is Some pt then
-       [:: left_pt top; pt]
-    else
-        [::]
-  else
-     if vertical_intersection_point (left_pt bottom) top is Some pt then
-        no_dup_seq [:: pt; left_pt bottom]
-     else
-        [::].
+Definition step :=
+  step R eq_op le *%R (fun x y => x - y) *%R (fun x y => x / y)
+  0 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
-Definition rightmost_points (bottom top : edge) :=
-  if p_x (right_pt bottom) < p_x (right_pt top) then
-    if vertical_intersection_point (right_pt bottom) top is Some pt then
-       [:: right_pt bottom; pt]
-    else
-        [::]
-  else
-     if vertical_intersection_point (left_pt top) bottom is Some pt then
-        [:: pt; right_pt top]
-     else
-        [::].
+Definition scan events st : seq cell * seq cell :=
+  let final_state := iter_list step events st in
+  (sc_open1 _ _ st ++ lst_open _ _ st :: sc_open2 _ _ st,
+   lst_closed _ _ st :: sc_closed _ _ st).
 
-Definition complete_last_open (bottom top : edge) (c : cell) :=
-  match c with
-  | Bcell lpts rpts le he =>
-      Bcell lpts (rightmost_points bottom top) le he
-  end.
+Definition start_open_cell :=
+  start_open_cell R eq_op le +%R (fun x y => x - y)
+  *%R (fun x y => x / y) edge (@left_pt R) (@right_pt R).
 
-Fixpoint scan (events : seq event) (st : scan_state)
-  : seq cell * seq cell :=
-  match events, st with
-     | [::], Bscan op1 lop op2 cl lcl _ _ =>
-       (op1 ++ lop :: op2, lcl :: cl)
-     | e::q, _ => scan q (step e st)
-  end.
-
-Definition start_open_cell (bottom top : edge) :=
-  Bcell (leftmost_points bottom top) [::] bottom top.
-
+(*
 Definition start (events : seq event) (bottom : edge) (top : edge) :
   seq cell * seq cell :=
   match events with
@@ -215,6 +119,8 @@ Definition start (events : seq event) (bottom : edge) (top : edge) :
          (close_cell (point ev0) (start_open_cell bottom top))
          top (p_x (point ev0)))
   end.
+
+*)
 
 Lemma cell_edges_sub_high bottom top (s : seq cell) :
   cells_bottom_top bottom top s ->
@@ -264,9 +170,10 @@ Lemma open_cells_decomposition_contact_none open_cells p :
   open_cells_decomposition_contact open_cells p = None ->
   open_cells != [::] -> ~~contains_point p (head dummy_cell open_cells).
 Proof.
+rewrite /contains_point.
 case: open_cells => [// | /= c0 q].
 by case : ifP=> ? //;
-  case: (open_cells_decomposition_contact _ _)=> // [] [] [] //.
+  case: (open_cells_decomposition_contact q p)=> // [] [] [].
 Qed.
 
 Lemma open_cells_decomposition_contact_main_properties open_cells p cc c' lc:
@@ -303,10 +210,12 @@ Lemma decomposition_main_properties open_cells p fc cc lcc lc le he:
   le \in cell_edges open_cells /\
   he \in cell_edges open_cells.
 Proof.
-rewrite /open_cells_decomposition.
+rewrite /open_cells_decomposition/generic_trajectories.open_cells_decomposition.
 elim : open_cells fc cc lcc lc le he => [ | c q Ih] fc cc lcc lc le he.
   by rewrite /= => _ [] w.
 rewrite /=; case: ifP=> ctc.
+  rewrite -[generic_trajectories.open_cells_decomposition_contact _ _ _ _ _
+              _ _ _ _ _ _ _]/(open_cells_decomposition_contact q p).
   case ocdc_eq : (open_cells_decomposition_contact q p) => [[[cc0 lc0] c0]|].
     move=> [] <- <- <- <- <- <- _.
     have [qeq [ctc0 [allct nct]] ]:=
@@ -323,20 +232,25 @@ rewrite /=; case: ifP=> ctc.
   split; first by [].
   split; first by [].
   by rewrite !mem_cat !map_f ?orbT // inE eqxx.
+rewrite -[generic_trajectories.open_cells_decomposition_rec _ _ _ _ _
+              _ _ _ _ _ _ _ _]/(open_cells_decomposition_rec q p).
 case ocdr_eq : (open_cells_decomposition_rec q p) => [[[fc1 cc1] lcc1] lc1].
 move=> [] <- <- <- <- <- <- [] w win ctw.
 have ex2 :exists2 w, w \in q & contains_point' p w.
   exists w; last by [].
   move: win ctw; rewrite inE => /orP[/eqP -> | //].
-  by move=> /contains_point'W; rewrite ctc.
+  by move=> /contains_point'W; rewrite /contains_point ctc.
 have := Ih fc1 cc1 lcc1 lc1 (low (head lcc1 cc1)) (high lcc1).
+rewrite /open_cells_decomposition_rec in ocdr_eq.
 rewrite ocdr_eq => /(_ erefl ex2).
 move=> [qeq [ctplcc1 [allct [allnct [nctlc [leeq heq]]]]]].
 split; first by rewrite /= qeq.
 split; first by [].
 split; first by [].
 split.
-  by move=> c0; rewrite inE=> /orP[/eqP -> // | c0in]; rewrite ?ctc ?allnct.
+  move=> c0; rewrite inE=> /orP[/eqP -> // | c0in]; last first.
+    by rewrite ?allnct.
+  by rewrite /contains_point ctc.
 repeat (split; first by []).
 by rewrite qeq !mem_cat !map_f ?orbT //; case:(cc1) => [| a b] /=; subset_tac.
 Qed.
@@ -574,9 +488,9 @@ have adjf : adjacent_cells f.
 have hfq : high (last c0 f) = low (head dummy_cell l).
   case: (l) adj exi => [ | c1 l']; first by move => _ [].
   by rewrite cat_path /==> /andP[] _ /andP[] /eqP.
-move: oca_eq; rewrite /open_cells_decomposition /=.
+move: oca_eq; rewrite /open_cells_decomposition/generic_trajectories.open_cells_decomposition /=.
 case: ifP=> [c0ctn | c0nctn].
-  move: c0ctn; rewrite /contains_point -[X in _ && X]negbK.
+  move: c0ctn; rewrite /generic_trajectories.contains_point -[X in _ && X]negbK.
   have [/eqP f0 | fn0] := boolP (f == nil).
     by move: hfq; rewrite f0 /= => ->; rewrite pal andbF.
   have := above_all_cells svalf adjf rfof.
@@ -586,13 +500,16 @@ case: ifP=> [c0ctn | c0nctn].
   have -> : high c0 = low (head dummy_cell f).
     by move: adj fn0; case: (f) => [// | ? ?] /= /andP[] /eqP.
   by rewrite palf andbF.
-move: ocal_eq; rewrite /open_cells_decomposition.
+move: ocal_eq; rewrite /open_cells_decomposition/generic_trajectories.open_cells_decomposition.
+rewrite -/(open_cells_decomposition_rec _ _).
 case ocal_eq: (open_cells_decomposition_rec _ _) =>
   [[[fc2 cc2] lcc2] lc2] [] <- <- <- <- <- <-.
 have adj' : adjacent_cells (f ++ l).
   by move: adj=> /path_sorted.
 have := Ih adj' rfo sval; rewrite /open_cells_decomposition.
-rewrite ocal_eq.
+rewrite /generic_trajectories.open_cells_decomposition.
+rewrite /open_cells_decomposition_rec in ocal_eq. rewrite ocal_eq.
+rewrite -/(open_cells_decomposition_rec _ _).
 case: (open_cells_decomposition_rec (f ++ l) p) => [[[fc4 cc4] lcc4] lc4].
 by move=> -[] -> -> -> -> _ _ [] <- <- <- <- <- <-.
 Qed.
@@ -645,14 +562,17 @@ have := open_cells_decomposition_cat adj srf sv exi pal.
 case ocl : (open_cells_decomposition (c :: l) p) =>
         [[[[[fc cc] lcc] lc] le] he].
 move: ocl; rewrite /open_cells_decomposition /=.
+rewrite /generic_trajectories.open_cells_decomposition /=.
+rewrite -/(contains_point _ _).
 have -> : contains_point p c.
-  by rewrite /contains_point underWC // underW.
+  by rewrite contains_pointE underWC // underW.
 case lq : l => [ | c1 l'] /=.
   by move=> [] <- <- <- <- <- <-; rewrite cats0.
+rewrite -/(contains_point _ _).
 suff -> : contains_point p c1 = false.
   by move=> [] <- <- <- <- <- <-; rewrite cats0.
 move: adj=> /adjacent_catW[] _; rewrite lq /= => /andP[] /eqP lc1q  _.
-by rewrite /contains_point -lc1q puh.
+by rewrite contains_pointE -lc1q puh.
 Qed.
 
 Section step.
