@@ -5483,6 +5483,12 @@ Lemma map_eq [A B : Type] (f : A -> B)  l :
    List.map f l = [seq f x | x <- l].
 Proof. by []. Qed.
 
+Definition main_process bottom top evs :=
+  match evs with
+  | ev :: evs => scan evs (initial_state bottom top (ev :: evs))
+  | [::] => ([:: start_open_cell bottom top], [::])
+  end.
+
 Lemma complete_process_eq bottom top ev evs :
   complete_process  R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 0 edge
   (@unsafe_Bedge _) (@left_pt _) (@right_pt _) (ev :: evs) bottom top =
@@ -5505,22 +5511,22 @@ Lemma complete_disjoint_general_position bottom top s closed open evs :
   {subset flatten [seq outgoing e | e <- evs] <= s} ->
   {in evs, forall ev, out_left_event ev} ->
   close_edges_from_events evs ->
-  start evs bottom top = (open, closed) ->
+  main_process bottom top evs = (open, closed) ->
   {in closed &, disjoint_closed_cells R} /\
   {in open & closed, disjoint_open_closed_cells R}.
 Proof.
 move=> ltev boxwf startok nocs' inbox_s evin lexev evsub out_evs cle.
 have nocs : {in bottom :: top :: s &, no_crossing R}.
   by apply: inter_at_ext_no_crossing.
-rewrite /start.
+rewrite /main_process/scan.
 case evsq : evs => [ | ev future_events].
   move=> [] <- <-; split; last by [].
   by move=> c1 c2; rewrite in_nil.
 have evsn0 : evs != [::] by rewrite evsq.
 have := initial_disjoint_general_position_invariant ltev boxwf startok nocs'
   evin lexev evsub out_evs cle evsn0.
-rewrite /initial_state evsq; case oca_eq : (opening_cells_aux _ _ _ _) =>
-   [nos1 lno1] /=.
+rewrite /initial_state evsq.
+case oca_eq : (opening_cells_aux _ _ _ _) => [nos1 lno1] /=.
 elim: (future_events) {oca_eq evsq} (Bscan _ _ _ _ _ _ _)=> [ | ev' fut' Ih].
   move=> state_f /=; case: state_f=> [] f m l cls lstc lsthe lstx.
   move=> /[swap] -[] <- <-; case; rewrite /state_open_seq /state_closed_seq /=.
@@ -5538,14 +5544,19 @@ move=> /andP[] /andP[] lstxlte lstx_fut' ltfut' edges_pairwise cl_at_left.
 move: (inv1)=> [] clae [] pre_sval [] adj [] cbtom rfo.
 have sval : seq_valid (fop ++ lsto :: lop) (point ev') by case: pre_sval.
 rewrite /=/simple_step; case: ifP=> [_ | ]; last first.
-  move=> /negbFE; rewrite eq_sym=> /eqP abs; suff: False by [].
+  move=> /negbFE; rewrite /same_x eq_sym=> /eqP abs; suff: False by [].
   by move : lstxlte; rewrite abs lt_irreflexive.
+rewrite -/(open_cells_decomposition _ _).
+rewrite /generic_trajectories.simple_step.
 case oe : (open_cells_decomposition _ _) => [[[[[fc cc] lcc] lc] le] he].
+rewrite -/(opening_cells_aux _ _ _ _).
 case oca_eq : (opening_cells_aux _ _ _ _) => [nos lno].
 apply: Ih.
 have :=
   simple_step_disjoint_general_position_invariant boxwf nocs' inbox_s oe.
-  rewrite /simple_step oca_eq=> /(_ _ _ lsthe lstx).
+  rewrite /simple_step/generic_trajectories.simple_step.
+  rewrite -/(opening_cells_aux _ _ _ _).
+  rewrite oca_eq=> /(_ _ _ lsthe lstx).
 by apply.
 Qed.
 
