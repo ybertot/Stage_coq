@@ -5568,13 +5568,13 @@ Record edge_covered_general_position_invariant (bottom top : edge)
        edge_covered g (state_open_seq s) (state_closed_seq s)}};
    processed_covered : {in processed_set, forall e,
        exists2 c, c \in (state_closed_seq s) &
-           point e \in right_pts c /\ point e >>> low c}  ;
+           point e \in (right_pts c : seq pt) /\ point e >>> low c}  ;
    common_inv_ec : common_general_position_invariant bottom top edge_set
      s events;
    non_in_ec : 
       {in edge_set & events, forall g e, non_inner g (point e)};
    uniq_ec : {in events, forall e, uniq (outgoing e)};
-   inj_high : {in state_open_seq s &, injective (@high _)};
+   inj_high : {in state_open_seq s &, injective high};
    bot_left_cells : 
        {in state_open_seq s & events, 
           forall c e, lexPt (bottom_left_corner c) (point e)};
@@ -5622,7 +5622,7 @@ Lemma initial_edge_covering_general_position
   {in events, forall ev, uniq (outgoing ev)} ->
   events != [::] ->
   edge_covered_general_position_invariant bottom top s
-   [:: (head (@dummy_event _) events)]
+   [:: (head dummy_event events)]
    (initial_state bottom top events) (behead events).
 Proof.
 move=> gen_pos lexev wf cle startok nocs' n_inner inbox_es sub_es out_es 
@@ -5639,7 +5639,7 @@ have oute : out_left_event e by apply: out_es; rewrite evsq inE eqxx.
 move=> Cinv [] ok0 []cbtom0 []adj0 []sval0 []rf0 []inbox_es0 []cle1
          []out_es1 []clae0 []vb []vt []oe0 []nocs []noc0 []pw0 lexevs.
 have inbox_e : inside_box bottom top (point e).
-  by apply/(allP inbox_es)/map_f; rewrite evsq inE eqxx.
+  by apply/(@allP [eqType of pt] _ _ inbox_es)/map_f; rewrite evsq inE eqxx.
 have /andP[eab ebt] : (point e >>> bottom) && (point e <<< top).
   by move: inbox_e=> /andP[].
 have cle0 : close_edges_from_events (e :: evs) by rewrite -evsq.
@@ -5650,7 +5650,7 @@ move=> -[]; rewrite /state_open_seq/state_closed_seq /=.
 move=> inv1 px1 lstheq1 sub1 _ _ _ _ oks1 lexpt1.
 have [clae1 [pre_sval [adj1 [cbtom1 rf1]]]] := inv1.
 set op0 := start_open_cell bottom top.
-have inj_high0 : {in [:: start_open_cell bottom top] &, injective (@high _)}.
+have inj_high0 : {in [:: start_open_cell bottom top] &, injective high}.
   by move=> g1 g2; rewrite !inE=> /eqP -> /eqP ->.
 have uniq1 : {in evs, forall e, uniq (outgoing e)}.
   by move=> ev evin; apply: uniq_out_es; rewrite evsq inE evin orbT.
@@ -5658,7 +5658,7 @@ have rf0' : s_right_form ([::] ++ [:: op0]) by [].
 have  btm_left_lex0 : 
   bottom_left_cells_lex [:: start_open_cell bottom top] (point e).
   by apply: bottom_left_start inbox_e startok.
-have inj_high1 : {in nos ++ [:: lno] &, injective (@high _)}.
+have inj_high1 : {in nos ++ [:: lno] &, injective high}.
   have uniq_e : uniq (outgoing e) by apply: uniq_out_es; rewrite evsq inE eqxx.
   have := step_keeps_injective_high_default inbox_es oute rf0' cbtom0
     adj0 sval0 ok0 uniq_e inj_high0 btm_left_lex0.
@@ -5689,7 +5689,7 @@ have btm_left_lex1 : {in nos ++ [:: lno] & evs,
 rewrite /state_open_seq/state_closed_seq/=.
 have cov_p1 : {in [:: e], forall e',
   exists2 c, c \in [:: close_cell (point e) op0] &
-  point e' \in right_pts c /\ point e' >>> low c}.
+  point e' \in (right_pts c : seq pt)/\ point e' >>> low c}.
   move=> e'; rewrite inE => /eqP -> {e'}.
   exists (close_cell (point e) op0); first by rewrite mem_head.
   split.
@@ -5790,8 +5790,12 @@ have cov' : {in rcons cov_set ev,forall e',
     by move=> /(_ _ gin); left.
   rewrite /state_open_seq /state_closed_seq /=.
   apply: edge_covered_sub.
-    by rewrite /simple_step oca_eq /= -catA.
-  by rewrite /simple_step oca_eq /= !cat_rcons -!cats1 -!catA.
+    rewrite /simple_step/generic_trajectories.simple_step.
+    rewrite -/(opening_cells_aux _ _ _ _).
+    by rewrite oca_eq /= -catA.
+  rewrite /simple_step/generic_trajectories.simple_step.
+  rewrite -/(opening_cells_aux _ _ _ _).
+  by rewrite oca_eq /= !cat_rcons -!cats1 -!catA.
 have n_inner' : {in s & evs, forall g e, non_inner g (point e)}.
   by move=> g e gin ein; apply: n_inner; rewrite // inE ein orbT.
 have uniq' : {in evs, forall e, uniq (outgoing e)}.
@@ -5799,10 +5803,13 @@ have uniq' : {in evs, forall e, uniq (outgoing e)}.
 have uniq_ev : uniq (outgoing ev) by apply: uniq_evs; rewrite inE eqxx.
 have inj_high' : 
   {in state_open_seq (simple_step fc cc lc lcc le he cls lstc ev) &,
-     injective (@high _)}.
+     injective high}.
   have := step_keeps_injective_high_default inbox0 out_e rfo cbtom adj sval
      oks uniq_ev inj_high btm_left_lex_e.
-  by rewrite /simple_step oe oca_eq /state_open_seq /= -catA.
+  rewrite /simple_step/generic_trajectories.simple_step.
+  rewrite -/(open_cells_decomposition _ _).
+  rewrite -/(opening_cells_aux _ _ _ _).
+  by rewrite oe oca_eq /state_open_seq /= -catA.
 have btm_left_lex' :
   {in state_open_seq (simple_step fc cc lc lcc le he cls lstc ev) & evs,
      forall c e, lexPt (bottom_left_corner c) (point e)}.
@@ -5811,11 +5818,13 @@ have btm_left_lex' :
   rewrite /simple_step/= /= oe oca_eq /= /state_open_seq /=.
   rewrite catA=> main.
   move=> c e cin ein; apply: main=> //=.
-  move: lexev; rewrite path_sortedE; last by apply: lexPtEv_trans.  
-  by move=> /andP[] /allP /(_ e ein).
+    move: lexev; rewrite path_sortedE; last by apply: lexPtEv_trans.  
+    by move=> /andP[] /allP /(_ e ein).
+  move: cin; rewrite /generic_trajectories.simple_step.
+  by rewrite -/(opening_cells_aux _ _ _ _) oca_eq.
 have p_cov' : {in rcons cov_set ev, forall e, exists2 c,
    c \in state_closed_seq (simple_step fc cc lc lcc le he cls lstc ev) &
-   point e \in right_pts c /\ point e >>> low c}.
+   point e \in (right_pts c : seq pt) /\ point e >>> low c}.
   have exi := exists_cell cbtom adj (inside_box_between inbox_e).
   have [ocd [lcc_ctn [allct [allnct [flcnct [heq [leq [lein hein]]]]]]]] :=
     decomposition_main_properties oe exi.
@@ -5824,12 +5833,16 @@ have p_cov' : {in rcons cov_set ev, forall e, exists2 c,
     (inside_box_between inbox_e) oe.
   move=> e; rewrite mem_rcons inE=> /orP[]; last first.
     move=> /p_covered [] c cin pin.
-    rewrite /state_closed_seq/simple_step oca_eq /=.
+    rewrite /state_closed_seq/simple_step/generic_trajectories.simple_step.
+    rewrite -/(opening_cells_aux _ _ _ _).
+    rewrite oca_eq /=.
     exists c; last by [].
-    by rewrite -cats1 /= -(cat_rcons lstc) !mem_cat cin.
+    by rewrite -cats1 /= appE -(cat_rcons lstc) !mem_cat cin.
   move=> /eqP -> {e}.
   exists (close_cell (point ev) (head lcc cc)).
-    rewrite /state_closed_seq /simple_step oca_eq /= -cats1 -catA /=.
+    rewrite /state_closed_seq /simple_step/generic_trajectories.simple_step.
+    rewrite -/(opening_cells_aux _ _ _ _).
+    rewrite oca_eq /= -cats1 -catA /=.
     rewrite -cat_rcons mem_cat; apply/orP; right.
     by case: (cc) => [ | ? ?]; rewrite /= mem_head.
   have hdin : head lcc cc \in fop ++ lsto :: lop.
@@ -5857,10 +5870,10 @@ Lemma start_edge_covered_general_position bottom top s closed open evs :
   close_edges_from_events evs ->
   {in s & evs, forall g e, non_inner g (point e)} ->
   {in evs, forall e, uniq (outgoing e)} ->
-  start evs bottom top = (open, closed) ->
+  main_process bottom top evs = (open, closed) ->
   {in events_to_edges evs, forall g, edge_covered g open closed} /\
   {in evs, forall e, exists2 c, c \in closed & 
-      point e \in right_pts c /\ point e >>> low c}.
+      point e \in (right_pts c : seq pt) /\ point e >>> low c}.
 Proof.
 move=> ltev boxwf startok nocs' inbox_s evin lexev evsub out_evs cle
   n_inner uniq_edges.
@@ -5882,7 +5895,7 @@ suff main : forall events op cl st cov_set,
   scan events st = (op, cl) ->
   ({in events_to_edges (cov_set ++ events), forall g, edge_covered g op cl} /\
   {in cov_set ++ events, forall e, exists2 c, c \in cl &
-    point e \in right_pts c /\ point e >>> low c}).
+    point e \in (right_pts c : seq pt) /\ point e >>> low c}).
   by move: req; apply: (main _ _ _ _ [:: ev]).
   move=> {req istateP istate oca_eq lno nos evsn0 evsq future_events ev}.
   move=> {uniq_edges n_inner out_evs evsub lexev evin startok ltev}.
@@ -5899,10 +5912,11 @@ suff main : forall events op cl st cov_set,
 move=> inv0; rewrite -cat_rcons.
 apply: Ih.
 case stq : st => [fop lsto lop cls lstc lsthe lstx].
-rewrite /step.
+rewrite /step/generic_trajectories.step.
 have /andP[/andP[+ _] _] := general_pos (common_inv_ec inv0).
 rewrite lt_neqAle eq_sym => /andP[] lstxneq _.
-rewrite stq /=in lstxneq; rewrite lstxneq.
+rewrite stq /= in lstxneq; rewrite lstxneq.
+rewrite -/(open_cells_decomposition _ _).
 case oe : (open_cells_decomposition _ _) => [[[[[fc cc] lcc] lc] le] he].
 move: (inv0); rewrite stq=> inv1.
 by have := simple_step_edge_covered_general_position boxwf nocs'
