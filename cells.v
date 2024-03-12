@@ -175,6 +175,10 @@ Fixpoint no_dup_seq (A : eqType) (s : seq A) : (seq A) :=
             end
     end.
 
+Lemma no_dup_seq_aux_eq {A : eqType} (s : seq A) :
+  no_dup_seq s = no_dup_seq_aux eq_op s.
+Proof. by elim: s => [ | a s /= ->]. Qed.
+
 Definition close_cell (p : pt) (c : cell) :=
   match vertical_intersection_point p (low c),
         vertical_intersection_point p (high c) with
