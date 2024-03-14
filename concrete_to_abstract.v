@@ -368,3 +368,11 @@ move=> cnd_p'.
 rewrite /r_prod_seq_cell_cell /= {1}/r_cell /= cnd_low Ih1 Ih2 cnd_g !andbT.
 by apply: c_no_dup_seq; rewrite /= cnd_p cnd_p'.
 Qed.
+
+Definition r_option_seq_cell_up_3 v1 v2 :=
+  match v1, v2 with
+  | None, None => true
+  | Some (s1, s2, s3), Some (s4, s5, s6) =>
+    r_seq_cell s1 s4 && r_seq_cell s2 s5 && r_seq_cell s3 s6
+  | _, _ => false
+  end.
