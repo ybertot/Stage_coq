@@ -114,6 +114,24 @@ Lemma no_dup_seq_aux_eq {A : eqType} (s : seq A) :
   no_dup_seq s = no_dup_seq_aux eq_op s.
 Proof. by elim: s => [ | a s /= ->]. Qed.
 
+Lemma c_no_dup_seq s1 s2 :
+  r_seq_pt s1 s2 ->
+  r_seq_pt (no_dup_seq_aux (generic_trajectories.pt_eqb R eq_op) s1)
+  (no_dup_seq s2).
+Proof.
+elim: s1 s2=> [ | p1 s1 Ih] [ | p2 s2] //= /andP[] cnd_p cnd_s.
+case: s1 s2 cnd_s Ih => [ | p3 s1] [ | p4 s2] //. 
+  by move=> _ Ih /=; rewrite cnd_p.
+rewrite /= => /andP[] cnd_p3 cnd_s Ih.
+move: (Ih (p4 :: s2)); rewrite cnd_p3 cnd_s=> /(_ isT) {}Ih.
+case: ifP=> [p1qp3 | p1np3].
+  rewrite c_pt_eqb (eqP cnd_p) (eqP cnd_p3) in p1qp3.
+  rewrite p1qp3.
+  exact: Ih.
+rewrite c_pt_eqb (eqP cnd_p) (eqP cnd_p3) in p1np3.
+by rewrite p1np3 /= cnd_p Ih.
+Qed.
+
 Lemma c_valid_edge p1 p2 g1 g2 :
   r_edge g1 g2 -> a_pt p1 == p2 ->
   generic_trajectories.valid_edge R le plain_edge p_left_pt p_right_pt g1 p1 =
@@ -229,6 +247,9 @@ rewrite (c_point_strictly_under_edge cnd_p1 cnd_l).
 by rewrite (c_point_under_edge cnd_p1 cnd_h).
 Qed.
 
+Arguments no_dup_seq_aux : simpl never.
+Arguments no_dup_seq : simpl never.
+
 Lemma c_close_cell p1 p2 c1 c2 :
   a_pt p1 == p2 ->
   r_cell c1 c2 ->
@@ -249,15 +270,9 @@ case: generic_trajectories.vertical_intersection_point => [p3 | ]; last first.
   by case: vertical_intersection_point => [ p3' | ].
 case: vertical_intersection_point => [ p3' | ] //.
 rewrite /r_cell /=.
-rewrite !c_pt_eqb.
 move=> /eqP <- /eqP <-.
 rewrite cnd_ls -(eqP cnd_pt) /= cnd_l cnd_h !andbT.
-case: ifP => //.
-  case: ifP=> //=.
-    by rewrite eqxx.
-  by rewrite !eqxx.
-rewrite /r_seq_pt /= !eqxx /=.
-by case: ifP=> //=; rewrite !eqxx.
+by apply: c_no_dup_seq; rewrite /= !eqxx.
 Qed.
 
 Lemma c_closing_cells p1 p2 s1 s2 :
@@ -271,4 +286,85 @@ Proof.
 move=> cnd_p1.
 elim: s1 s2 => [ | c1 s1 Ih] [ | c2 s2] //= /andP[] cnd_c1 cnd_s1.
 by rewrite (c_close_cell cnd_p1 cnd_c1) Ih.
+Qed.
+
+Lemma c_pvert_y p1 p2 g1 g2 :
+  a_pt p1 == p2 ->
+  r_edge g1 g2 ->
+  generic_trajectories.pvert_y R le +%R (fun x y => x - y) *%R 
+  (fun x y => x / y) 0 plain_edge p_left_pt p_right_pt p1 g1 =
+  pvert_y p2 g2.
+Proof.
+move=> cnd_p cnd_g.
+rewrite /generic_trajectories.pvert_y /pvert_y.
+have := (c_vertical_intersection_point cnd_p cnd_g).
+case: generic_trajectories.vertical_intersection_point => [p' | ].
+  rewrite /r_option_pt.
+  case: vertical_intersection_point=> [p'2 /eqP <- | ]; last by [].
+  by apply: c_a_pt_y.
+rewrite /r_option_pt.
+by case: vertical_intersection_point.
+Qed.
+
+Definition r_prod_seq_cell_cell (p1 : seq (generic_trajectories.cell R plain_edge) * generic_trajectories.cell R plain_edge) p2 :=
+    r_seq_cell (fst p1) (fst p2) && r_cell (snd p1) (snd p2).
+
+Lemma c_opening_cells_aux p1 p2 out1 out2 low1 low2 high1 high2 :
+  a_pt p1 == p2 ->
+  r_seq_edge out1 out2 ->
+  r_edge low1 low2 ->
+  r_edge high1 high2 ->
+  all (fun g=> generic_trajectories.pt_eqb R eq_op (p_left_pt g)
+               p1) out1 ->
+  generic_trajectories.valid_edge R le plain_edge p_left_pt p_right_pt
+    low1 p1 ->
+  generic_trajectories.valid_edge R le plain_edge p_left_pt p_right_pt
+    high1 p1 ->
+  r_prod_seq_cell_cell
+  (generic_trajectories.opening_cells_aux R eq_op le +%R (fun x y => x - y) *%R 
+  (fun x y => x / y) 0 plain_edge plain_Bedge p_left_pt p_right_pt
+  p1 out1 low1 high1)
+  (opening_cells_aux p2 out2 low2 high2).
+Proof.
+move=> cnd_p cnd_out cnd_low cnd_high oute vle vhe.
+elim: out1 out2 low1 low2 cnd_out cnd_low oute vle => [ | g1 gs Ih] [ | g2 gs2] //.
+  move=> low1 low2 _ cnd_low _ vle /=.
+  have svl := c_valid_edge cnd_low cnd_p.
+  have vle2 : valid_edge low2 p2.
+    by rewrite -svl.
+  have := c_vertical_intersection_point cnd_p cnd_low.
+  rewrite (pvertE vle2).
+  case: generic_trajectories.vertical_intersection_point => [ pl | ] //.
+  rewrite /r_option_pt => plq.
+  have svh := c_valid_edge cnd_high cnd_p.
+  have vhe2 : valid_edge high2 p2.
+    by rewrite -svh.
+  have := c_vertical_intersection_point cnd_p cnd_high.
+  rewrite (pvertE vhe2).
+  case: generic_trajectories.vertical_intersection_point => [ ph | ] //.
+  rewrite /r_option_pt => phq.
+  rewrite /r_prod_seq_cell_cell /= /r_cell /= cnd_low cnd_high !andbT.
+  by apply: c_no_dup_seq; rewrite /= plq phq cnd_p.
+move=> low1 low2 /= /andP[] cnd_g cnd_gs cnd_low /andP[] lg oute vl.
+have vl2 : valid_edge low2 p2.
+  by rewrite -(c_valid_edge cnd_low cnd_p).
+have vg : generic_trajectories.valid_edge R le plain_edge p_left_pt
+      p_right_pt g1 p1.
+  rewrite /generic_trajectories.valid_edge.
+  rewrite c_pt_eqb in lg.
+  rewrite !(c_a_pt_x).
+  rewrite (eqP lg) le_refl /= !(c_a_pt_x) -(eqP lg).
+  have := cnd_g=> /andP[] /eqP -> /eqP ->.
+  by case: (g2)=> /= a b /ltW.
+have vg2 : valid_edge g2 p2.
+  by rewrite -(c_valid_edge cnd_g cnd_p).
+have := Ih gs2 g1 g2 cnd_gs cnd_g oute vg.
+case: generic_trajectories.opening_cells_aux => [nos1 lno1].
+case: opening_cells_aux=> [nos2 lno2]=> {Ih} /andP[]/= Ih1 Ih2.
+have := c_vertical_intersection_point cnd_p cnd_low.
+rewrite (pvertE vl2).
+case: generic_trajectories.vertical_intersection_point => [p' | ] //=.
+move=> cnd_p'.
+rewrite /r_prod_seq_cell_cell /= {1}/r_cell /= cnd_low Ih1 Ih2 cnd_g !andbT.
+by apply: c_no_dup_seq; rewrite /= cnd_p cnd_p'.
 Qed.
