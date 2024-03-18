@@ -94,7 +94,7 @@ Definition step :=
   0 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Definition scan events st : seq cell * seq cell :=
-  let final_state := iter_list step events st in
+  let final_state := foldl step st events in
   (sc_open1 final_state ++ lst_open final_state :: sc_open2 final_state,
    lst_closed final_state :: sc_closed final_state).
 
@@ -1145,7 +1145,7 @@ Proof. by rewrite 2!mem_cat map_f // orbT. Defined.
 Arguments pt_eqb : simpl never.
 
 Lemma step_keeps_invariant1 :
-  invariant1 (step e (Bscan fop lsto lop cls lstc lsthe lstx)).
+  invariant1 (step (Bscan fop lsto lop cls lstc lsthe lstx) e).
 Proof.
 case step_eq : (step _ _) => [fop' lsto' lop' cls' lstc' lsthe' lstx']. 
 rewrite /state_open_seq /=; move: step_eq.
@@ -1654,8 +1654,8 @@ Defined.
 Lemma step_keeps_pw :
   pairwise (@edge_below _)
      (bottom ::
-       [seq high x | x <- state_open_seq (step e (Bscan fop lsto lop cls lstc
-           lsthe lstx))]).
+       [seq high x | x <- state_open_seq (step (Bscan fop lsto lop cls lstc
+           lsthe lstx) e)]).
 Proof.
 rewrite /step/=/generic_trajectories.simple_step.
 case: ifP=> [pxaway | /negbFE/eqP/[dup] pxhere/abovelstle palstol].
@@ -1878,7 +1878,7 @@ Qed.
 
 Lemma step_keeps_open_side_limit :
   all open_cell_side_limit_ok
-    (state_open_seq (step e (Bscan fop lsto lop cls lstc lsthe lstx))).
+    (state_open_seq (step (Bscan fop lsto lop cls lstc lsthe lstx) e)).
 Proof.
 rewrite /step/=/generic_trajectories.simple_step.
 case: ifP=> [pxaway | /negbFE/eqP/[dup] pxhere/abovelstle palstol].
@@ -1990,7 +1990,7 @@ by apply: disoc=> //; have := pwo; rewrite /= => /andP[].
 Qed.
 
 Lemma step_keeps_open_disjoint :
-  {in state_open_seq (step e (Bscan fop lsto lop cls lstc lsthe lstx)) &,
+  {in state_open_seq (step (Bscan fop lsto lop cls lstc lsthe lstx) e) &,
      disjoint_open_cells R}.
 Proof.
 have := step_keeps_invariant1; rewrite /invariant1/inv1_seq. 
@@ -2552,7 +2552,7 @@ Lemma appE {T : Type} (l1 l2 : seq T) : app l1 l2 = cat l1 l2.
 Proof. by elim: l1 => [ | a l1 /= ->]. Qed.
 
 Lemma step_keeps_disjoint :
-  let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  let s' := step (Bscan fop lsto lop cls lstc lsthe lstx) e in
   {in state_closed_seq  s' &, disjoint_closed_cells R} /\
   {in state_open_seq s' & state_closed_seq s',
     disjoint_open_closed_cells R}.
@@ -3022,7 +3022,7 @@ by apply/negP=> /new_ctn/nctn.
 Qed.
 
 Lemma step_keeps_injective_high :
-  let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  let s' := step (Bscan fop lsto lop cls lstc lsthe lstx) e in
   {in state_open_seq s' &, injective high}.
 Proof.
 rewrite /step/=/generic_trajectories.simple_step.
@@ -3181,7 +3181,7 @@ elim/last_ind: {-1} (right_pts c) (erefl (right_pts c))
 Qed.
 
 Lemma step_keeps_closed_to_the_left :
-  let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  let s' := step (Bscan fop lsto lop cls lstc lsthe lstx) e in
   {in state_closed_seq s', forall c, right_limit c <= p_x (point e)}.
 Proof.
 rewrite /step/=/generic_trajectories.simple_step.
@@ -3351,7 +3351,7 @@ by move=> /e'fut; rewrite /lexePtEv -ge2 -heq ghe.
 Qed.
 
 Lemma step_keeps_lex_edge :
-  let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  let s' := step (Bscan fop lsto lop cls lstc lsthe lstx) e in
   forall e', inside_box (point e') -> lexPtEv e e' ->
                (forall e2, e2 \in future_events -> lexePtEv e' e2) ->
    {in [seq high c | c <- state_open_seq s'], forall g,
@@ -3826,7 +3826,7 @@ by rewrite (on_pvert (left_on_edge _)) leNgt lty.
 Qed.
 
 Lemma step_keeps_edge_covering:
-  let s' :=  step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  let s' :=  step (Bscan fop lsto lop cls lstc lsthe lstx) e in
   forall g, edge_covered g open (rcons cls lstc) \/ g \in outgoing e ->
   edge_covered g (state_open_seq s') (state_closed_seq s').
 Proof.
@@ -4184,7 +4184,7 @@ by have := opening_cells_aux_high_last vl vp oute'; rewrite oca_eq /= => ->.
 Qed.
 
 Lemma step_keeps_subset : 
-  let s' :=  step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  let s' :=  step (Bscan fop lsto lop cls lstc lsthe lstx) e in
   {subset [seq high c | c <- state_open_seq s'] <=
     [seq high c | c <- open] ++ outgoing e}.
 Proof.
@@ -4289,7 +4289,7 @@ Qed.
 (* Keeping as a record that this statement should be proved.  However,
   since this statement is not used yet, we do not start a proof. *)
 Definition TODO_step_keeps_left_pts_inf :=
-  let s' := step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  let s' := step (Bscan fop lsto lop cls lstc lsthe lstx) e in
   {in state_open_seq s', forall c, lexPt (bottom_left_corner c) (point e)}.
 
 Lemma step_keeps_left_limit_has_right_limit_default :
@@ -4486,7 +4486,7 @@ Qed.
  is not used for now, so we make it a definition just to keep in records what
  should be the lemma statement. *)
 Definition TODO_step_keeps_cover_left_border :=
-  let s' :=  step e (Bscan fop lsto lop cls lstc lsthe lstx) in
+  let s' :=  step (Bscan fop lsto lop cls lstc lsthe lstx) e in
   {in state_open_seq s', forall c p, inside_box p -> left_limit c = p_x p ->
      contains_point' p c ->
      has (inside_closed' p) (state_closed_seq s')}.
@@ -5543,6 +5543,7 @@ move=> /[dup]  inbox_all_events' /andP[inbox_e inbox_all_events] lexevs oks.
 move=> /andP[] /andP[] lstxlte lstx_fut' ltfut' edges_pairwise cl_at_left.
 move: (inv1)=> [] clae [] pre_sval [] adj [] cbtom rfo.
 have sval : seq_valid (fop ++ lsto :: lop) (point ev') by case: pre_sval.
+
 rewrite /=/simple_step; case: ifP=> [_ | ]; last first.
   move=> /negbFE; rewrite /same_x eq_sym=> /eqP abs; suff: False by [].
   by move : lstxlte; rewrite abs lt_irreflexive.
