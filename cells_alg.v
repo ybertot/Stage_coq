@@ -28,21 +28,21 @@ Notation point := (point R edge).
 
 Notation cell := (cell R edge).
 
-Notation dummy_pt := (dummy_pt R 0).
-Notation dummy_edge := (dummy_edge R 0 edge (@unsafe_Bedge R)).
-Notation dummy_cell := (dummy_cell R 0 edge (@unsafe_Bedge _)).
-Notation dummy_event := (dummy_event R 0 edge).
+Notation dummy_pt := (dummy_pt R 1).
+Notation dummy_edge := (dummy_edge R 1 edge (@unsafe_Bedge R)).
+Notation dummy_cell := (dummy_cell R 1 edge (@unsafe_Bedge _)).
+Notation dummy_event := (dummy_event R 1 edge).
 
 Definition open_cells_decomposition_contact :=
-  open_cells_decomposition_contact R eq_op le +%R (fun x y => x - y) *%R 0
+  open_cells_decomposition_contact R eq_op le +%R (fun x y => x - y) *%R 1
     edge (@left_pt R) (@right_pt R).
 
 Definition open_cells_decomposition_rec :=
-  open_cells_decomposition_rec R eq_op le +%R (fun x y => x - y) *%R 0
+  open_cells_decomposition_rec R eq_op le +%R (fun x y => x - y) *%R 1
   edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Definition open_cells_decomposition :=
-  open_cells_decomposition R eq_op le +%R (fun x y => x - y) *%R 0
+  open_cells_decomposition R eq_op le +%R (fun x y => x - y) *%R 1
   edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Notation scan_state := (scan_state R edge).
@@ -54,7 +54,7 @@ Notation lst_closed := (lst_closed R edge).
 
 
 Definition update_closed_cell :=
-  update_closed_cell R 0 edge.
+  update_closed_cell R 1 edge.
 
 Definition set_left_pts :=
   set_left_pts R.
@@ -76,22 +76,22 @@ Definition set_pts := set_pts R edge.
   the first segment of the last opening cells should keep its existing
   left points.*)
 Definition update_open_cell := 
-  update_open_cell R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 0
+  update_open_cell R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 1
   edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Definition update_open_cell_top :=
-  update_open_cell_top R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 0
+  update_open_cell_top R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 1
   edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Notation Bscan := (Bscan _ _).
 
 Definition simple_step :=
   simple_step R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y)
-  0 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
+  1 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Definition step :=
   step R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y)
-  0 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
+  1 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Definition scan events st : seq cell * seq cell :=
   let final_state := foldl step st events in
@@ -1981,7 +1981,8 @@ have p1e : p1 = (point e).
       by apply: under_above_on=> //; rewrite -lstheq // ?underW.
     by have /eqP := on_edge_same_point eonlsthe' p1on samex.
   by apply/esym/(@eqP [eqType of pt]); rewrite pt_eqE samex samey.
-by rewrite p1e -strict_under_pvert_y // puh -pxe pvert_on.
+rewrite p1e /generic_trajectories.pvert_y subrr -strict_under_pvert_y //.
+by rewrite puh -pxe pvert_on.
 Qed.
 
 Lemma disjoint_open : {in open &, disjoint_open_cells R}.
@@ -2448,6 +2449,7 @@ have samer : last dummy_pt (right_pts lstc) =
   by rewrite !last_cat /=.
 rewrite /update_closed_cell.
 have := inside_closed_set_right_pts q samer.
+rewrite /set_right_pts /=.
 by rewrite /set_right_pts /= => <- //.
 Qed.
 
@@ -2823,7 +2825,7 @@ move: clopcnd; set w := (X in _ ++ X :: _).
 have nlstoq : nlsto = set_pts w                      
    (Bpt (p_x (point e)) (pvert_y (point e) he) :: left_pts lsto)
    (right_pts lsto).
-   by [].
+   by rewrite /nlsto /generic_trajectories.pvert_y subrr.
 move=> clopcnd.
 rewrite nlstoq -inside_open'_set_pts.
   apply: clopcnd.
@@ -5467,7 +5469,7 @@ by constructor.
 Qed.
 
 Definition start :=
-  start R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 0 edge
+  start R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 1 edge
   (@unsafe_Bedge _) (@left_pt _) (@right_pt _).
 
 Lemma start_eq_initial (bottom top : edge) (ev : event) :
@@ -5490,7 +5492,7 @@ Definition main_process bottom top evs :=
   end.
 
 Lemma complete_process_eq bottom top ev evs :
-  complete_process  R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 0 edge
+  complete_process  R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y) 1 edge
   (@unsafe_Bedge _) (@left_pt _) (@right_pt _) (ev :: evs) bottom top =
   match scan evs (initial_state bottom top (ev :: evs)) with
    (a, b) => [seq complete_last_open bottom top c | c <- a] ++ b

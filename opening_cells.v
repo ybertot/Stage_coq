@@ -31,9 +31,9 @@ Notation high := (high R edge).
 Notation left_pts := (left_pts R edge).
 Notation right_pts := (right_pts R edge).
 
-Notation dummy_pt := (dummy_pt R 0).
+Notation dummy_pt := (dummy_pt R 1).
 Notation dummy_edge := (dummy_edge R).
-Notation dummy_cell := (dummy_cell R 0 edge (@unsafe_Bedge R)).
+Notation dummy_cell := (dummy_cell R 1 edge (@unsafe_Bedge R)).
 
 (*
 Fixpoint opening_cells_aux (p : pt) (out : seq edge) (low_e high_e : edge) 
@@ -60,7 +60,7 @@ end.
 
 Definition opening_cells_aux :=
   opening_cells_aux R eq_op le +%R (fun x y => x - y) *%R (fun x y => x / y)
-  0 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
+  1 edge (@unsafe_Bedge R) (@left_pt R) (@right_pt R).
 
 Lemma opening_cells_aux_eqn p out low_e high_e :
   opening_cells_aux p out low_e high_e =
